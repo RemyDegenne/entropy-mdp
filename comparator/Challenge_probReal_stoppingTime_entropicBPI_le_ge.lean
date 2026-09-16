@@ -12,6 +12,49 @@ import Mathlib.MeasureTheory.Function.EssSup
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Data.Nat.Log
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Mathlib.Analysis.Complex.ExponentialBounds
+import Mathlib.Analysis.Real.Sqrt
+import Mathlib.Basic.Real.ENatENNReal
+import Mathlib.Algebra.Order.Floor.Semiring
+import Mathlib.Basic.ENNReal.Real
+import Mathlib.MeasureTheory.Integral.Bochner.Basic
+import Mathlib.Analysis.SpecialFunctions.Sqrt
+import Mathlib.Analysis.SpecialFunctions.Exp
+import Mathlib.Probability.Kernel.Composition.IntegralCompProd
+import Mathlib.Probability.Kernel.Composition.Lemmas
+import Mathlib.Probability.Moments.Variance
+import Mathlib.Algebra.Order.Field.Basic
+import Mathlib.Tactic.FieldSimp
+import Mathlib.Tactic.Linarith
+import Mathlib.Tactic.Positivity
+import Mathlib.Tactic.Ring
+import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.InformationTheory.KullbackLeibler.Basic
+import Mathlib.MeasureTheory.Measure.GiryMonad
+import Mathlib.MeasureTheory.Measure.Dirac.Basic
+import Mathlib.MeasureTheory.Measure.Tilted
+import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
+import Mathlib.Analysis.Calculus.Deriv.MeanValue
+import Mathlib.Analysis.SpecialFunctions.Exponential
+import Mathlib.Analysis.SpecialFunctions.Log.Deriv
+import Mathlib.Analysis.SpecificLimits.Normed
+import Mathlib.Algebra.BigOperators.Intervals
+import Mathlib.Probability.HasLawExists
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
+import Mathlib.Probability.Martingale.OptionalStopping
+import Mathlib.MeasureTheory.Function.ConditionalExpectation.PullOut
+import Mathlib.Probability.ConditionalExpectation
+import Mathlib.Probability.Process.Filtration
+import Mathlib.Analysis.SpecialFunctions.Stirling
+import Mathlib.Probability.Independence.InfinitePi
+import Mathlib.Probability.Independence.Integration
+import Mathlib.Algebra.Order.Antidiag.FinsuppEquiv
+import Mathlib.Data.Nat.Choose.Bounds
+import Mathlib.Probability.Independence.Basic
+import Mathlib.MeasureTheory.Measure.NullMeasurable
+import Mathlib.MeasureTheory.MeasurableSpace.Pi
+import Mathlib.MeasureTheory.Function.ConditionalExpectation.Basic
 
 /-! # Standalone extraction for `Essakine2026Tight.probReal_stoppingTime_entropicBPI_le_ge`
 Definitions are copied verbatim; theorem proofs are replaced by `sorry`.
@@ -24,6 +67,8 @@ set_option quotPrecheck false
 -- Namespace stubs (so later `open`s resolve).
 namespace MeasureTheory
 end MeasureTheory
+namespace ProbabilityTheory
+end ProbabilityTheory
 namespace Learning
 end Learning
 namespace Learning.MDP

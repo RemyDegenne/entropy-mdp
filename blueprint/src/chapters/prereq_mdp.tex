@@ -11,9 +11,12 @@ identity that expresses the variance of the exponentiated return as a sum of one
 variances, and the sampling structure at the visits of a state-action pair in a run of an
 arbitrary algorithm (what the concentration events of Chapter~\ref{chap:empirical} consume).
 Everything is stated for an arbitrary finite-horizon MDP and policy, in library generality
-(namespace \texttt{Learning.MDP}, files \texttt{Episodic.lean}, \texttt{Entropic.lean} and
-\texttt{Empirical.lean} of
-\texttt{Essakine2026Tight/LeanMachineLearning/ReinforcementLearning/MDP/}).
+(namespace \texttt{Learning.MDP.Episodic}, files \texttt{MarkovIter.lean}, \texttt{Occupancy.lean},
+\texttt{Unroll.lean}, \texttt{EntropicVariance.lean} and \texttt{Visits.lean} of
+\texttt{Essakine2026Tight/LeanMachineLearning/ReinforcementLearning/MDP/}; the pure probability
+lemmas are in \texttt{Essakine2026Tight/Mathlib/Probability/HasCondDistribIntegral.lean} and
+\texttt{Essakine2026Tight/Mathlib/MeasureTheory/Integral/CauchySchwarz.lean}, and the statements
+about the run quantities of Entropic-BPI in \texttt{Essakine2026Tight/EV2026/VisitCounts.lean}).
 
 \textbf{Standing notation.} $\mathcal M = (\Ss, \As, H, (p_h)_{h \le H}, (R_h)_{h \le H})$ is
 a finite-horizon MDP (Definition~\ref{def:episodic_mdp}), $\pi$ a deterministic policy
@@ -56,15 +59,37 @@ of an arm (\texttt{Online/Bandit/RewardByCountMeasure.lean}: \texttt{hasLaw\_rew
 Cauchy--Schwarz inequalities \texttt{Finset.sum\_mul\_sq\_le\_sq\_mul\_sq} and
 \texttt{integral\_mul\_le\_Lp\_mul\_Lq\_of\_nonneg}.
 
-\textbf{What is missing.} Everything below: the iterated Markov property for finite-horizon
+\textbf{What was missing.} Everything below: the iterated Markov property for finite-horizon
 trajectory laws, occupancy measures, the unrolling lemma, entropic variances and the
 sampling-at-visits lemma (the episodic analogue of \texttt{RewardByCountMeasure.lean}, a
-candidate for LML).
+candidate for LML). Mathlib also lacks the integral form of \texttt{HasCondDistrib}
+(Lemma~\ref{lem:pmdp_hascond_integral}).
+
+\begin{lemma}[Integrals against a conditional distribution]\label{lem:pmdp_hascond_integral}
+\lean{ProbabilityTheory.HasCondDistrib.lintegral_prodMk, ProbabilityTheory.HasCondDistrib.integral_prodMk, ProbabilityTheory.hasCondDistrib_of_lintegral_eq, ProbabilityTheory.HasCondDistrib.compProd_left_of_sectR}\leanok
+Let $X, Y$ be random variables on $(\Omega, \Prob)$ and $\kappa$ a kernel. $Y$ has conditional law
+$\kappa$ given $X$ iff $\E[f(X, Y)] = \E\big[\int f(X, y)\,\kappa(X, dy)\big]$ for every measurable
+$f \ge 0$; the same identity then holds for every $f$ integrable against the joint law. Moreover,
+if $Y$ has conditional law $\eta(a, \cdot)$ given $X$ under $\kappa(a)$ for every $a$, then under
+$\mu \otimes \kappa$ the variable $Y \circ \mathrm{snd}$ has conditional law $\eta$ given
+$(\mathrm{fst}, X \circ \mathrm{snd})$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+The law of $(X, Y)$ is $\mathrm{law}(X) \otimes \kappa$ iff the two measures agree on measurable sets,
+i.e.\ on indicator functions $f$; the integral identities are Tonelli and Fubini for
+$\mathrm{law}(X) \otimes \kappa$ (\texttt{Measure.lintegral\_compProd},
+\texttt{Measure.integral\_compProd}). For the last claim, the law of $(X, Y)$ under $\kappa$ is
+$\kappa.\mathrm{map}(X) \otimes \eta$, and associativity of the composition-product
+(\texttt{Measure.compProd\_assoc}) gives the claim.
+\end{proof}
 
 \section{The iterated Markov property}
 \label{sec:pre_mdp_markov}
 
 \begin{lemma}[Iterated Markov property]\label{lem:pmdp_markov_iter}
+\lean{Learning.MDP.shiftRounds, Learning.MDP.Episodic.lintegral_stepLaw_hist_shiftRounds, Learning.MDP.Episodic.hasCondDistrib_shiftRounds_stepLaw, Learning.MDP.Episodic.ae_stepLaw_of_ae_shiftRounds, Learning.MDP.Episodic.ae_obs_eq_stepLaw, Learning.MDP.Episodic.rewardTransKernel, Learning.MDP.Episodic.hasCondDistrib_feedback_obs_succ_stepLaw, Learning.MDP.Episodic.histTransKernel, Learning.MDP.Episodic.hasCondDistrib_obs_succ_hist_stepLaw, Learning.MDP.Episodic.integral_mul_obs_succ_stepLaw}\leanok
 \uses{def:episodic_mdp, def:policy, def:step_law}
 Let $1 \le h' \le h \le H + 1$ and $s \in \Ss$. For every bounded measurable function $\Psi$ of
 the rounds $(S_i, A_i, R_i)_{h' \le i < h}$ and every bounded measurable function $F$ of the
@@ -85,7 +110,8 @@ $\psi : \As \times \R \times \Ss \to \R$ and every $f : \Ss \to \R$,
 \end{lemma}
 
 \begin{proof}
-\uses{lem:step_law_markov}
+\uses{lem:step_law_markov, lem:pmdp_hascond_integral}
+\leanok
 Induction on $k := h - h' \ge 0$, for all $h'$ and $s$ simultaneously. For $k = 0$ there are
 no rounds before $h = h'$, so $\Psi$ is a constant $c$; since $S_{h'} = s$ a.s.\ under
 $\Prob^\pi_{(s,h')}$ (Lemma~\ref{lem:step_law_markov}), $\Phi_F(S_{h'}) = \Phi_F(s) =
@@ -115,14 +141,59 @@ with $\psi(a, r, s'') := f(s'')$ this is $\sum_{s''} p_h(s'' \mid s', \pi_h(s'))
 \textbf{Lean remark.} In \texttt{stepLaw M π (s, h)} the trajectory is a sequence of rounds
 indexed by $\N$ and the paper's step $i$ is the round $i - h'$ (with the $0$-indexed
 translation of Chapter~\ref{chap:mdp}); ``the trajectory from $h$'' is the shift by $h - h'$
-rounds, and ``the rounds before $h$'' are the first $h - h'$ rounds. State the lemma as a
-\texttt{HasCondDistrib} statement (the conditional law of the shifted trajectory given the
-first $h - h'$ rounds is \texttt{stepLaw M π (S\_h, h)}), or directly in the integral form
-above, by induction on $h - h'$ from LML's one-step statement. The layer component of the
-state at round $k$ is deterministic ($h' + k$); this is part of the description of
-\texttt{layerMDP} and is what allows writing $\pi_h(S_h)$ for the action.
+rounds, and ``the rounds before $h$'' are the first $h - h'$ rounds. With $k = h - h'$ rounds
+and the $0$-indexed steps \texttt{h₀ j : Fin (H + 1)} with \texttt{h₀ + k = j}:
+\texttt{hasCondDistrib\_shiftRounds\_stepLaw} states that the trajectory shifted by $k$ rounds
+(\texttt{shiftRounds k}) has conditional law \texttt{stepLaw M π (s', j)} given the first $k$ rounds
+and the state $s' = S_h$ of the round $k$ (\texttt{IT.hist k}, \texttt{(IT.obs k x).1}); this is the
+displayed identity for all bounded or nonnegative $\Psi$, $F$. It is proved in the Lebesgue integral
+form \texttt{lintegral\_stepLaw\_hist\_shiftRounds} by the induction above (peeling the first round
+with \texttt{lintegral\_stepLaw\_castSucc}) and converted with
+Lemma~\ref{lem:pmdp_hascond_integral}. Almost sure properties of the future given the past are
+transported by \texttt{ae\_stepLaw\_of\_ae\_shiftRounds}; the layer of the round $k$ is $j$
+(\texttt{ae\_obs\_eq\_stepLaw}). The first consequence is
+\texttt{hasCondDistrib\_feedback\_obs\_succ\_stepLaw}: given the first $k$ rounds and $S_h$, the pair
+$(R_h, S_{h+1})$ has conditional law $(R_h \otimes p_h)(S_h, \pi_h(S_h))$ (\texttt{rewardTransKernel}),
+and $A_h = \pi_h(S_h)$ a.s.\ (Lemma~\ref{lem:pmdp_action_eq_policy}). The second consequence is
+\texttt{hasCondDistrib\_obs\_succ\_hist\_stepLaw}, a slightly stronger statement: $S_{h+1}$ has
+conditional law $p_h(\cdot \mid S_h, \pi_h(S_h))$ given the first $k + 1$ rounds (including the round
+$h$ itself, \texttt{histTransKernel}), with the integral form \texttt{integral\_mul\_obs\_succ\_stepLaw}
+for bounded measurable $\Psi$ of the first $k + 1$ rounds.
+
+\begin{lemma}[Law of the next state within an episode, given the past]\label{lem:pmdp_episode_env_step}
+\lean{Learning.MDP.Episodic.statesTransKernel, Learning.MDP.Episodic.hasCondDistrib_statesLaw, Learning.MDP.Episodic.episodeStepKernel, Learning.MDP.Episodic.hasCondDistrib_feedback_succ_statesEnv}\leanok
+\uses{def:episode_env, lem:episode_env_law, lem:pmdp_markov_iter}
+Let $(X, Y)$ be an algorithm-environment sequence for any algorithm and the episode environment
+of $\mathcal M$ from $s_1$, on $(\Omega, \Prob)$, and write $Y_t = (s^{t+1}_1, \dots, s^{t+1}_{H+1})$
+and $a^{t+1}_h := X_t{}_h(s^{t+1}_h)$. For $h \le H$, conditionally on the history of the first $t$
+episodes, on $X_t$ and on $s^{t+1}_1, \dots, s^{t+1}_h$, the next state $s^{t+1}_{h+1}$ has law
+$p_h(\cdot \mid s^{t+1}_h, a^{t+1}_h)$: for every $g : \Ss \to \R$,
+$\E[g(s^{t+1}_{h+1}) \mid (X_i, Y_i)_{i < t}, X_t, s^{t+1}_{\le h}] = (p_h g)(s^{t+1}_h, a^{t+1}_h)$ a.s.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:episode_env_law, lem:pmdp_markov_iter, def:step_law, lem:pmdp_hascond_integral}
+\leanok
+By Lemma~\ref{lem:episode_env_law}, the conditional law of the state sequence given the past and
+the policy $\pi = X_t$ is the law of $(S_1, \dots, S_{H+1})$ under $\Prob^\pi_{(s_1, 1)}$; under this
+law, by Lemma~\ref{lem:pmdp_markov_iter} (with $h' = 1$, $\Psi$ a bounded function of
+$S_1, \dots, S_h$ and $f = g$), $\E^\pi[\Psi\, g(S_{h+1})] = \E^\pi[\Psi\,(p_h g)(S_h, \pi_h(S_h))]$.
+Composing the two conditional laws (integrate this identity against the conditional law of
+$Y_t$ given the past and $X_t$, then against the law of the past and $X_t$) gives the claim in
+integral form, for every bounded measurable function of the past, $X_t$ and $s^{t+1}_{\le h}$.
+\end{proof}
+
+\textbf{Lean remark.} \texttt{hasCondDistrib\_feedback\_succ\_statesEnv}:
+\texttt{HasCondDistrib (fun ω ↦ Y t ω h.succ) (fun ω ↦ (((history O X Y t ω, O t ω), X t ω), fun i : Fin (h + 1) ↦ Y t ω (Fin.castLE \_ i))) (episodeStepKernel M \_ h) P}
+for the $0$-indexed step \texttt{h : Fin H}, where \texttt{episodeStepKernel} maps
+$((\cdot, \pi), (s_i)_{i \le h})$ to \texttt{M.trans h (s\_h, π h s\_h)}. Under the law of the state
+sequence of one policy it is \texttt{hasCondDistrib\_statesLaw} (derived from
+\texttt{hasCondDistrib\_obs\_succ\_hist\_stepLaw}); the combination with
+Lemma~\ref{lem:episode_env_law} is \texttt{HasCondDistrib.compProd\_left\_of\_sectR}
+(Lemma~\ref{lem:pmdp_hascond_integral}). The integral form is Lemma~\ref{lem:visits_iid}(ii).
 
 \begin{lemma}[Actions and rewards along a trajectory]\label{lem:pmdp_action_eq_policy}
+\lean{Learning.MDP.Episodic.ae_obs_zero_stepLaw, Learning.MDP.Episodic.ae_action_eq_stepLaw, Learning.MDP.Episodic.ae_feedback_eq_stepLaw}\leanok
 \uses{def:episodic_mdp, def:policy, def:step_law, def:reward_fn}
 Let $1 \le h' \le h \le H$ and $s \in \Ss$. Under $\Prob^\pi_{(s,h')}$: $S_{h'} = s$ and
 $A_h = \pi_h(S_h)$ almost surely; and if $\mathcal M$ has the reward function $r$
@@ -131,6 +202,7 @@ $A_h = \pi_h(S_h)$ almost surely; and if $\mathcal M$ has the reward function $r
 
 \begin{proof}
 \uses{lem:step_law_markov, lem:pmdp_markov_iter}
+\leanok
 $S_{h'} = s$ a.s.\ is part of Lemma~\ref{lem:step_law_markov}. Apply
 Lemma~\ref{lem:pmdp_markov_iter} with $\Psi = 1$ and $F := \indic\{A_h \ne \pi_h(S_h)\}$, a
 function of the first round of the trajectory from $h$: $\Phi_F(s') = \Prob^\pi_{(s',h)}(A_h \ne \pi_h(S_h)) = 0$
@@ -139,6 +211,12 @@ for every $s'$, because $S_h = s'$ and $A_h = \pi_h(s')$ a.s.\ under $\Prob^\pi_
 rewards, take $F := \indic\{R_h \ne r_h(S_h, A_h)\}$: under $\Prob^\pi_{(s',h)}$, $R_h$ has law
 $R_h(\cdot \mid s', \pi_h(s')) = \delta_{r_h(s', \pi_h(s'))}$, so again $\Phi_F \equiv 0$.
 \end{proof}
+
+\textbf{Lean remark.} For the round $k$ with \texttt{h₀ + k = h} (\texttt{h : Fin H}):
+\texttt{ae\_action\_eq\_stepLaw} ($A_h = \pi_h(S_h)$) and \texttt{ae\_feedback\_eq\_stepLaw}
+($R_h = r_h(S_h, A_h)$ under \texttt{M.HasRewardFn r}); the Lean proofs transport the almost sure
+statements of the first round with \texttt{ae\_stepLaw\_of\_ae\_shiftRounds} instead of integrating
+indicator functions.
 
 \section{Occupancy measures}
 \label{sec:pre_mdp_occupancy}
@@ -158,6 +236,7 @@ with the $0$-indexed step \texttt{h : Fin H} (the paper's $h$ is Lean's $h - 1$)
 (\texttt{Measure.real}). The dependence on $s_1$ is kept explicit.
 
 \begin{lemma}[Occupancy measures are probability vectors]\label{lem:occupancy_sum_one}
+\lean{Learning.MDP.Episodic.occupancy_nonneg, Learning.MDP.Episodic.occupancy_le_one, Learning.MDP.Episodic.sum_occupancy, Learning.MDP.Episodic.occupancy_eq}\leanok
 \uses{def:occupancy}
 For $1 \le h \le H$: $p^\pi_h(s,a) \ge 0$ for all $(s, a)$, $\sum_{s,a} p^\pi_h(s,a) = 1$, and
 \[
@@ -167,6 +246,7 @@ For $1 \le h \le H$: $p^\pi_h(s,a) \ge 0$ for all $(s, a)$, $\sum_{s,a} p^\pi_h(
 
 \begin{proof}
 \uses{lem:pmdp_action_eq_policy}
+\leanok
 Nonnegativity is clear. The events $\{S_h = s, A_h = a\}$, $(s, a) \in \Ss \times \As$, are
 pairwise disjoint and cover $\Omega$, so their probabilities sum to $1$ (finite additivity,
 Mathlib \texttt{measureReal\_biUnion\_finset} or \texttt{sum\_measureReal\_preimage\_singleton}
@@ -175,7 +255,12 @@ $A_h = \pi_h(S_h)$ a.s., so up to a null set $\{S_h = s, A_h = a\} = \{S_h = s, 
 which is $\{S_h = s\}$ if $a = \pi_h(s)$ and empty otherwise.
 \end{proof}
 
+\textbf{Lean remark.} \texttt{sum\_occupancy} is the case $f = 1$ of
+\texttt{integral\_comp\_obs\_action\_stepLaw} (Lemma~\ref{lem:occupancy_expectation}), and
+\texttt{occupancy\_eq} is stated with \texttt{if a = π h s then (stepLaw M π (s₁, 0)).real \{x | (IT.obs h x).1 = s\} else 0}.
+
 \begin{lemma}[Expectations of sums along the trajectory]\label{lem:occupancy_expectation}
+\lean{Learning.MDP.Episodic.integral_comp_obs_action_stepLaw, Learning.MDP.Episodic.integral_sum_comp_obs_action_stepLaw}\leanok
 \uses{def:occupancy}
 For functions $f_h : \Ss \times \As \to \R$, $1 \le h \le H$,
 \[
@@ -185,14 +270,18 @@ For functions $f_h : \Ss \times \As \to \R$, $1 \le h \le H$,
 
 \begin{proof}
 \uses{def:occupancy}
+\leanok
 Pointwise, $f_h(S_h, A_h) = \sum_{s,a} f_h(s,a)\,\indic\{S_h = s, A_h = a\}$ (exactly one term
 of the sum is nonzero). All functions are bounded, so the integral commutes with the finite
 sums (\texttt{integral\_finset\_sum}, \texttt{integral\_const\_mul}), and
 $\E^\pi[\indic\{S_h = s, A_h = a\}] = p^\pi_h(s,a)$ (\texttt{integral\_indicator\_one} or
-\texttt{integral\_indicator} with \texttt{Measure.real}).
+\texttt{integral\_indicator} with \texttt{Measure.real}). In Lean, the expectation of
+$f_h(S_h, A_h)$ is computed as an integral against the law of $(S_h, A_h)$ on the finite type
+$\Ss \times \As$ (\texttt{integral\_map}, \texttt{integral\_fintype}).
 \end{proof}
 
 \begin{lemma}[Forward recursion of the occupancy measures]\label{lem:occupancy_recursion}
+\lean{Learning.MDP.Episodic.occupancy_succ}\leanok
 \uses{def:occupancy}
 For $1 \le h \le H - 1$ and $(s', a') \in \Ss \times \As$,
 \[
@@ -201,7 +290,8 @@ For $1 \le h \le H - 1$ and $(s', a') \in \Ss \times \As$,
 \end{lemma}
 
 \begin{proof}
-\uses{lem:occupancy_sum_one, lem:pmdp_markov_iter}
+\uses{lem:occupancy_sum_one, lem:pmdp_markov_iter, lem:occupancy_expectation}
+\leanok
 By Lemma~\ref{lem:occupancy_sum_one} at step $h + 1$ it suffices to compute
 $\Prob^\pi(S_{h+1} = s')$. Decomposing over the value of $S_h$,
 \[
@@ -215,6 +305,10 @@ By Lemma~\ref{lem:occupancy_sum_one}, $\Prob^\pi(S_h = s)\,p_h(s'\mid s, \pi_h(s
 (the terms with $a \ne \pi_h(s)$ vanish), which gives the claim.
 \end{proof}
 
+\textbf{Lean remark.} \texttt{occupancy\_succ} is stated for $0$-indexed steps \texttt{h h' : Fin H}
+with \texttt{h' = h + 1}; the last sum over $s$ is computed with
+Lemma~\ref{lem:occupancy_expectation}.
+
 \section{Unrolling a backward recursion along the trajectory}
 \label{sec:pre_mdp_unroll}
 
@@ -225,7 +319,29 @@ unrolls such an inequality into an expectation along the trajectory of $\pi$; it
 unrolling step of Appendix~B.1 of \cite{essakine2026tight} (``Sample complexity''), stated for
 arbitrary functions.
 
+\begin{lemma}[The Markov property with a weight along the trajectory]\label{lem:pmdp_weighted_next_state}
+\lean{Learning.MDP.Episodic.integral_exp_sum_mul_obs_succ, Learning.MDP.Episodic.integrable_exp_sum_mul, Learning.MDP.Episodic.abs_le_sum_abs}\leanok
+\uses{lem:pmdp_markov_iter}
+Let $c \in \R$, $w_h : \Ss \times \As \to \R$ ($1 \le h \le H$), $g : \Ss \to \R$ and $1 \le i \le H$.
+Then $e^{c\sum_{j \le i} w_j(S_j, A_j)}\,f(S_h, A_h)$ is integrable under $\Prob^\pi$ for every
+$f$ and $h$, and
+\[
+  \E^\pi\Big[e^{c\sum_{j \le i} w_j(S_j, A_j)}\,g(S_{i+1})\Big]
+  = \E^\pi\Big[e^{c\sum_{j \le i} w_j(S_j, A_j)}\,(p_i g)(S_i, \pi_i(S_i))\Big] .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pmdp_markov_iter}
+\leanok
+The functions $w_j$, $f$ take finitely many values, so the integrand is bounded and measurable.
+The weight is a bounded measurable function of the rounds $1, \dots, i$, and
+Lemma~\ref{lem:pmdp_markov_iter} (second consequence, with $h' = 1$ and $\Psi$ the weight) gives
+the identity.
+\end{proof}
+
 \begin{lemma}[Unrolling a backward recursive inequality]\label{lem:unroll_recursion}
+\lean{Learning.MDP.Episodic.integral_exp_sum_mul_le_of_backward, Learning.MDP.Episodic.le_sum_integral_of_backward}\leanok
 \uses{def:episodic_mdp, def:policy, def:step_law}
 Let $\beta \in \R$, $\kappa \ge 0$, and let $r_h, u_h : \Ss \times \As \to \R$ ($1 \le h \le H$)
 and $g_h : \Ss \to \R$ ($1 \le h \le H + 1$) be arbitrary functions with $g_{H+1} = 0$. Assume
@@ -245,7 +361,8 @@ and in particular ($h = 1$, using $S_1 = s_1$ a.s.)
 \end{lemma}
 
 \begin{proof}
-\uses{lem:pmdp_action_eq_policy, lem:pmdp_markov_iter}
+\uses{lem:pmdp_action_eq_policy, lem:pmdp_markov_iter, lem:pmdp_weighted_next_state}
+\leanok
 Write $W_h := e^{\beta\sum_{i < h} r_i(S_i, A_i)}$ for $1 \le h \le H + 1$, a positive function
 of the rounds before $h$, with $W_1 = 1$ and $W_{h+1} = W_h\,e^{\beta r_h(S_h, A_h)}$. We prove
 \eqref{eq:pmdp_unroll_ih} by backward induction on $h$.
@@ -283,17 +400,23 @@ The paper applies the unrolling with $\kappa = 1 + 13/H$, nonnegative $u_h$ and 
 $[0, 1]$; none of $\kappa \ge 1$, $u_h \ge 0$, $r_h \ge 0$ is needed, only $\kappa \ge 0$ (to
 multiply an inequality) and $e^{\beta r} > 0$ (to keep the direction of the inequality when
 multiplying by $W_h$). The functions $r_h$ are arbitrary: the lemma is about the state-action
-process only, and the reward kernels of $\mathcal M$ play no role. \textbf{Lean remark.} The
-induction is on the number $j = H + 1 - h$ of steps to the end (the convention of the backward
-recursions of Chapter~\ref{chap:algorithm}); $\sum_{i \le h} r_i(S_i, A_i)$ is a
-\texttt{Finset.sum} over \texttt{Finset.range h} of the rounds of the trajectory, and
-\eqref{eq:pmdp_unroll_ih} is the statement to prove by induction (the ``in particular'' is its
-instance $h = 1$).
+process only, and the reward kernels of $\mathcal M$ play no role. \textbf{Lean remark.}
+\texttt{integral\_exp\_sum\_mul\_le\_of\_backward} is \eqref{eq:pmdp_unroll_ih} for the $0$-indexed
+step \texttt{h : Fin (H + 1)}, with the weight $\sum_{i < h}$ written as the sum over
+\texttt{i : Fin H} with \texttt{i.castSucc < h} and the right-hand side over \texttt{h' : Fin H}
+with \texttt{h ≤ h'.castSucc} (the sums $\sum_{i \le h'}$ are over \texttt{Finset.Iic h'}); the
+hypotheses are \texttt{0 ≤ κ}, \texttt{g (Fin.last H) = 0} and the backward inequality with
+\texttt{vecExp (M.transVec h s (π h s)) (g h.succ)}. It is proved by \texttt{Fin.reverseInduction}
+on \texttt{h} (equivalently on the number of steps to the end). The ``in particular'' is
+\texttt{le\_sum\_integral\_of\_backward}:
+\texttt{g 0 s₁ ≤ ∑ h : Fin H, κ \^{} h * ∫ x, exp (β * ∑ i ∈ Iic h, r i (S\_i) (A\_i)) * u h (S\_h) (A\_h) ∂stepLaw M π (s₁, 0)}.
 \end{remark}
 
 \begin{lemma}[Cauchy--Schwarz along a trajectory]\label{lem:cauchy_schwarz_traj}
-Let $(\Omega, \Prob)$ be a probability space and, for $1 \le h \le H$, let
-$W_h, V_h, U_h : \Omega \to [0, \infty)$ be bounded random variables. Then
+\lean{MeasureTheory.integral_sum_mul_sqrt_mul_le, Real.le_sqrt_mul_sqrt_of_forall_two_mul_le}\leanok
+Let $(\Omega, \Prob)$ be a measure space and, for $1 \le h \le H$, let
+$W_h : \Omega \to \R$ and $V_h, U_h : \Omega \to [0, \infty)$ be measurable functions such that
+$W_h^2 V_h$ and $U_h$ are integrable (for instance bounded random variables with $W_h \ge 0$). Then
 \[
   \E\Big[\sum_{h = 1}^H W_h\sqrt{V_h U_h}\Big]
   \le \sqrt{\E\Big[\sum_{h=1}^H W_h^2 V_h\Big]}\;\sqrt{\E\Big[\sum_{h=1}^H U_h\Big]} .
@@ -303,6 +426,14 @@ $U_h = u_h(S_h, A_h)$ under $\Prob^\pi$ for nonnegative functions $w_h, v_h, u_h
 \end{lemma}
 
 \begin{proof}
+\leanok
+\emph{Lean proof.} For every $t > 0$, pointwise
+$2W_h\sqrt{V_h U_h} \le t\,W_h^2V_h + U_h/t$ (expand $(\sqrt t\,W_h\sqrt{V_h} - \sqrt{U_h}/\sqrt t)^2 \ge 0$),
+which also shows that $W_h\sqrt{V_h U_h}$ is integrable. Summing over $h$ and integrating,
+$2c \le t a + b/t$ for all $t > 0$, with $c$ the left-hand side,
+$a = \E[\sum_h W_h^2V_h] \ge 0$ and $b = \E[\sum_h U_h] \ge 0$; this implies $c \le \sqrt a\sqrt b$
+(take $t = \sqrt b/\sqrt a$ if $a, b > 0$, and argue by contradiction with $t = c/a$ or $t = b/c$ if
+one of them vanishes). \emph{Alternative proof.}
 Let $X_h := W_h\sqrt{V_h} \ge 0$ and $Y_h := \sqrt{U_h} \ge 0$, so that
 $X_h Y_h = W_h\sqrt{V_h U_h}$ (\texttt{Real.sqrt\_mul}), $X_h^2 = W_h^2 V_h$ and $Y_h^2 = U_h$
 (\texttt{Real.sq\_sqrt}). By the Cauchy--Schwarz inequality for integrals (Mathlib
@@ -353,18 +484,20 @@ The \emph{entropic variances} of $\pi$ are
 for $1 \le h \le H$, and $\sigma V^\pi_{H+1} := 0$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{entropicVarQ M β π h s a} is
-\texttt{variance (fun x ↦ exp (β * (x.1 + episodeReturn x.2))) (saLaw M π h s a)} where
-\texttt{saLaw M π h s a} is the composition of the step kernel $(R_h \otimes p_h)(s,a)$ with
-\texttt{fun (R, s') ↦ (dirac R).prod (stepLaw M π (s', h + 1))} (``\texttt{stepLaw} from
-\texttt{(x.2, h+1)} after the first transition''); \texttt{entropicVarV M β π h s :=
-entropicVarQ M β π h s (π h s)} for $h \le H$ and $0$ at the terminal step. This matches the
+\textbf{Lean remark.} \texttt{entropicVarQ M β π h s a} is the nested integral
+\texttt{∫ x, ∫ s', ∫ traj, (exp (β * (x + episodeReturn H traj)) - expQ M β π h s a) \^{} 2 ∂stepLaw M π (s', h.succ) ∂M.trans h (s, a) ∂M.reward h (s, a)}
+(the mean square deviation from $U^\pi_h(s,a)$ under $\Prob^\pi_{(s,a,h)}$, without naming that
+measure), and \texttt{entropicVarV M β π h s := entropicVarQ M β π h s (π h s)} for $h \le H$ and
+$0$ at the terminal step (\texttt{entropicVarV\_castSucc}, \texttt{entropicVarV\_last}). This matches the
 paper's ``$\E^\pi[\,\cdot \mid S_h = s, A_h = a]$'' (Lemma~23) without conditioning on an event
 of probability zero when $a \ne \pi_h(s)$.
 
 \begin{lemma}[The entropic variance of a state is a variance under the trajectory law]\label{lem:pmdp_entropic_variance_V}
+\lean{Learning.MDP.Episodic.entropicVarV_castSucc, Learning.MDP.Episodic.entropicVarV_last, Learning.MDP.Episodic.integrable_exp_two_mul_episodeReturn, Learning.MDP.Episodic.integrable_exp_episodeReturn, Learning.MDP.Episodic.integrable_exp_episodeReturn_sub_sq, Learning.MDP.Episodic.entropicVarV_eq_integral, Learning.MDP.Episodic.entropicVarV_eq_variance}\leanok
 \uses{def:entropic_variance, def:exp_value}
-For $1 \le h \le H$ and $s \in \Ss$,
+Assume that the rewards have finite exponential moments of order $2\beta$:
+$\int e^{2\beta x}\,R_h(dx \mid s, a) < \infty$ for all $h, s, a$ (true for bounded rewards). For
+$1 \le h \le H$ and $s \in \Ss$,
 \[
   \sigma V^\pi_h(s) = \Var_{\Prob^\pi_{(s,h)}}\big(e^{\beta R^\pi_h}\big)
   = \E^\pi_{(s,h)}\Big[\big(e^{\beta R^\pi_h} - Z^\pi_h(s)\big)^2\Big] ,
@@ -374,6 +507,7 @@ and both sides are $0$ for $h = H + 1$.
 
 \begin{proof}
 \uses{lem:step_law_markov, lem:exp_bellman}
+\leanok
 Under $\Prob^\pi_{(s,h)}$, $A_h = \pi_h(s)$ a.s.\ and the pair $(R_h, \theta)$, with $\theta$
 the trajectory from $h + 1$, has law $\Prob^\pi_{(s, \pi_h(s), h)}$ by
 Lemma~\ref{lem:step_law_markov} (the law of $(R_h, S_{h+1})$ is $(R_h \otimes p_h)(s, \pi_h(s))$
@@ -387,9 +521,19 @@ Lemma~\ref{lem:exp_bellman}, and for a square-integrable variable the variance i
 square deviation from the mean (\texttt{variance\_def'} or the definition of
 \texttt{variance} through \texttt{evariance}). For $h = H + 1$, $R^\pi_{H+1} = 0$, the variable
 is the constant $1$ and $Z^\pi_{H+1} = 1$, so both sides are $0 = \sigma V^\pi_{H+1}$.
+
+In Lean the moment hypothesis gives $\int^- e^{2\beta R^\pi_h}\,d\Prob^\pi_{(s,h)} < \infty$
+(\texttt{lexpValue\_lt\_top} at $2\beta$), hence the square integrability of $e^{\beta R^\pi_h}$
+(\texttt{integrable\_exp\_episodeReturn\_sub\_sq}; $e^{\beta x} \le 1 + e^{2\beta x}$ gives the moment
+of order $\beta$ needed by Lemma~\ref{lem:exp_bellman}); the square deviation is then integrable
+against the law of (first reward, next state, shifted trajectory)
+(\texttt{integrable\_map\_measure}), and \texttt{Measure.integral\_compProd} and
+\texttt{integral\_prod} turn its integral into the nested integral of
+Definition~\ref{def:entropic_variance}.
 \end{proof}
 
 \begin{lemma}[Entropic variance recursion]\label{lem:entropic_variance_recursion}
+\lean{Learning.MDP.Episodic.entropicVarQ_eq_of_hasRewardFn, Learning.MDP.Episodic.integrable_exp_two_mul_of_hasRewardFn}\leanok
 \uses{def:entropic_variance, def:exp_value, def:reward_fn}
 Assume $\mathcal M$ has the reward function $r$. For $1 \le h \le H$ and $(s,a) \in \Ss\times\As$,
 \[
@@ -400,6 +544,7 @@ Assume $\mathcal M$ has the reward function $r$. For $1 \le h \le H$ and $(s,a) 
 
 \begin{proof}
 \uses{lem:pmdp_entropic_variance_V, def:exp_value}
+\leanok
 Write $r := r_h(s,a)$, $Z := Z^\pi_{h+1}$ and $m := (p_h Z)(s,a)$. Under $\Prob^\pi_{(s,a,h)}$ the
 reward kernel is $\delta_{r}$, so $R = r$ a.s.\ and $e^{\beta(R + R^\pi_{h+1})} = e^{\beta r}X$ with
 $X := e^{\beta R^\pi_{h+1}}$; hence $\sigma Q^\pi_h(s,a) = e^{2\beta r}\Var(X)$
@@ -426,6 +571,7 @@ and multiplying by $e^{2\beta r}$ gives the claim. This is the paper's Lemma~23.
 \end{proof}
 
 \begin{lemma}[Telescoping of the entropic variances]\label{lem:entropic_variance_sum}
+\lean{Learning.MDP.Episodic.sum_integral_exp_mul_vecVar_eq_entropicVarV, Learning.MDP.Episodic.sum_integral_exp_mul_vecVar_eq_variance}\leanok
 \uses{def:entropic_variance, def:exp_value, def:reward_fn}
 Assume $\mathcal M$ has the reward function $r$. Then
 \[
@@ -435,7 +581,8 @@ Assume $\mathcal M$ has the reward function $r$. Then
 \end{lemma}
 
 \begin{proof}
-\uses{lem:entropic_variance_recursion, lem:pmdp_entropic_variance_V, lem:pmdp_action_eq_policy, lem:pmdp_markov_iter}
+\uses{lem:entropic_variance_recursion, lem:pmdp_entropic_variance_V, lem:pmdp_action_eq_policy, lem:pmdp_markov_iter, lem:pmdp_weighted_next_state}
+\leanok
 Let $W_h := e^{2\beta\sum_{i < h} r_i(S_i, A_i)}$ for $1 \le h \le H + 1$ ($W_1 = 1$,
 $W_{h+1} = W_h e^{2\beta r_h(S_h, A_h)}$), a bounded function of the rounds before $h$. Fix
 $1 \le h \le H$. By Lemma~\ref{lem:pmdp_action_eq_policy}, $A_h = \pi_h(S_h)$ a.s., so
@@ -460,7 +607,13 @@ Finally $\sigma V^\pi_1(s_1) = \Var_{\Prob^\pi}(e^{\beta R^\pi_1})$ by
 Lemma~\ref{lem:pmdp_entropic_variance_V}.
 \end{proof}
 
+\textbf{Lean remark.} With $0$-indexed steps, the weight of the step \texttt{h : Fin H} is
+\texttt{exp (2 * β * ∑ i ∈ Iic h, r i (S\_i) (A\_i))} and the variance term is
+\texttt{vecVar (M.transVec h (S\_h) (A\_h)) (expValue M β π h.succ)}, under
+\texttt{stepLaw M π (s₁, 0)}; the telescoping is \texttt{Finset.sum\_range\_sub'}.
+
 \begin{lemma}[Normalized variance of the exponentiated return]\label{lem:variance_ratio_le}
+\lean{Learning.MDP.Episodic.expValue_pos_of_ae_mem_Icc, Learning.MDP.Episodic.variance_exp_episodeReturn_div_sq_le, Learning.MDP.Episodic.variance_exp_episodeReturn_div_sq_le', Learning.MDP.Episodic.variance_exp_episodeReturn_div_sq_le_maxReturn}\leanok
 \uses{def:exp_value, def:episode_return, def:gmax}
 Let $G \ge 0$ be such that $R^\pi_1 \in [0, G]$ almost surely under $\Prob^\pi$. Then
 $Z^\pi_1(s_1) > 0$ and
@@ -469,19 +622,21 @@ $Z^\pi_1(s_1) > 0$ and
   \le \frac{(e^{\abs\beta G} - 1)^2}{4\,e^{\abs\beta G}}
   \le \frac{(e^{\abs\beta G} - 1)^2}{e^{\abs\beta G}} .
 \]
-In particular, if $\mathcal M$ has a reward function with values in $[0, 1]$, this holds with
-$G = \Gmax(\mathcal M)$.
+In particular, if the rewards of $\mathcal M$ are in $[0, 1]$ (for instance, $\mathcal M$ has a
+reward function with values in $[0, 1]$), this holds with $G = \Gmax(\mathcal M)$. The same holds
+for $\Prob^\pi_{(s,h)}$ and $Z^\pi_h(s)$ at any $(s, h)$.
 \end{lemma}
 
 \begin{proof}
-\uses{lem:normalized_variance_bound, lem:gmax_le_horizon, lem:pmdp_action_eq_policy}
+\uses{lem:normalized_variance_bound, lem:gmax_le_horizon, lem:exp_value_range}
+\leanok
 Apply Lemma~\ref{lem:normalized_variance_bound} on $(\Omega, \Prob^\pi)$ with $f := R^\pi_1$ and
 $R := G$: the mean of $Y = e^{\beta R^\pi_1}$ is $Z^\pi_1(s_1)$ (Definition~\ref{def:exp_value}),
 which is positive, and the first inequality follows; the second holds because
 $4e^{\abs\beta G} \ge e^{\abs\beta G} > 0$. For the last claim: by
 Lemma~\ref{lem:gmax_le_horizon}, $\Gmax(\mathcal M) \ge 0$ and $R^\pi_1 \le \Gmax(\mathcal M)$
-a.s.\ under $\Prob^\pi$; and $R^\pi_1 = \sum_{i \le H} r_i(S_i, A_i) \ge 0$ a.s.\ by
-Lemma~\ref{lem:pmdp_action_eq_policy} since $r \ge 0$.
+a.s.\ under $\Prob^\pi$; and $R^\pi_1 \ge 0$ a.s.\ by Lemma~\ref{lem:exp_value_range} since the
+rewards are nonnegative.
 \end{proof}
 
 \textbf{Lean remark.} This is where the paper's Lemma~24 enters (Lemma~\ref{lem:ratio_bound_pos}).
@@ -520,6 +675,7 @@ $(\mathrm{hist}_t, X_t, s^{t+1}_1, \dots, s^{t+1}_h)$: the information available
 transition of episode $t + 1$ at step $h$; $w_{t+1}$ is $\mathcal G_t$-measurable.
 
 \begin{lemma}[Counts and episodes]\label{lem:count_le_episodes}
+\lean{Essakine2026Tight.visitCountAt_eq_pullCount, Essakine2026Tight.visitCountAt_le, Essakine2026Tight.sum_visitCountAt}\leanok
 \uses{def:counts}
 For every $t \ge 0$ and $h \le H$: $0 \le n^t_h(s,a) \le t$ for every $(s,a)$, and
 $\sum_{s,a} n^t_h(s,a) = t$.
@@ -527,14 +683,19 @@ $\sum_{s,a} n^t_h(s,a) = t$.
 
 \begin{proof}
 \uses{def:counts}
+\leanok
 $n^t_h(s,a)$ is a sum of $t$ indicators, hence between $0$ and $t$
 (\texttt{Finset.sum\_le\_card\_nsmul}). Exchanging the sums,
 $\sum_{s,a} n^t_h(s,a) = \sum_{i \le t}\sum_{s,a}\indic\{(s^i_h, a^i_h) = (s,a)\} = \sum_{i \le t} 1 = t$,
 since for each episode $i$ exactly one pair equals $(s^i_h, a^i_h)$ (\texttt{Finset.sum\_comm},
-\texttt{Finset.sum\_ite\_eq}).
+\texttt{Finset.sum\_ite\_eq}). In Lean, \texttt{visitCountAt X Y h s a t ω} is LML's
+\texttt{pullCount (stepPair X Y h) (s, a) t ω} for the process \texttt{stepPair X Y h} of the
+pairs visited at the step $h$ (\texttt{visitCountAt\_eq\_pullCount}), and the bound is
+\texttt{pullCount\_le}.
 \end{proof}
 
 \begin{lemma}[The empirical transitions are the empirical distribution of the observed next states]\label{lem:emp_trans_reindex}
+\lean{Learning.MDP.Episodic.stepPair, Learning.MDP.Episodic.visitNextState, Essakine2026Tight.transCount_eq_sum, Essakine2026Tight.transCount_eq_card, Essakine2026Tight.empTransAt_eq}\leanok
 \uses{def:counts, def:emp_trans}
 For every $t \ge 0$, let $n := n^t_h(s,a)$. Then $\{i \le t : w_i = 1\} = \{T_1, \dots, T_n\}$
 with $T_1 < \dots < T_n \le t < T_{n+1}$, and for every $s' \in \Ss$,
@@ -548,6 +709,7 @@ empirical distribution of $W_1, \dots, W_{n}$.
 
 \begin{proof}
 \uses{def:counts, def:emp_trans}
+\leanok
 By definition, $T_k$ is the $k$-th element (in increasing order) of the set
 $I := \{i \ge 1 : w_i = 1\}$, and $I \cap \{1, \dots, t\}$ has exactly $n = \sum_{i \le t} w_i$
 elements; so $I \cap \{1,\dots,t\} = \{T_1, \dots, T_n\}$, $T_n \le t$ and $T_{n+1} > t$. Then
@@ -561,15 +723,21 @@ elements; so $I \cap \{1,\dots,t\} = \{T_1, \dots, T_n\}$, $T_n \le t$ and $T_{n
 (Definition~\ref{def:emp_trans}).
 \end{proof}
 
-\textbf{Lean remark.} With the episodes $0$-indexed, $T_k - 1 = $ \texttt{Nat.nth (fun i ↦ w i = 1) (k - 1)}
-(Mathlib \texttt{Nat.nth}, with \texttt{Nat.count}, \texttt{Nat.nth\_count},
-\texttt{Nat.nth\_mem\_of\_lt\_card}, \texttt{Nat.count\_nth\_of\_infinite}/\texttt{count\_nth});
-$\{T_k < \infty\}$ is ``$k - 1 <$ the number of visits'' or ``the set of visits is infinite''.
-Alternatively, avoid $\infty$ by working with the finite enumeration
-\texttt{Finset.orderEmbOfFin} of $\{i < t : w_i = 1\}$ for each $t$; the statement (i) below
-about $\{T_n < \infty\}$ is then a statement about $\bigcup_t\{n^t_h(s,a) = n\}$.
+\textbf{Lean remark.} The visits are encoded with LML's bandit bookkeeping
+(\texttt{SequentialLearning/FiniteActions.lean}) applied to the process
+\texttt{stepPair X Y h : ℕ → Ω → S × A} of the pairs visited at the step $h$ (the ``arm'' is
+$(s, a)$): with the episodes $0$-indexed, $n^t_h(s,a)$ is \texttt{pullCount (stepPair X Y h) (s, a) t},
+$T_k - 1$ is \texttt{stepsUntil (stepPair X Y h) (s, a) k : ℕ∞} ($\top$ iff $T_k = \infty$), and
+$W_k$ is \texttt{visitNextState X Y h s a k := Y (stepsUntil … k).toNat h.succ}. The statement of
+the lemma is \texttt{transCount\_eq\_card}:
+\texttt{(stepModel (histAt X Y t ω) h).2.2 (s, a) s' = \#\{k : Fin n | visitNextState X Y h s a (k + 1) ω = s'\}}
+with $n = n^t_h(s, a)$ (the reindexing $k \mapsto T_{k+1}$, with inverse
+$i \mapsto$ \texttt{pullCount … i}, is inside its proof, \texttt{Finset.sum\_nbij'}), and
+\texttt{empTransAt\_eq} for $\phat$; the identification $\{i \le t : w_i = 1\} = \{T_1, \dots, T_n\}$
+is not stated separately.
 
 \begin{lemma}[Sampling at the visits]\label{lem:visits_iid}
+\lean{Learning.MDP.Episodic.infoBeforeStep, Learning.MDP.Episodic.measure_inter_feedback_succ_eq_mul, Learning.MDP.Episodic.integral_mul_feedback_succ_statesEnv, Learning.MDP.Episodic.measure_inter_visitNextState_eq_mul, Learning.MDP.Episodic.measure_visitNextState_succ_eq_mul, Learning.MDP.Episodic.measure_visitNextState_le_prod, Learning.MDP.Episodic.measure_visitNextState_mem_le_pi, Learning.MDP.Episodic.exists_le_pullCount_iff_stepsUntil_ne_top, Learning.MDP.Episodic.exists_pullCount_eq_iff_exists_le_pullCount, Essakine2026Tight.measure_exists_visitCountAt_eq_le_pi}\leanok
 \uses{def:episode_env, def:counts, def:emp_trans, lem:emp_trans_reindex}
 In the setting above, with $p := p_h(\cdot \mid s, a)$:
 \begin{enumerate}
@@ -613,8 +781,9 @@ In the setting above, with $p := p_h(\cdot \mid s, a)$:
 \end{lemma}
 
 \begin{proof}
-\uses{lem:episode_env_law, lem:pmdp_markov_iter, lem:emp_trans_reindex}
-\emph{(ii).} Lemma~\ref{lem:episode_env_law} states that, conditionally on
+\uses{lem:episode_env_law, lem:pmdp_episode_env_step, lem:pmdp_markov_iter, lem:emp_trans_reindex}
+\leanok
+\emph{(ii).} Lemma~\ref{lem:pmdp_episode_env_step} states that, conditionally on
 $\mathrm{hist}_t$, $X_t$ and $s^{t+1}_1, \dots, s^{t+1}_h$, the next state $s^{t+1}_{h+1}$ has law
 $p_h(\cdot \mid s^{t+1}_h, a^{t+1}_h)$: $\E[f(s^{t+1}_{h+1}) \mid \mathcal G_t] = (p_h f)(s^{t+1}_h, a^{t+1}_h)$
 a.s. Multiplying by the bounded $\mathcal G_t$-measurable $\Psi$ and integrating gives the
@@ -671,9 +840,27 @@ it iff $w_i = 1$) and the ``reward'' is the next state $s^i_{h+1}$. The bandit f
 exact i.i.d.\ law of the rewards by count by extending the probability space with an
 independent i.i.d.\ stream (\texttt{P.prod (streamMeasure ν)}) that fills in the pulls that never
 happen; the dominated form (i), stated on $\{T_n < \infty\}$ without any extension, is all the
-union bound needs and is the statement to contribute to LML (\texttt{Empirical.lean}). Item
-(ii) is \texttt{lem:episode\_env\_law} in integral form (\texttt{HasCondDistrib} of
-$s^{t+1}_{h+1}$ given $\mathcal G_t$, from LML's \texttt{IsAlgEnvSeq.hasCondDistrib\_feedback}
-and \texttt{feedback\_stationaryEnv}); the $\sigma$-algebra $\mathcal G_t$ is the comap of the
-map $\omega \mapsto (\mathrm{hist}_t, X_t, (s^{t+1}_i)_{i \le h})$.
+union bound needs and is the statement to contribute to LML (\texttt{MDP/Visits.lean}). The Lean
+statements are as follows, for a run \texttt{hseq : IsAlgEnvSeq O X Y alg (statesEnv M s₁) P}, the
+$0$-indexed step \texttt{h : Fin H} and the map
+\texttt{infoBeforeStep O X Y t h ω = (((history O X Y t ω, O t ω), X t ω), (Y t ω i)\_\{i ≤ h\})}
+generating $\mathcal G_t$ (a map into a finite type, so that $\mathcal G_t$-measurable sets and
+functions are preimages and compositions with it).
+(ii) is \texttt{integral\_mul\_feedback\_succ\_statesEnv} (every function $\Psi$ of
+\texttt{infoBeforeStep}, no boundedness needed on the finite type) and, in measure form,
+\texttt{measure\_inter\_feedback\_succ\_eq\_mul}: $\Prob(\{\mathrm{info} \in B\} \cap \{s^{t+1}_{h+1} \in C\})
+= \Prob(\mathrm{info} \in B)\,p(C)$ for $B$ contained in the event $(s^{t+1}_h, a^{t+1}_h) = (s, a)$.
+(iii) is \texttt{measure\_inter\_visitNextState\_eq\_mul}, in measure form
+($\Prob(E \cap \{T_k < \infty\} \cap \{W_k \in C\}) = \Prob(E \cap \{T_k < \infty\})\,p(C)$, which gives
+the integral form by summing over $s' \in \Ss$), with the hypothesis ``$E \cap \{T_k = t + 1\}$ is
+$\mathcal G_t$-measurable'' written as: membership in $E$ of an $\omega$ with $T_k(\omega) = t + 1$ only
+depends on \texttt{infoBeforeStep O X Y t h ω}. (i) is \texttt{measure\_visitNextState\_succ\_eq\_mul}
+(the equality, with $\{T_{n+1} < \infty\}$ written \texttt{stepsUntil … (n + 1) ω ≠ ⊤}),
+\texttt{measure\_visitNextState\_le\_prod} (the product bound) and
+\texttt{measure\_visitNextState\_mem\_le\_pi} (the bound $p^{\otimes n}(B)$, with
+\texttt{Measure.pi (fun \_ : Fin n ↦ M.trans h (s, a))}), where the event $\{T_n < \infty\}$ is
+\texttt{∃ t, n ≤ pullCount (stepPair X Y h) (s, a) t ω} (equal to $\{T_n < \infty\}$ for $n \ge 1$,
+\texttt{exists\_le\_pullCount\_iff\_stepsUntil\_ne\_top}, and to $\Omega$ for $n = 0$); the form with
+$\{\exists t, n^t_h(s,a) = n\}$ is \texttt{Essakine2026Tight.measure\_exists\_visitCountAt\_eq\_le\_pi}
+(for the runs of \texttt{EV2026/Run.lean}, with trivial observations).
 \end{remark}

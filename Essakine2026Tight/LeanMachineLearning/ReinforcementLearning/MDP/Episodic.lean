@@ -116,6 +116,17 @@ noncomputable def transVec (M : EpisodicMDP S A H) (h : Fin H) (s : S) (a : A) :
   MDP.transVec (M.trans h) (s, a)
 
 omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
+lemma transVec_nonneg (M : EpisodicMDP S A H) (h : Fin H) (s : S) (a : A) (s' : S) :
+    0 ≤ M.transVec h s a s' :=
+  MDP.transVec_nonneg _ _ _
+
+omit [Fintype A] [MeasurableSingletonClass A] in
+/-- The transition probabilities `p_h(· | s, a)` form a probability vector. -/
+lemma sum_transVec (M : EpisodicMDP S A H) (h : Fin H) (s : S) (a : A) :
+    ∑ s', M.transVec h s a s' = 1 :=
+  MDP.sum_transVec _ _
+
+omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The mean reward `r_h(s, a) = E[R]` at step `h`. -/
 noncomputable def meanReward (M : EpisodicMDP S A H) (h : Fin H) (s : S) (a : A) : ℝ :=
   ∫ x, x ∂(M.reward h (s, a))

@@ -81,6 +81,7 @@ never-visited pair is the paper's convention; it never matters, since every use 
 for a pair with $n = 0$ is replaced by a trivial bound (deviation~1 of the overview).
 
 \begin{lemma}[The empirical transitions form a probability vector]\label{lem:emp_trans_simplex}
+\lean{Essakine2026Tight.empTrans_nonneg, Essakine2026Tight.sum_empTrans, Essakine2026Tight.isConsistent_stepModel, Learning.MDP.EmpiricalModel.IsConsistent.sum_empTrans, Learning.MDP.vecExp_mem_Icc, Learning.MDP.abs_vecExp_le, Learning.MDP.vecVar_nonneg, Learning.MDP.vecVar_eq_sum_sq}\leanok
 \uses{def:emp_trans}
 For all $t, h, (s, a)$: $\phat_h^t(\cdot \mid s, a)$ is a probability vector on $\Ss$
 (nonnegative entries summing to $1$). Consequently $f \mapsto (\phat_h^t f)(s, a)$ is linear,
@@ -90,6 +91,7 @@ $\Var_{\phat_h^t}(f)(s, a) \ge 0$, and if $f$ takes values in $[m, M]$ then so d
 
 \begin{proof}
 \uses{def:emp_trans, def:counts}
+\leanok
 If $n_h^t(s, a) > 0$, the entries $n_h^t(s, a, s')/n_h^t(s, a)$ are nonnegative and sum to
 $\sum_{s'} n_h^t(s, a, s')/n_h^t(s, a) = 1$ (Definition~\ref{def:counts}); otherwise the entries are
 $1/S$, which sum to $1$. The consequences hold for every probability vector $q$: linearity,
@@ -98,8 +100,11 @@ $q(s') \ge 0$, $\sum q(s') = 1$; the bound and the preservation of $[m, M]$ foll
 convexity of the combination; $\Var_q(f) = q(f - qf)^2 \ge 0$ by positivity.
 \end{proof}
 
-\textbf{Lean remark.} \texttt{isProbVec\_empTrans}, then the \texttt{vecExp}/\texttt{vecVar}
-lemmas of \texttt{Vec.lean} (Lemma~\ref{lem:exp_value_monotone}) apply to
+\textbf{Lean remark.} \texttt{empTrans\_nonneg} and \texttt{sum\_empTrans}
+(\texttt{EV2026/Backups.lean}); the sum uses that the transition counts of the model of a history
+sum to the visit counts (\texttt{EmpiricalModel.IsConsistent}, preserved by sums,
+\texttt{MDP/EmpiricalCounts.lean}). The \texttt{vecExp}/\texttt{vecVar} lemmas of \texttt{Vec.lean}
+(Lemma~\ref{lem:exp_value_monotone}, \texttt{vecVar\_nonneg}) then apply to
 \texttt{empTrans hist h s a}. The KL divergence of Definition~\ref{def:event_kl} views this
 vector as a measure through \texttt{weightedMeasure : (S → ℝ) → Measure S}
 (\texttt{Essakine2026Tight/Mathlib/}), $\sum_{s'} q(s') \delta_{s'}$.
@@ -136,12 +141,13 @@ shows that the paper's quantity is their expectation. Since the policies are det
 the paper's ``$\nu_{\hat\pi}(u) > 1/2$'' in the lower bound is ``$\hat\pi$ realizes $u$''.
 \end{remark}
 
-\textbf{Lean remark.} \texttt{pseudoCount M s₁ X h s a t ω := ∑ i ∈ Finset.range t, occupancy M (X i ω) s₁ h s a}
+\textbf{Lean remark.} \texttt{pseudoCount X M s₁ h s a t ω := ∑ i ∈ Finset.range t, occupancy M (X i ω) s₁ h s a}
 (the outline's \texttt{pseudoCount X Y P h s a t}, now depending on the MDP through the
 occupancy measures and not on the measure \texttt{P}; the expectation version
 $\E[n_h^t(s, a)]$ is not used).
 
 \begin{lemma}[Increments of the pseudo-counts]\label{lem:pseudo_counts_increments}
+\lean{Essakine2026Tight.pseudoCount_succ, Essakine2026Tight.pseudoCount_zero, Essakine2026Tight.sum_pseudoCount, Learning.MDP.Episodic.measureReal_statesLaw_stepPair_eq, ProbabilityTheory.HasCondDistrib.condExp_comap_ae_eq_integral, Learning.MDP.Episodic.condExp_visit_filtrationAction_ae_eq, Essakine2026Tight.integral_visitCountAt_eq_integral_pseudoCount}\leanok
 \uses{def:pseudo_counts, def:counts, lem:episode_env_law, def:occupancy, lem:occupancy_sum_one}
 For all $t \ge 0$, $h \le H$ and $(s, a)$:
 \begin{enumerate}
@@ -157,6 +163,7 @@ For all $t \ge 0$, $h \le H$ and $(s, a)$:
 
 \begin{proof}
 \uses{def:pseudo_counts, def:counts, lem:episode_env_law, lem:occupancy_sum_one}
+\leanok
 (i) is the definition; the formula for $p^\pi_h(s, a)$ and $\sum_{s, a} p^\pi_h(s, a) = 1$ are
 Lemma~\ref{lem:occupancy_sum_one}, which gives $p^\pi_h(s, a) \in [0, 1]$. (ii) follows from
 (i) by induction on $t$. (iii) By Lemma~\ref{lem:episode_env_law}, the conditional law of
@@ -168,6 +175,25 @@ probability under $\Prob^{\pi^{t+1}}_{(s_1, 1)}$ is $p^{\pi^{t+1}}_h(s, a)$. (iv
 expectations in (iii) (tower rule), $\E[\indic\{(s^{i}_h, a^{i}_h) = (s, a)\}] = \E[p^{\pi^{i}}_h(s, a)]$
 for every $i \ge 1$; sum over $i = 1, \dots, t$.
 \end{proof}
+
+\textbf{Lean remark.} In \texttt{EV2026/Events.lean} and \texttt{MDP/VisitConcentration.lean}, with
+$0$-indexed episodes. (i) is \texttt{pseudoCount\_succ}
+(\texttt{pseudoCount X M s₁ h s a (t + 1) ω = pseudoCount X M s₁ h s a t ω + occupancy M (X t ω) s₁ h s a}),
+with \texttt{occupancy\_nonneg}, \texttt{occupancy\_le\_one} and \texttt{occupancy\_eq} of
+Lemma~\ref{lem:occupancy_sum_one}. (ii) is \texttt{pseudoCount\_nonneg}, \texttt{pseudoCount\_le}
+(\texttt{EV2026/RateBounds.lean}) and \texttt{sum\_pseudoCount}. (iii) is
+\texttt{condExp\_visit\_filtrationAction\_ae\_eq}, for any observation process \texttt{O}: the
+conditional expectation of \texttt{if stepPair X Y h t ω = (s, a) then 1 else 0} given LML's
+\texttt{hseq.filtrationAction t} (generated by \texttt{((history O X Y t, O t), X t)}, which is
+$\mathcal F_t$) is \texttt{occupancy M (X t ω) s₁ h s a} almost surely. It combines
+Lemma~\ref{lem:episode_env_law} (\texttt{hasCondDistrib\_feedback\_history\_action\_statesEnv}),
+\texttt{measureReal\_statesLaw\_stepPair\_eq} (the probability that the state sequence of $\pi$
+visits $(s, a)$ at the step $h$ is $p^\pi_h(s, a)$) and the general
+\texttt{HasCondDistrib.condExp\_comap\_ae\_eq\_integral} (\texttt{Mathlib/Probability/HasCondDistribCondExp.lean}):
+if $Y$ has conditional law $\kappa$ given $X$, then $\E[f(X, Y) \mid \sigma(X)] = \int f(X, y)\,\kappa(X, dy)$
+almost surely for every bounded measurable $f$. Unlike Mathlib's
+\texttt{condExp\_prod\_ae\_eq\_integral\_condDistrib}, it needs no standard Borel assumption, the
+kernel being given. (iv) is \texttt{integral\_visitCountAt\_eq\_integral\_pseudoCount}.
 
 \section{Exploration rates}
 \label{sec:empirical_rates}
@@ -194,6 +220,7 @@ with \texttt{Fintype.card S}, \texttt{Fintype.card A}.
 
 \begin{lemma}[Properties of the rates]\label{lem:rates_props}
 \uses{def:rates}
+\lean{Essakine2026Tight.alphaCnt_nonneg, Essakine2026Tight.alphaCnt_le_alphaStar, Essakine2026Tight.alphaStar_le_alphaKL, Essakine2026Tight.log_three_le_alphaCnt, Essakine2026Tight.one_lt_alphaCnt, Essakine2026Tight.alphaKL_nonneg, Essakine2026Tight.alphaStar_nonneg, Essakine2026Tight.alphaKL_mono, Essakine2026Tight.alphaStar_mono, Essakine2026Tight.alphaKL_div_le_div, Essakine2026Tight.alphaStar_div_le_div}\leanok
 For $\delta \in (0, 1)$ (more generally $\delta \in (0, 1]$):
 \begin{enumerate}
   \item[(i)] $0 \le \alpha^{\mathrm{cnt}}(\delta) \le \alpha^*(n, \delta) \le \alpha(n, \delta)$ for all $n$,
@@ -208,6 +235,7 @@ For $\delta \in (0, 1)$ (more generally $\delta \in (0, 1]$):
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:rates}
 (i) $S, A, H \ge 1$ and $\delta \le 1$ give $3SAH/\delta \ge 3$, so $\alpha^{\mathrm{cnt}} \ge \log 3 > 1 > 0$;
 $\log(8e(n + 1)) \ge \log(8e) > 0$ and $S \ge 1$ give the two other inequalities.
@@ -217,6 +245,13 @@ is nonincreasing on $(0, \infty)$ because $x \mapsto \log(1 + x)$ is concave wit
 $0$ (for $0 < x' \le x$, concavity gives $\log(1 + x') \ge (x'/x)\log(1 + x) + (1 - x'/x)\log 1$).
 The same argument applies to $\alpha^*$ with $S$ replaced by $1$. (iv) is the definition.
 \end{proof}
+
+\textbf{Lean remark.} In \texttt{EV2026/RateBounds.lean}. The statements take $S, A, H \ge 1$
+and $\delta \in (0, 1]$ as hypotheses where they are needed (only for $\alpha^{\mathrm{cnt}}(\delta) \ge \log 3$
+and for (iii), through $\alpha^{\mathrm{cnt}}(\delta) \ge 0$); $\alpha^* \le \alpha$ only needs $S \ge 1$, and
+$\alpha^{\mathrm{cnt}} \le \alpha^*$ and (ii) need nothing. (iv) is the definition. The integer forms are
+derived from the real ones of Lemma~\ref{lem:sc_rates_real}
+(\texttt{alphaKL\_eq\_rateReal}, \texttt{alphaStar\_eq\_rateReal}).
 
 \section{Concentration events}
 \label{sec:empirical_events}
@@ -283,7 +318,7 @@ and \texttt{b : Fin H → ℝ}: for all \texttt{t h s a} with \texttt{0 < visitC
 \]
 \end{definition}
 
-\textbf{Lean remark.} \texttt{eventCnt M s₁ X Y δ : Set Ω}, with the random pseudo-counts of
+\textbf{Lean remark.} \texttt{eventCnt X Y M s₁ δ : Set Ω}, with the random pseudo-counts of
 Definition~\ref{def:pseudo_counts} (the outline's \texttt{eventCnt X Y δ P} loses the
 dependence on \texttt{P}).
 
@@ -303,7 +338,7 @@ $\beta > 0$ and in $[e^{\beta(H - h)}, 1]$ for $\beta < 0$: an interval of lengt
 so that $b^\pm_h \ge \max Z^*_{h+1} - \min Z^*_{h+1}$ as required by Lemma~\ref{lem:event_bern_prob}.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{goodEvent M s₁ X Y β δ := eventKL X Y M δ ∩ eventBern X Y M δ (optExpValue M β) (fun h ↦ if 0 < β then Real.exp (β * k) else 1 - Real.exp (β * k)) ∩ eventCnt M s₁ X Y δ}
+\textbf{Lean remark.} \texttt{goodEvent X Y M s₁ β δ := eventKL X Y M δ ∩ eventBern X Y M δ (optExpValue M β) (fun h ↦ if 0 < β then Real.exp (β * k) else 1 - Real.exp (β * k)) ∩ eventCnt X Y M s₁ δ}
 with \texttt{k = H - 1 - h} for the Lean step \texttt{h : Fin H} (the paper's $H - h$ for its
 $1$-indexed step); both signs in one definition, the analysis chapters instantiating
 \texttt{0 < β} or \texttt{β < 0}.
@@ -330,6 +365,7 @@ $(\mathcal F_t)$ (since $n_h^t(s, a)$ is $\mathcal F_t$-measurable), $T_k \le T_
 $T_{n_h^t(s, a)} \le t$.
 
 \begin{lemma}[Domination of the observed transitions by an i.i.d.\ sample, time-uniform form]\label{lem:empirical_visits_domination}
+\lean{ProbabilityTheory.iIndepFun.measure_prefix_mem_eq_pi, MeasureTheory.firstEntrance, MeasureTheory.firstEntrance_subset, MeasureTheory.pairwise_disjoint_setOf_mem_firstEntrance, MeasureTheory.exists_mem_firstEntrance, MeasureTheory.measure_exists_mem_le_of_forall_measure_inter_le, Learning.MDP.Episodic.measure_exists_le_pullCount_visitNextState_mem_le, Learning.MDP.Episodic.measure_exists_visitNextState_mem_le}\leanok
 \uses{lem:visits_iid, def:counts, def:episode_env}
 Fix $(h, s, a)$ and let $\xi_1, \xi_2, \dots$ be i.i.d.\ with law $p = p_h(\cdot \mid s, a)$ on some
 auxiliary probability space $(\Omega', \Prob')$. Then:
@@ -346,6 +382,7 @@ auxiliary probability space $(\Omega', \Prob')$. Then:
 
 \begin{proof}
 \uses{lem:visits_iid, def:counts}
+\leanok
 (i) Lemma~\ref{lem:visits_iid}(i) gives the inequality for product sets
 $B = B^1 \times \dots \times B^n$: $\Prob(W_1 \in B^1, \dots, W_n \in B^n, T_n < \infty) \le \prod_i p(B^i)$.
 Since $\Ss^n$ is finite, an arbitrary $B$ is the disjoint union of its singletons, which are
@@ -365,19 +402,146 @@ union is $\{\exists n, (\xi_1, \dots, \xi_n) \in B_n\}$; so
 $\sum_n p^{\otimes n}(B'_n) = \Prob'(\exists n, (\xi_1, \dots, \xi_n) \in B_n)$.
 \end{proof}
 
-\textbf{Lean remark.} The auxiliary space can be taken to be $\Ss^{\N}$ with the product measure
-\texttt{Measure.infinitePi (fun \_ ↦ weightedMeasure p)} (Mathlib \texttt{Measure.infinitePi}),
-and the events of (ii) are measurable as countable unions. The lemma is the bridge between
-the i.i.d.\ statements of Chapter~\ref{chap:pre_concentration} and the run; it is the
-episodic analogue of LML's \texttt{Online/Bandit/RewardByCountMeasure.lean} (the ``arm'' is
-$(h, s, a)$ and the ``reward'' the next state), to be contributed to LML with
+\textbf{Lean remark.} (i) is Lemma~\ref{lem:visits_iid}(i) (\texttt{measure\_visitNextState\_mem\_le\_pi})
+together with \texttt{iIndepFun.measure\_prefix\_mem\_eq\_pi}: the prefix $(\xi_1, \dots, \xi_n)$ of an
+i.i.d.\ sequence of law $p$ has law $p^{\otimes n}$. (ii) is proved in two steps. The
+first-entrance decomposition is library material,
+\texttt{MeasureTheory.measure\_exists\_mem\_le\_of\_forall\_measure\_inter\_le}
+(\texttt{Mathlib/Probability/Process/FirstEntrance.lean}): for a nonincreasing sequence of events
+$E_n$, a process $W$ and a measurable process $\xi$ with values in a countable type with
+measurable singletons, if $\Prob(E_n \cap \{(W_1, \dots, W_n) \in C\}) \le \Prob'((\xi_1, \dots, \xi_n) \in C)$
+for all $n$ and $C$, then $\Prob(\exists n : E_n,\ (W_1, \dots, W_n) \in B_n) \le \Prob'(\exists n : (\xi_1, \dots, \xi_n) \in B_n)$;
+the sets $B'_n$ of the proof are \texttt{firstEntrance B n}. Only the $\xi$ side uses disjointness
+and measurability; the run side is a countable union bound, so no measurability of the events of
+the run is needed. The application to the visits is
+\texttt{measure\_exists\_le\_pullCount\_visitNextState\_mem\_le} (\texttt{MDP/VisitConcentration.lean}),
+with $\{T_n < \infty\}$ written \texttt{∃ t, n ≤ pullCount (stepPair X Y h) (s, a) t ω}, the
+$0$-indexed sample \texttt{ξ k} ($\xi_{k+1}$ above), all $n \ge 0$ ($E_0 = \Omega$; the sets $B_0$
+of the applications are empty) and any i.i.d.\ sequence (\texttt{iIndepFun ξ μ'} and
+\texttt{HasLaw (ξ k) (M.trans h (s, a)) μ'}); the events of Lemmas~\ref{lem:event_kl_prob}
+and~\ref{lem:event_bern_prob} take it from Mathlib's \texttt{exists\_iid}. The form used by the
+events, \texttt{measure\_exists\_visitNextState\_mem\_le}, bounds
+$\Prob(\exists t : (W_1, \dots, W_{n^t_h(s, a)}) \in B_{n^t_h(s, a)})$ by the same quantity. The
+lemma is the bridge between the i.i.d.\ statements of Chapter~\ref{chap:pre_concentration} and the
+run; it is the episodic analogue of LML's \texttt{Online/Bandit/RewardByCountMeasure.lean} (the
+``arm'' is $(h, s, a)$ and the ``reward'' the next state), to be contributed to LML with
 Lemma~\ref{lem:visits_iid}.
 
+\begin{lemma}[The Laplace likelihood ratio]\label{lem:emp_laplace_product}
+\lean{InformationTheory.laplaceRatio, InformationTheory.laplaceRatio_zero, InformationTheory.laplaceRatio_succ, InformationTheory.typeCount_prefix_succ, InformationTheory.prod_range_typeCount_add_one, InformationTheory.prod_range_measureReal_eq_prod_pow_typeCount, InformationTheory.laplaceRatio_eq}\leanok
+Let $\mathcal X$ be a finite set with $m := \abs{\mathcal X}$ elements, $p$ a measure on
+$\mathcal X$, $x_1, x_2, \dots$ a sequence in $\mathcal X$ and $N_k(y) := \#\{i \le k : x_i = y\}$
+for $k \ge 0$. The \emph{Laplace (rule of succession) likelihood ratio} of $x$ with respect to $p$
+is
+\[
+  M_n := \prod_{k = 1}^{n} \frac{N_{k-1}(x_k) + 1}{(k - 1 + m)\, p(x_k)} \qquad (M_0 = 1),
+\]
+with the convention $1/0 := 0$. Then $\prod_{k \le n} (N_{k-1}(x_k) + 1) = \prod_{y} N_n(y)!$ and
+$\prod_{k \le n} p(x_k) = \prod_y p(y)^{N_n(y)}$, hence
+\[
+  M_n = \frac{\prod_y N_n(y)!}{m (m + 1) \cdots (m + n - 1)\, \prod_{k \le n} p(x_k)} .
+\]
+\end{lemma}
+
+\begin{proof}
+\leanok
+By induction on $n$: $N_n(y) = N_{n-1}(y) + \indic\{x_n = y\}$, so $N_n(y)! = N_{n-1}(y)!$ for
+$y \ne x_n$ and $N_n(x_n)! = N_{n-1}(x_n)!\,(N_{n-1}(x_n) + 1)$. The denominators $k - 1 + m$
+multiply to $m (m + 1) \cdots (m + n - 1)$, and $\prod_{k \le n} p(x_k) = \prod_y p(y)^{N_n(y)}$
+groups the factors by value.
+\end{proof}
+
+\begin{lemma}[Factorial bounds]\label{lem:emp_factorial_bounds}
+\lean{Stirling.factorial_le_exp_one_mul_sqrt_mul_div_pow, Nat.ascFactorial_le_factorial_mul_add_one_pow, InformationTheory.prod_pow_self_mul_ascFactorial_le}\leanok
+\uses{lem:num_types}
+\begin{enumerate}
+  \item[(i)] For $n \ge 1$, $n! \le e \sqrt n\, (n/e)^n$ (Stirling's upper bound).
+  \item[(ii)] For $m \ge 1$ and $n \ge 0$, $m (m + 1) \cdots (m + n - 1) \le n!\, (n + 1)^{m - 1}$.
+  \item[(iii)] For a finite set $\mathcal X$ with $m$ elements, $n \ge 1$ and nonnegative integers
+        $(N(y))_{y \in \mathcal X}$ with $\sum_y N(y) = n$ (and $0^0 := 1$),
+        \[
+          \prod_y N(y)^{N(y)} \cdot m (m + 1) \cdots (m + n - 1)
+          \le \prod_y N(y)! \cdot n^n\, (n + 1)^{m - 1} e \sqrt n .
+        \]
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\leanok
+\uses{lem:num_types}
+(i) The sequence $s_n := n!/(\sqrt{2n}\,(n/e)^n)$ is nonincreasing for $n \ge 1$ (the monotonicity
+step of Stirling's formula) with $s_1 = e/\sqrt 2$, so $n! \le (e/\sqrt 2) \sqrt{2n}\,(n/e)^n$.
+(ii) $m (m + 1) \cdots (m + n - 1) = n! \binom{n + m - 1}{n} = n! \binom{n + m - 1}{m - 1}$ and
+$\binom{n + m - 1}{m - 1} \le (n + 1)^{m - 1}$ (Lemma~\ref{lem:num_types}).
+(iii) $m \ge 1$ since $n \ge 1$. Each $N^N/N!$ is a term of the exponential series of $e^N$, so
+$\prod_y N(y)^{N(y)} \le e^n \prod_y N(y)!$. Multiply by (ii) and use (i):
+$e^n\, n! \le e^n \cdot e \sqrt n\, n^n e^{-n} = e \sqrt n\, n^n$.
+\end{proof}
+
+\begin{lemma}[Lower bound on the Laplace ratio]\label{lem:emp_laplace_lower_bound}
+\lean{InformationTheory.isProbabilityMeasure_weightedMeasure_empiricalFreq, MeasureTheory.Measure.absolutelyContinuous_of_forall_singleton, InformationTheory.weightedMeasure_empiricalFreq_absolutelyContinuous, InformationTheory.exp_mul_toReal_klDiv_mul_prod_eq, InformationTheory.exp_mul_toReal_klDiv_le_laplaceRatio, InformationTheory.one_div_le_laplaceRatio, InformationTheory.timeUniformThreshold_le}\leanok
+\uses{lem:emp_laplace_product, lem:emp_factorial_bounds}
+In the setting of Lemma~\ref{lem:emp_laplace_product}, let $p$ be a probability measure, $n \ge 1$,
+$\hat q_n := \hat q_n(x_1, \dots, x_n)$, and assume $p(x_k) > 0$ for all $k \le n$. Then
+$\hat q_n \ll p$ and
+\[
+  \exp\big(n \KL(\hat q_n \| p)\big) \le M_n\, (n + 1)^{m - 1} e \sqrt n .
+\]
+Consequently, for $\delta > 0$, if
+$n \KL(\hat q_n \| p) \ge \log(1/\delta) + (m - 1)\log(n + 1) + 1 + \frac12 \log n$, then
+$M_n \ge 1/\delta$. Moreover
+$(m - 1)\log(n + 1) + 1 + \frac12 \log n \le m \log(e(n + 1))$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+\uses{lem:emp_laplace_product, lem:emp_factorial_bounds}
+Every $y$ with $\hat q_n(y) > 0$ is some $x_k$, so $p(y) > 0$: $\hat q_n \ll p$ and
+$\KL(\hat q_n \| p) = \sum_y \hat q_n(y) \log(\hat q_n(y)/p(y))$ is finite. With $N := N_n$, so
+that $n \hat q_n = N$,
+\[
+  \exp\big(n \KL(\hat q_n \| p)\big) \prod_{k \le n} p(x_k)
+  = \prod_{y : N(y) > 0} \Big(\frac{N(y)}{n\, p(y)}\Big)^{N(y)} p(y)^{N(y)}
+  = \frac{\prod_y N(y)^{N(y)}}{n^n} ,
+\]
+while $M_n \prod_{k \le n} p(x_k) = \prod_y N(y)!/(m (m + 1) \cdots (m + n - 1))$
+(Lemma~\ref{lem:emp_laplace_product}). Since $\prod_{k \le n} p(x_k) > 0$, the inequality is
+Lemma~\ref{lem:emp_factorial_bounds}(iii). For the consequence, exponentiate the assumption:
+$\delta^{-1} (n + 1)^{m - 1} e \sqrt n \le \exp(n \KL(\hat q_n \| p)) \le M_n (n + 1)^{m - 1} e \sqrt n$.
+The last inequality follows from $\frac12 \log n \le \log(n + 1)$ and $1 \le m$.
+\end{proof}
+
+\begin{lemma}[The Laplace ratio is a supermartingale]\label{lem:emp_laplace_supermartingale}
+\lean{InformationTheory.supermartingale_laplaceRatio, InformationTheory.laplaceRatio_nonneg, InformationTheory.typeCount_add_one_div_le_one, InformationTheory.laplaceRatio_le, InformationTheory.measurable_typeCount_filtration, InformationTheory.measurable_laplaceRatio_filtration}\leanok
+\uses{lem:emp_laplace_product}
+Let $p$ be a probability measure on a finite set $\mathcal X$, $(\mathcal G_n)_{n \ge 0}$ a
+filtration and $\xi_1, \xi_2, \dots$ random variables in $\mathcal X$ such that, for every
+$n \ge 1$, $\xi_n$ is $\mathcal G_n$-measurable, independent of $\mathcal G_{n-1}$, and has law
+$p$. Then the Laplace ratio $M_n := M_n(\xi)$ (Lemma~\ref{lem:emp_laplace_product}) is a
+nonnegative supermartingale with respect to $(\mathcal G_n)$, with $M_0 = 1$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+\uses{lem:emp_laplace_product}
+$M_n$ is a function of $(\xi_1, \dots, \xi_n)$, hence $\mathcal G_n$-measurable, and it is bounded
+by $(\sum_{y : p(y) > 0} 1/p(y))^n$ since $(N_{k-1}(y) + 1)/(k - 1 + m) \le 1$; so it is
+integrable. Write $M_{n+1} = \sum_y M_n c_y \indic\{\xi_{n+1} = y\}$ with the
+$\mathcal G_n$-measurable coefficients $c_y := (N_n(y) + 1)/((n + m)\, p(y))$. For
+$A \in \mathcal G_n$, the independence of $\xi_{n+1}$ and $\mathcal G_n$ gives
+\[
+  \E[\indic_A M_{n+1}] = \sum_y \E[\indic_A M_n c_y]\, p(y)
+  = \E\Big[\indic_A M_n \sum_{y : p(y) > 0} \frac{N_n(y) + 1}{n + m}\Big] \le \E[\indic_A M_n] ,
+\]
+since $M_n \ge 0$ and $\sum_y (N_n(y) + 1) = n + m$.
+\end{proof}
+
 \begin{lemma}[Time-uniform KL concentration of the empirical distribution]\label{lem:empirical_kl_time_uniform}
-\uses{lem:ville, lem:num_types}
+\lean{InformationTheory.measure_exists_le_klDiv_empiricalFreq_le, InformationTheory.measure_exists_le_klDiv_empiricalFreq_le', InformationTheory.measure_exists_le_klDiv_empiricalFreq_le_infinitePi, InformationTheory.measure_exists_le_klDiv_empiricalFreq_le_infinitePi', InformationTheory.measure_exists_le_klDiv_empiricalFreq_le_of_filtration, InformationTheory.measurableSet_exists_prefix, InformationTheory.measure_exists_prefix_eq_infinitePi}\leanok
+\uses{lem:ville, lem:num_types, lem:emp_laplace_product, lem:emp_laplace_supermartingale, lem:emp_laplace_lower_bound}
 Let $p$ be a probability vector on a finite set $\mathcal X$ with $m := \abs{\mathcal X} \ge 1$
 elements, $\xi_1, \xi_2, \dots$ i.i.d.\ with law $p$, and $\hat q_n := \hat q_n(\xi_1, \dots, \xi_n)$.
-For every $\delta' \in (0, 1)$,
+For every $\delta' > 0$,
 \[
   \Prob\Big( \exists n \ge 1 :\ n\, \KL(\hat q_n \| p) \ge \log\frac1{\delta'} + (m - 1)\log(n + 1) + 1 + \tfrac12 \log n \Big) \le \delta' ,
 \]
@@ -386,53 +550,26 @@ $\Prob\big( \exists n \ge 1 : \KL(\hat q_n \| p) \ge (\log(1/\delta') + m \log(e
 \end{lemma}
 
 \begin{proof}
-\uses{lem:ville, lem:num_types}
-\emph{Support.} Almost surely all $\xi_k$ lie in the support $\mathcal X_0 := \{x : p(x) > 0\}$;
-on this event $\hat q_n$ is supported in $\mathcal X_0$ and $\KL(\hat q_n \| p) = \sum_{x \in \mathcal X_0} \hat q_n(x)\log(\hat q_n(x)/p(x)) < \infty$.
-Replacing $\mathcal X$ by $\mathcal X_0$ ($m_0 := \abs{\mathcal X_0} \le m$ elements) only decreases
-the threshold, so we assume $p(x) > 0$ for all $x$. Write $N_n(x) := n \hat q_n(x) = \#\{k \le n : \xi_k = x\}$,
-so that, with $0 \log 0 := 0$,
-\[
-  n\, \KL(\hat q_n \| p) = \sum_x N_n(x) \log\frac{N_n(x)}{n} - \sum_{k \le n} \log p(\xi_k)
-\]
-(since $\sum_{k \le n} \log p(\xi_k) = \sum_x N_n(x) \log p(x)$).
+\leanok
+\uses{lem:ville, lem:emp_laplace_product, lem:emp_laplace_supermartingale, lem:emp_laplace_lower_bound}
+Let $M_n$ be the Laplace ratio of $\xi$ with respect to $p$ (Lemma~\ref{lem:emp_laplace_product})
+and $\mathcal G_n := \sigma(\xi_1, \dots, \xi_n)$. By independence, $\xi_{n+1}$ is independent of
+$\mathcal G_n$, so $M$ is a nonnegative supermartingale with $M_0 = 1$
+(Lemma~\ref{lem:emp_laplace_supermartingale}), and Ville's inequality (Lemma~\ref{lem:ville})
+gives $\Prob(\exists n,\ M_n \ge 1/\delta') \le \delta'$. The event
+$\{\exists k,\ p(\xi_k) = 0\}$ is null, since $\Prob(p(\xi_k) = 0) = \sum_{y : p(y) = 0} p(y) = 0$.
+Outside this event, Lemma~\ref{lem:emp_laplace_lower_bound} shows that the event of the statement
+is contained in $\{\exists n,\ M_n \ge 1/\delta'\}$. The simplified form follows from the last
+inequality of Lemma~\ref{lem:emp_laplace_lower_bound}, which makes its event smaller.
 
-\emph{A mixture martingale.} Let $\nu$ be the uniform probability measure on the simplex
-$\Delta := \{q \in [0, 1]^{\mathcal X} : \sum_x q(x) = 1\}$ (normalized Lebesgue measure on the
-$(m - 1)$-dimensional simplex, whose Lebesgue measure is $1/(m - 1)!$; the point mass if $m = 1$)
-and
-\[
-  M_n := \int_\Delta \prod_{k \le n} \frac{q(\xi_k)}{p(\xi_k)}\, \nu(dq)
-  = \Big(\prod_{k \le n} p(\xi_k)\Big)^{-1} \int_\Delta \prod_x q(x)^{N_n(x)}\, \nu(dq),
-  \qquad M_0 = 1 .
-\]
-For a fixed $q$, $L_n(q) := \prod_{k \le n} q(\xi_k)/p(\xi_k)$ is a nonnegative martingale for the
-natural filtration $\mathcal G_n := \sigma(\xi_1, \dots, \xi_n)$ with $L_0(q) = 1$:
-$\E[L_{n+1}(q) \mid \mathcal G_n] = L_n(q)\, \E[q(\xi)/p(\xi)] = L_n(q) \sum_x q(x) = L_n(q)$. By
-Fubini for nonnegative integrands, $M_n = \int L_n(q)\, \nu(dq)$ is a nonnegative martingale with
-$M_0 = 1$, and Ville's inequality (Lemma~\ref{lem:ville}) gives $\Prob(\exists n, M_n \ge 1/\delta') \le \delta'$.
-
-\emph{Lower bound on $M_n$.} The Dirichlet integral gives, for nonnegative integers $N(x)$ with
-$\sum_x N(x) = n$, $\int_\Delta \prod_x q(x)^{N(x)}\, \nu(dq) = (m - 1)!\, \prod_x N(x)! / (n + m - 1)!$
-(the integral of $\prod_x q(x)^{a_x - 1}$ over the simplex with respect to Lebesgue measure is
-$\prod_x \Gamma(a_x)/\Gamma(\sum_x a_x)$, by induction on $m$ with the Beta integral). Hence
-\[
-  \log M_n - n\, \KL(\hat q_n \| p)
-  = \log\frac{(m - 1)!}{(n + m - 1)!} + \sum_x \big[\log N_n(x)! - N_n(x)\log N_n(x)\big] + n \log n .
-\]
-Now $N! \ge (N/e)^N$ gives $\sum_x [\log N_n(x)! - N_n(x)\log N_n(x)] \ge -\sum_x N_n(x) = -n$;
-and $(n + m - 1)!/(m - 1)! = \binom{n + m - 1}{m - 1}\, n!$ with $\binom{n + m - 1}{m - 1} \le (n + 1)^{m - 1}$
-(Lemma~\ref{lem:num_types}) and $n! \le e \sqrt n\,(n/e)^n$ (Stirling's upper bound). Therefore
-\[
-  \log M_n - n\, \KL(\hat q_n \| p)
-  \ge -(m - 1)\log(n + 1) - 1 - \tfrac12 \log n - n\log n + n - n + n\log n
-  = -(m - 1)\log(n + 1) - 1 - \tfrac12 \log n .
-\]
-
-\emph{Conclusion.} On the event $\{\forall n, M_n < 1/\delta'\}$, of probability at least
-$1 - \delta'$, for every $n \ge 1$:
-$n\, \KL(\hat q_n \| p) \le \log M_n + (m - 1)\log(n + 1) + 1 + \frac12 \log n < \log(1/\delta') + (m - 1)\log(n + 1) + 1 + \frac12\log n$.
-The simplified form follows from $1 + \frac12 \log n \le \log(e(n + 1))$ and $\log(n + 1) \le \log(e(n + 1))$.
+This replaces the mixture over the uniform prior on the simplex in the argument of
+\cite{menard2021fast}. $M_n$ is that mixture:
+$M_n = \int \prod_{k \le n} q(\xi_k)/p(\xi_k)\, \nu(dq)$ for the uniform probability measure $\nu$
+on the simplex, by the Dirichlet integral
+$\int \prod_y q(y)^{N(y)} \nu(dq) = (m - 1)! \prod_y N(y)!/(n + m - 1)!$, and
+$(N_{k-1}(y) + 1)/(k - 1 + m)$ is its predictive probability (Laplace's rule of succession).
+The product form avoids integrating over the simplex. It also avoids reducing to the support of
+$p$: the supermartingale inequality holds with $1/0 := 0$.
 \end{proof}
 
 \begin{remark}[Why a union bound over $n$ of Sanov's bound does not suffice]\label{rem:empirical_sanov_union}
@@ -450,26 +587,49 @@ rates; it uses Ville's inequality and the type count of Chapter~\ref{chap:pre_co
 in place of Theorem~\ref{thm:sanov_hp}.
 \end{remark}
 
-\textbf{Lean remark.} The statement is library material for \texttt{Essakine2026Tight/Mathlib/}
-(then Chapter~\ref{chap:pre_concentration}): a sample \texttt{ξ : ℕ → Ω → 𝒳} with
-\texttt{iIndepFun} and \texttt{HasLaw (ξ k) (weightedMeasure p)}, the empirical measure as a
-\texttt{weightedMeasure} and \texttt{klDiv}. Ingredients: Mathlib's
-\texttt{Real.pow\_div\_factorial\_le\_exp} for $N^N/N! \le e^N$, the Stirling bound
-$n! \le e\sqrt n\,(n/e)^n$ from \texttt{Stirling.stirlingSeq'\_antitone} and
-\texttt{Stirling.stirlingSeq\_one} ($n!/(\sqrt{2n}(n/e)^n)$ is antitone with value $e/\sqrt 2$ at
-$1$), and the Dirichlet integral, which is not in Mathlib (prove it by induction on $m$ with
-\texttt{Real.betaIntegral}, or define $\nu$ as the law of a normalized vector of i.i.d.\
-exponential variables and compute the moments). The martingale is with respect to the
-natural filtration of \texttt{ξ}, and Lemma~\ref{lem:ville} is used in the form
-$\Prob(\sup_n M_n \ge 1/\delta') \le \delta'$.
+\textbf{Lean remark.} Lemmas~\ref{lem:emp_laplace_product}--\ref{lem:empirical_kl_time_uniform}
+are library material in \texttt{Essakine2026Tight/Mathlib/InformationTheory/KLTimeUniform.lean}
+(namespace \texttt{InformationTheory}). They are stated for an arbitrary probability measure
+\texttt{ν : Measure α} on a \texttt{Fintype α} with measurable singletons: the probability vector
+$p$ of the statement is \texttt{ν = weightedMeasure p}, $p(y)$ is \texttt{ν.real \{y\}}, and the
+application takes \texttt{ν = M.trans h (s, a)}. Indices are $0$-based: the sample is
+\texttt{ξ k}, $k \ge 0$, and $\hat q_n$ is
+\texttt{weightedMeasure (empiricalFreq fun k : Fin n ↦ ξ k ω)}. The Laplace ratio is
+\texttt{laplaceRatio ν x n}, with the count \texttt{typeCount (fun i : Fin k ↦ x i) (x k)} of the
+prefix. The statement is proved for every \texttt{0 < δ}, not only $\delta' < 1$, and $m - 1$ is
+the natural subtraction \texttt{Fintype.card α - 1}. The event is
+\texttt{\{ω | ∃ n : ℕ, 0 < n ∧ ENNReal.ofReal (thr n) ≤ klDiv (…) ν\}} with
+\texttt{thr n = (log (1 / δ) + (m - 1) * log (n + 1) + 1 + log n / 2) / n}, or
+\texttt{(log (1 / δ) + m * log (exp 1 * (n + 1))) / n} for the primed (simplified) versions. The
+bound is \texttt{ENNReal.ofReal δ}.
+
+There are three forms. The i.i.d.\ form (\texttt{iIndepFun ξ μ} and
+\texttt{∀ k, HasLaw (ξ k) ν μ}, with no further measurability assumption) reduces to the product
+form through \texttt{measure\_exists\_prefix\_eq\_infinitePi} (Mathlib's
+\texttt{iIndepFun.map\_fun\_eq\_infinitePi\_map₀'}). The product form, for the coordinate process of
+\texttt{Measure.infinitePi (fun \_ : ℕ ↦ ν)}, is the one combined with
+Lemma~\ref{lem:empirical_visits_domination} in Lemma~\ref{lem:event_kl_prob}. It reduces to the
+filtration form with $\mathcal G_n := \bigvee_{k < n} \sigma(x_k)$ (Mathlib's
+\texttt{iIndepFun\_infinitePi} and \texttt{indep\_iSup\_of\_disjoint}). The filtration form assumes
+that \texttt{ξ k} is \texttt{ℱ (k + 1)}-measurable and \texttt{Indep (ℱ n) (comap (ξ n))}.
+
+The supermartingale property is checked with \texttt{supermartingale\_of\_setIntegral\_succ\_le}
+and \texttt{IndepFun.integral\_fun\_mul\_eq\_mul\_integral}. The Stirling bound comes from
+\texttt{Stirling.stirlingSeq'\_antitone} and \texttt{Stirling.stirlingSeq\_one}, and
+$N^N \le e^N N!$ from \texttt{Real.pow\_div\_factorial\_le\_exp}. Lemma~\ref{lem:ville} is used in
+the form $\Prob(\exists n,\ M_n \ge 1/\delta') \le \E[M_0]\,\delta'$. The ``$\ge$'' of the
+statement is the non-strict \texttt{≤} in \texttt{ℝ≥0∞}, which contains the strict event
+\texttt{klThreshold … < klDiv …} of the complement of \texttt{eventKL}.
 
 \begin{lemma}[Probability of the KL event]\label{lem:event_kl_prob}
+\lean{Essakine2026Tight.empTransAt_eq_empiricalFreq, Essakine2026Tight.measure_iUnion_le_ofReal_div_three, Essakine2026Tight.div_three_mul_pos, Essakine2026Tight.log_one_div_div_eq_alphaCnt, Essakine2026Tight.measure_exists_klThreshold_lt_klDiv_le, Essakine2026Tight.measure_compl_eventKL_le}\leanok
 \uses{def:event_kl, lem:empirical_kl_time_uniform, lem:empirical_visits_domination, lem:emp_trans_reindex, lem:rates_props}
-For $\delta \in (0, 1)$, $\Prob(\evKL) \ge 1 - \delta/3$.
+For $\delta > 0$, $\Prob(\Omega \setminus \evKL) \le \delta/3$; in particular $\Prob(\evKL) \ge 1 - \delta/3$.
 \end{lemma}
 
 \begin{proof}
 \uses{def:event_kl, lem:empirical_kl_time_uniform, lem:empirical_visits_domination, lem:emp_trans_reindex, def:rates, def:counts, def:emp_trans}
+\leanok
 Fix $(h, s, a)$, put $p := p_h(\cdot \mid s, a)$, $\delta' := \delta/(3SAH)$, and let
 $B_n := \{x \in \Ss^n : \KL(\hat q_n(x) \| p) > \alpha(n, \delta)/n\}$ for $n \ge 1$.
 
@@ -494,15 +654,67 @@ the union bound over the $SAH$ triples gives
 $\Prob(\Omega \setminus \evKL) \le SAH \cdot \delta/(3SAH) = \delta/3$.
 \end{proof}
 
-\begin{lemma}[Probability of the Bernstein event]\label{lem:event_bern_prob}
-\uses{def:event_bern, cor:bernstein_explicit, lem:empirical_visits_domination, lem:emp_trans_reindex, lem:rates_props}
-Let $\delta \in (0, 1)$, $f = (f_h)_{h \le H + 1}$ and $b = (b_h)_{h \le H}$ with
-$b_h \ge \max_{s'} f_{h+1}(s') - \min_{s'} f_{h+1}(s')$ for every $h \le H$. Then
-$\Prob(\evBern(f, b)) \ge 1 - \delta/3$.
+\textbf{Lean remark.} \texttt{measure\_compl\_eventKL\_le : P (eventKL X Y M δ)ᶜ ≤ ENNReal.ofReal (δ / 3)}
+(\texttt{EV2026/Events.lean}) for \texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M s₁) P}
+and \texttt{0 < δ}: the lemma of the paper only needs $\delta > 0$ (the time-uniform bound holds for
+every $\delta' > 0$). The bound for one triple is \texttt{measure\_exists\_klThreshold\_lt\_klDiv\_le},
+with $B_n$ = \texttt{\{x | klThreshold S A H δ n < klDiv (weightedMeasure (empiricalFreq x)) (M.trans h (s, a))\}}
+(empty for $n = 0$), the i.i.d.\ bound \texttt{measure\_exists\_le\_klDiv\_empiricalFreq\_le'} for the
+i.i.d.\ sequence given by Mathlib's \texttt{exists\_iid}, and
+$\phat_h^t(\cdot \mid s, a) = \hat q_n(W_1, \dots, W_n)$ in the form
+\texttt{empTransAt\_eq\_empiricalFreq}. The union bound over the triples with the confidence
+$\delta' = \delta/(3SAH)$ is \texttt{measure\_iUnion\_le\_ofReal\_div\_three} (a finite union bound,
+which needs no measurability of the events), $\delta' > 0$ is \texttt{div\_three\_mul\_pos} and
+$\log(1/\delta') = \alpha^{\mathrm{cnt}}(\delta)$ is \texttt{log\_one\_div\_div\_eq\_alphaCnt}; they are
+shared with Lemmas~\ref{lem:event_bern_prob} and~\ref{lem:event_cnt_prob}.
+
+\begin{lemma}[Time-uniform Bernstein inequality for an i.i.d.\ sequence]\label{lem:emp_bernstein_iid}
+\lean{MeasureTheory.Filtration.naturalPast, MeasureTheory.Filtration.naturalPast_apply, MeasureTheory.Filtration.measurable_naturalPast_succ, ProbabilityTheory.iIndepFun.indep_comap_naturalPast, ProbabilityTheory.iIndepFun.condExp_naturalPast_ae_eq, ProbabilityTheory.measure_exists_sqrt_add_lt_abs_sum_sub_integral_le}\leanok
+\uses{cor:bernstein_explicit}
+Let $\xi_1, \xi_2, \dots$ be i.i.d.\ with law $\nu$, let $g$ be a measurable function and $b \ge 0$
+with $\abs{g(x) - \nu g} \le b$ for every $x$, and $\sigma^2 := \nu(g - \nu g)^2$. For every
+$\delta' \in (0, 1)$,
+\[
+  \Prob\Big(\exists n \ge 0 :\ \Big|\sum_{k \le n} \big(g(\xi_k) - \nu g\big)\Big| > \sqrt{2 n \sigma^2 L_n} + 3 b L_n\Big) \le \delta' ,
+  \qquad L_n := \log\frac{4e(2n + 1)}{\delta'} .
+\]
 \end{lemma}
 
 \begin{proof}
-\uses{def:event_bern, cor:bernstein_explicit, thm:bernstein_self_normalized, lem:empirical_visits_domination, lem:emp_trans_reindex, def:rates, def:emp_trans, def:counts}
+\uses{cor:bernstein_explicit, thm:bernstein_self_normalized}
+\leanok
+If $b = 0$, every term of the sum vanishes and the event is empty. Otherwise let
+$\mathcal G_n := \sigma(\xi_1, \dots, \xi_n)$ ($\mathcal G_0$ trivial) and $Y_k := g(\xi_k) - \nu g$.
+Then $Y_{n+1}$ is $\mathcal G_{n+1}$-measurable, and $\xi_{n+1}$ is independent of $\mathcal G_n$
+(independence of the $\sigma$-algebras generated by disjoint sets of indices), so
+$\E[Y_{n+1} \mid \mathcal G_n] = \E[Y_{n+1}] = \nu g - \nu g = 0$ and
+$\E[Y_{n+1}^2 \mid \mathcal G_n] = \E[Y_{n+1}^2] = \sigma^2$ almost surely. Moreover $\abs{Y_k} \le b$
+and $0 \le \sigma^2 \le b^2$. Corollary~\ref{cor:bernstein_explicit} with the filtration
+$(\mathcal G_n)$, the constant weights $w_k := 1$, the constant conditional variances
+$v_k := \sigma^2$ (so that $S_n$ is the sum of the statement and $V_n = n \sigma^2$), the bound $b$
+and the confidence $\delta'$ gives the claim.
+\end{proof}
+
+\textbf{Lean remark.} \texttt{Mathlib/Probability/Independence/NaturalPast.lean} and
+\texttt{Mathlib/Probability/Moments/SelfNormalizedBernsteinIID.lean}. The filtration $(\mathcal G_n)$
+is \texttt{Filtration.naturalPast ξ hξ} ($\bigvee_{i < n} \sigma(\xi_i)$; Mathlib's
+\texttt{Filtration.natural} includes the present), the independence is
+\texttt{indep\_iSup\_of\_disjoint} and the conditional expectations are \texttt{condExp\_indep\_eq}.
+The sample is $0$-indexed (\texttt{∑ i ∈ range n, (g (ξ i ω) - ∫ y, g y ∂ν)}), the range condition
+is \texttt{∀ x, |g x - ∫ y, g y ∂ν| ≤ b} ($b \ge 0$ follows from it) and $\sigma^2$ is
+\texttt{∫ x, (g x - ∫ y, g y ∂ν) \^{} 2 ∂ν}.
+
+\begin{lemma}[Probability of the Bernstein event]\label{lem:event_bern_prob}
+\lean{Essakine2026Tight.vecExp_empiricalFreq, Essakine2026Tight.abs_sub_vecExp_le, Essakine2026Tight.div_three_mul_lt_one, Essakine2026Tight.log_div_div_le_alphaStar, Essakine2026Tight.measure_exists_lt_abs_vecExp_empTransAt_sub_le, Essakine2026Tight.measure_compl_eventBern_le}\leanok
+\uses{def:event_bern, lem:emp_bernstein_iid, lem:empirical_visits_domination, lem:emp_trans_reindex, lem:rates_props}
+Let $\delta \in (0, 1]$, $f = (f_h)_{h \le H + 1}$ and $b = (b_h)_{h \le H}$ with
+$b_h \ge \max_{s'} f_{h+1}(s') - \min_{s'} f_{h+1}(s')$ for every $h \le H$. Then
+$\Prob(\Omega \setminus \evBern(f, b)) \le \delta/3$; in particular $\Prob(\evBern(f, b)) \ge 1 - \delta/3$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:event_bern, lem:emp_bernstein_iid, lem:empirical_visits_domination, lem:emp_trans_reindex, def:rates, def:emp_trans, def:counts}
+\leanok
 Fix $(h, s, a)$ and put $p := p_h(\cdot \mid s, a)$, $g := f_{h+1}$, $\bar g := pg$,
 $\sigma^2 := \Var_p(g) = p(g - \bar g)^2$, $\delta' := \delta/(3SAH)$, and
 \[
@@ -515,16 +727,12 @@ $T_n \le t < \infty$, and $\phat_h^t(\cdot \mid s, a) = \hat q_n(W_1, \dots, W_n
 (Lemma~\ref{lem:emp_trans_reindex}), so $(W_1, \dots, W_n) \in B_n$; thus
 $\Omega \setminus \evBern(f, b) \subseteq \bigcup_{(h, s, a)} \{\exists n \ge 1 : T_n < \infty, (W_1, \dots, W_n) \in B_n\}$.
 
-\emph{The i.i.d.\ bound.} Let $\xi_1, \xi_2, \dots$ be i.i.d.\ with law $p$ and
-$Y_k := g(\xi_k) - \bar g$. The $Y_k$ are i.i.d., centered, with $\E[Y_k^2] = \sigma^2$, and
-$\abs{Y_k} \le \max g - \min g \le b_h$ since $\bar g \in [\min g, \max g]$. If $b_h = 0$ then $g$ is
-constant, $(\hat q_n(x) - p) g = 0$ for every $x$, and $B_n = \emptyset$ (the right-hand side is
-nonnegative). If $b_h > 0$, apply Corollary~\ref{cor:bernstein_explicit} (the explicit form of the
-self-normalized Bernstein inequality, Theorem~\ref{thm:bernstein_self_normalized}) to the
-sequence $(Y_k)$ with its natural filtration, the constant weights $w_k := 1 \in [0, 1]$ (trivially
-predictable), the bound $b_h$ and the confidence $\delta'$: here
-$S_n = \sum_{k \le n} Y_k = n\,(\hat q_n(\xi) - p) g$ and $V_n = \sum_{k \le n} \E[Y_k^2 \mid \mathcal G_{k-1}] = n\sigma^2$,
-so with probability at least $1 - \delta'$, for all $n \ge 1$,
+\emph{The i.i.d.\ bound.} Let $\xi_1, \xi_2, \dots$ be i.i.d.\ with law $p$. Since $\bar g$ is a
+convex combination of the values of $g$, $\abs{g(x) - \bar g} \le \max g - \min g \le b_h$ for every
+$x$. Lemma~\ref{lem:emp_bernstein_iid} (the self-normalized Bernstein inequality for the constant
+weights $1$, Corollary~\ref{cor:bernstein_explicit}) with the bound $b_h$ and the confidence
+$\delta' \le \delta/3 < 1$ applies: since $\sum_{k \le n} (g(\xi_k) - \bar g) = n\,(\hat q_n(\xi) - p) g$,
+with probability at least $1 - \delta'$, for all $n \ge 1$,
 \[
   n\,\big|(\hat q_n(\xi) - p) g\big| \le \sqrt{2 n \sigma^2 L_n} + 3 b_h L_n,
   \qquad L_n := \log\frac{4e(2n + 1)}{\delta'} .
@@ -537,6 +745,16 @@ $\Prob'(\exists n \ge 1 : (\xi_1, \dots, \xi_n) \in B_n) \le \delta'$.
 \emph{Transfer and union bound.} Lemma~\ref{lem:empirical_visits_domination}(ii) and the union
 bound over the $SAH$ triples give $\Prob(\Omega \setminus \evBern(f, b)) \le SAH \cdot \delta/(3SAH) = \delta/3$.
 \end{proof}
+
+\textbf{Lean remark.} \texttt{measure\_compl\_eventBern\_le : P (eventBern X Y M δ f b)ᶜ ≤ ENNReal.ofReal (δ / 3)}
+(\texttt{EV2026/Events.lean}) for a run \texttt{hseq} as in Lemma~\ref{lem:event_kl_prob},
+\texttt{0 < δ}, \texttt{δ ≤ 1} (for $\delta' < 1$, \texttt{div\_three\_mul\_lt\_one}) and the range
+condition written \texttt{∀ h x y, f h.succ x - f h.succ y ≤ b h}. The bound for one triple is
+\texttt{measure\_exists\_lt\_abs\_vecExp\_empTransAt\_sub\_le}, for any $g$ and $c$ with
+$g(x) - g(y) \le c$; $\abs{g(x) - pg} \le c$ is \texttt{abs\_sub\_vecExp\_le}, the empirical mean
+$(\hat q_n(x)) g = \frac1n \sum_k g(x_k)$ is \texttt{vecExp\_empiricalFreq}, $L_n \le \alpha^*(n, \delta)$ is
+\texttt{log\_div\_div\_le\_alphaStar}, and $pg$, $\Var_p(g)$ are converted to the integrals of the
+i.i.d.\ statement by \texttt{integral\_eq\_vecExp\_transVec} and \texttt{vecVar\_eq\_sum\_sq}.
 
 \begin{remark}[The index of the Bernstein inequality]\label{rem:empirical_bernstein_index}
 The paper's proof of Lemma~5 applies the self-normalized Bernstein inequality to the process
@@ -553,12 +771,14 @@ contain $\log(3SAH/\delta)$, i.e.\ the choice $\delta_{h, s, a} = \delta/(3SAH)$
 \end{remark}
 
 \begin{lemma}[Probability of the counts event]\label{lem:event_cnt_prob}
+\lean{Learning.MDP.Episodic.measure_exists_pullCount_lt_le, Essakine2026Tight.measure_exists_visitCountAt_lt_le, Essakine2026Tight.measure_compl_eventCnt_le}\leanok
 \uses{def:event_cnt, thm:bernoulli_concentration, lem:pseudo_counts_increments, lem:rates_props}
-For $\delta \in (0, 1)$, $\Prob(\evCnt) \ge 1 - \delta/3$.
+For $\delta > 0$, $\Prob(\Omega \setminus \evCnt) \le \delta/3$; in particular $\Prob(\evCnt) \ge 1 - \delta/3$.
 \end{lemma}
 
 \begin{proof}
 \uses{def:event_cnt, thm:bernoulli_concentration, lem:pseudo_counts_increments, def:pseudo_counts, def:counts, def:rates}
+\leanok
 Fix $(h, s, a)$ and $\delta' := \delta/(3SAH)$. For $i \ge 1$ let $X'_i := \indic\{(s^i_h, a^i_h) = (s, a)\}$,
 the visit indicator of the episode $i$, and consider the filtration $(\mathcal F_i)_{i \ge 0}$.
 $X'_i$ is a function of $(X_{i-1}, Y_{i-1})$, which is part of $\hist_i$, hence $\mathcal F_i$-measurable;
@@ -568,32 +788,40 @@ $\mathcal F_{i-1}$-measurable (a function of $X_{i-1} = \pi^i$). Theorem~\ref{th
 (the Bernoulli maximal inequality, Lemma~20 of the paper, from \cite{dann2017unifying}) applied
 to $(X'_i)$, $(P_i)$ and $(\mathcal F_i)$ with the confidence $\delta'$ gives
 \[
-  \Prob\Big(\exists t \ge 1 : \sum_{i \le t} X'_i < \frac12 \sum_{i \le t} P_i - \log\frac1{\delta'}\Big) \le \delta' .
+  \Prob\Big(\exists t \ge 0 : \sum_{i \le t} X'_i < \frac12 \sum_{i \le t} P_i - \log\frac1{\delta'}\Big) \le \delta'
 \]
-Now $\sum_{i \le t} X'_i = n_h^t(s, a)$ (Definition~\ref{def:counts}), $\sum_{i \le t} P_i = \nbar_h^t(s, a)$
-(Definition~\ref{def:pseudo_counts}) and $\log(1/\delta') = \log(3SAH/\delta) = \alpha^{\mathrm{cnt}}(\delta)$;
-for $t = 0$ the inequality $n_h^0 = 0 \ge 0 - \alpha^{\mathrm{cnt}}(\delta)$ holds since
-$\alpha^{\mathrm{cnt}}(\delta) \ge 0$ (Lemma~\ref{lem:rates_props}). So the constraint of $\evCnt$ for the
-triple $(h, s, a)$ fails with probability at most $\delta'$, and the union bound over the $SAH$
+(the empty sums at $t = 0$ are included). Now $\sum_{i \le t} X'_i = n_h^t(s, a)$
+(Definition~\ref{def:counts}), $\sum_{i \le t} P_i = \nbar_h^t(s, a)$ (Definition~\ref{def:pseudo_counts})
+and $\log(1/\delta') = \log(3SAH/\delta) = \alpha^{\mathrm{cnt}}(\delta)$. So the constraint of $\evCnt$ for
+the triple $(h, s, a)$ fails with probability at most $\delta'$, and the union bound over the $SAH$
 triples gives $\Prob(\Omega \setminus \evCnt) \le \delta/3$.
 \end{proof}
 
-\textbf{Lean remark.} The filtration is only needed inside Theorem~\ref{thm:bernoulli_concentration};
-its hypotheses are supplied as: \texttt{X' i} is measurable with respect to the $\sigma$-algebra
-generated by \texttt{histAt X Y i}, and the conditional law of \texttt{X' i} given
-\texttt{(histAt X Y (i - 1), X (i - 1))} is the Bernoulli law of parameter
-\texttt{occupancy M (X (i - 1)) s₁ h s a} (Lemma~\ref{lem:pseudo_counts_increments}(iii) as a
-\texttt{HasCondDistrib} statement, from Lemma~\ref{lem:episode_env_law}). The martingale
-$\exp(\sum_{i \le t}(P_i/2 - X'_i))$ of the proof of Theorem~\ref{thm:bernoulli_concentration} is
-adapted to $(\mathcal F_t)$.
+\textbf{Lean remark.} The Bernoulli maximal inequality for the visits is
+\texttt{Learning.MDP.Episodic.measure\_exists\_pullCount\_lt\_le} (\texttt{MDP/VisitConcentration.lean}),
+for any observation process: Theorem~\ref{thm:bernoulli_concentration}
+(\texttt{measure\_exists\_sum\_lt\_half\_mul\_sum\_sub\_le}) applied to LML's filtration
+\texttt{hseq.filtrationAction} (with $0$-indexed episodes, \texttt{filtrationAction i} is generated
+by the history of the first $i$ episodes and the policy of the episode $i$),
+\texttt{X' i := if stepPair X Y h i ω = (s, a) then 1 else 0} (measurable for
+\texttt{filtrationAction (i + 1)} by \texttt{measurable\_feedback\_filtrationAction\_of\_lt}),
+\texttt{P i := occupancy M (X i ω) s₁ h s a} and the conditional expectation
+\texttt{condExp\_visit\_filtrationAction\_ae\_eq} of Lemma~\ref{lem:pseudo_counts_increments}(iii).
+The count is LML's \texttt{pullCount (stepPair X Y h) (s, a) t} (\texttt{visitCountAt\_eq\_pullCount}).
+The sums over $i < t$ of the theorem include $t = 0$, so neither $\alpha^{\mathrm{cnt}}(\delta) \ge 0$ nor
+$\delta \le 1$ is needed: \texttt{measure\_compl\_eventCnt\_le : P (eventCnt X Y M s₁ δ)ᶜ ≤ ENNReal.ofReal (δ / 3)}
+for \texttt{0 < δ}; the bound for one triple is \texttt{measure\_exists\_visitCountAt\_lt\_le}.
 
 \begin{lemma}[Lemma 5: the good event has probability at least $1 - \delta$]\label{lem:good_event}
+\lean{Essakine2026Tight.optExpValue_succ_sub_le, Essakine2026Tight.measure_compl_goodEvent_le, Essakine2026Tight.one_sub_le_measureReal_goodEvent}\leanok
 \uses{def:good_event, lem:event_kl_prob, lem:event_bern_prob, lem:event_cnt_prob, lem:opt_exp_value_range}
-For $\beta > 0$, $\Prob(\evGood^+) \ge 1 - \delta$, and for $\beta < 0$, $\Prob(\evGood^-) \ge 1 - \delta$.
+Let $\delta \in (0, 1]$ and let the rewards of $\mathcal M$ take values in $[0, 1]$. For $\beta > 0$,
+$\Prob(\evGood^+) \ge 1 - \delta$, and for $\beta < 0$, $\Prob(\evGood^-) \ge 1 - \delta$.
 \end{lemma}
 
 \begin{proof}
 \uses{def:good_event, lem:event_kl_prob, lem:event_bern_prob, lem:event_cnt_prob, lem:opt_exp_value_range}
+\leanok
 By Lemma~\ref{lem:opt_exp_value_range}, for every $h \le H$ the function $Z^*_{h+1}$ takes values
 in $[1, e^{\beta(H - h)}]$ if $\beta > 0$ and in $[e^{\beta(H - h)}, 1]$ if $\beta < 0$, so
 $\max Z^*_{h+1} - \min Z^*_{h+1} \le \abs{e^{\beta(H - h)} - 1} \le b^\pm_h$ (for $\beta > 0$,
@@ -604,8 +832,15 @@ and~\ref{lem:event_cnt_prob}, the union bound gives
 $\Prob(\Omega \setminus \evGood^\pm) \le \delta/3 + \delta/3 + \delta/3 = \delta$.
 \end{proof}
 
-\textbf{Lean remark.} \texttt{measureReal\_goodEvent\_ge : 1 - δ ≤ P.real (goodEvent M s₁ X Y β δ)}
-for any algorithm-environment sequence \texttt{(X, Y)} in \texttt{statesEnv M s₁}, with the
-hypotheses $\delta \in (0, 1)$, \texttt{M.HasRewardFn r} and $r \in [0, 1]$ (needed for the ranges of
-$Z^*$); it is applied in Chapters~\ref{chap:analysis_pos} and~\ref{chap:analysis_neg} to runs
-of Entropic-BPI, but holds for every algorithm.
+\textbf{Lean remark.} \texttt{one\_sub\_le\_measureReal\_goodEvent : 1 - δ ≤ P.real (goodEvent X Y M s₁ β δ)}
+and \texttt{measure\_compl\_goodEvent\_le : P (goodEvent X Y M s₁ β δ)ᶜ ≤ ENNReal.ofReal δ}
+(\texttt{EV2026/Events.lean}), for any algorithm-environment sequence
+\texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M s₁) P} (for a run of Entropic-BPI,
+the field \texttt{isAlgEnvSeq} of \texttt{IdentAlg.IsRun}), with the hypotheses
+\texttt{M.HasRewardFn r}, \texttt{∀ h s a, r h s a ∈ Set.Icc 0 1}, \texttt{0 < δ}, \texttt{δ ≤ 1} and
+every \texttt{β : ℝ} (for $\beta = 0$, $Z^* \equiv 1$ and the range $1 - e^0 = 0$ of the definition is
+still an upper bound). The ranges are \texttt{optExpValue\_succ\_sub\_le} (from
+\texttt{optExpValue\_mem\_Icc}, for \texttt{M.RewardsIn (Set.Icc 0 1)}). The real form uses
+$1 \le \Prob(\evGood) + \Prob(\Omega \setminus \evGood)$ (subadditivity), so no measurability of
+the event is needed. It is applied in Chapters~\ref{chap:analysis_pos}
+and~\ref{chap:analysis_neg} to runs of Entropic-BPI, but holds for every algorithm.

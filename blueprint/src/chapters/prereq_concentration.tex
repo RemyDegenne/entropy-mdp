@@ -24,6 +24,43 @@ $\Var_p(f)$ is \texttt{ProbabilityTheory.variance}, and $\KL$ is
 \texttt{klDiv\_of\_not\_ac} for the infinite case and \texttt{toReal\_klDiv} for the finite-sum
 formula. Throughout, $\log$ is the natural logarithm and $e$ its base.
 
+\textbf{Lean remark.} Sections~\ref{sec:pconc_kl} and~\ref{sec:pconc_bernstein} are formalized in
+full measure-theoretic generality: $p, q$ are arbitrary probability measures (not only
+\texttt{weightedMeasure}s), $pf$ is \texttt{∫ x, f x ∂p} and the functions are only assumed
+a.e.\ measurable with values a.e.\ in the stated interval. The finite-vector statements are the
+specializations to \texttt{weightedMeasure}s (Lemma~\ref{lem:pconc_weighted_measure}); the
+finite-sum formula for $\KL$ is Lemma~\ref{lem:pconc_kl_finite_sum}.
+
+\begin{lemma}[Weighted measures of probability vectors]\label{lem:pconc_weighted_measure}
+\lean{MeasureTheory.weightedMeasure_singleton, MeasureTheory.measureReal_weightedMeasure_singleton, MeasureTheory.isFiniteMeasure_weightedMeasure, MeasureTheory.isProbabilityMeasure_weightedMeasure, MeasureTheory.weightedMeasure_absolutelyContinuous}\leanok
+Let $p, q : \mathcal X \to \R$ on a finite set. The measure $\sum_x p(x)\delta_x$ gives mass
+$\max(p(x), 0)$ to $\{x\}$, is finite, is a probability measure when $p$ is a probability vector,
+and $\sum_x q(x)\delta_x \ll \sum_x p(x)\delta_x$ as soon as $q(x) > 0 \Rightarrow p(x) > 0$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+Evaluate the finite sum of Dirac masses on singletons and on $\mathcal X$
+(\texttt{weightedMeasure\_apply}); a set of measure $0$ contains no $x$ with $p(x) > 0$.
+\end{proof}
+
+\begin{lemma}[The Kullback--Leibler divergence on a finite set]\label{lem:pconc_kl_finite_sum}
+\lean{InformationTheory.rnDeriv_apply_eq_div, InformationTheory.toReal_klDiv_eq_sum, InformationTheory.klDiv_ne_top_of_finite}\leanok
+Let $\mu \ll \nu$ be probability measures on a finite set (with measurable singletons). Then
+$\KL(\mu \| \nu) < \infty$ and $\KL(\mu \| \nu) = \sum_x \mu(\{x\}) \log\big(\mu(\{x\})/\nu(\{x\})\big)$
+(with $0 \log 0 = 0$).
+\end{lemma}
+
+\begin{proof}
+\leanok
+Every function on a finite set is integrable, so $\KL(\mu\|\nu) = \int \log\frac{d\mu}{d\nu}\,d\mu$
+(\texttt{toReal\_klDiv\_of\_measure\_eq}) $= \sum_x \mu(\{x\}) \log\frac{d\mu}{d\nu}(x)$
+(\texttt{integral\_fintype}). If $\nu(\{x\}) > 0$, integrating the density over $\{x\}$
+(\texttt{Measure.setLIntegral\_rnDeriv'}, \texttt{lintegral\_singleton}) gives
+$\frac{d\mu}{d\nu}(x)\,\nu(\{x\}) = \mu(\{x\})$; if $\nu(\{x\}) = 0$ then $\mu(\{x\}) = 0$ and the term
+vanishes.
+\end{proof}
+
 \section{The method of types and Sanov's bound}
 \label{sec:pconc_sanov}
 
@@ -35,11 +72,23 @@ $\phat_n(x) := \frac1n \sum_{k \le n} \indic\{X_k = x\}$, a random probability v
 $\phat_n$ is a type.
 
 \begin{lemma}[Probability of a type]\label{lem:type_prob_le}
+\lean{InformationTheory.typeCount, InformationTheory.empiricalFreq, InformationTheory.sum_typeCount, InformationTheory.prod_comp_eq_prod_pow_typeCount, InformationTheory.measure_typeCount_eq, InformationTheory.pi_weightedMeasure_typeCount_eq, InformationTheory.measure_typeCount_eq_le}\leanok
 For every type $q$ of denominator $n$,
 $\Prob(\phat_n = q) \le e^{-n \KL(q \| p)}$, with $e^{-\infty} := 0$.
 \end{lemma}
 
+\textbf{Lean remark.} The type of $x \in \mathcal X^n$ is the count vector
+\texttt{typeCount x : α → ℕ} and $\phat_n$ is \texttt{weightedMeasure (empiricalFreq x)} with
+\texttt{empiricalFreq x a = typeCount x a / n}. To avoid $e^{-\infty}$, the Lean statement is: for
+every count vector $N$ with $\sum_x N(x) = n$ and every real $t$ with
+\texttt{ENNReal.ofReal t ≤ klDiv (weightedMeasure (N/n)) (weightedMeasure p)},
+$\Prob(\text{type of } (X_1, \dots, X_n) = N) \le e^{-nt}$ (\texttt{measure\_typeCount\_eq\_le}); it
+also holds for $n = 0$, and $\sum_x p(x) = 1$ is not a hypothesis (it follows from
+\texttt{HasLaw}).
+
 \begin{proof}
+\uses{lem:pconc_weighted_measure, lem:pconc_kl_finite_sum}
+\leanok
 Write $N(x) := n q(x) \in \N$, so that $\sum_x N(x) = n$. The event $\{\phat_n = q\}$ is the
 set $T(q)$ of sequences $(x_1, \dots, x_n) \in \mathcal X^n$ in which each $x$ appears exactly
 $N(x)$ times. By independence, each such sequence has probability
@@ -55,15 +104,31 @@ show $\abs{T(q)} \le e^{n H(q)}$: under the product law $q^{\otimes n}$ on $\mat
 sequence of $T(q)$ has probability $\prod_x q(x)^{N(x)} = e^{-n H(q)}$ by the same computation
 (with $p := q$, for which $\KL(q \| q) = 0$), hence
 $1 \ge q^{\otimes n}(T(q)) = \abs{T(q)}\, e^{-n H(q)}$. This is Theorem~11.1.4 of
-\cite{cover2006elements}.
+\cite{cover2006elements}. (Lean: the law of $(X_1, \dots, X_n)$ is $p^{\otimes n}$ by
+\texttt{iIndepFun.map\_fun\_eq\_pi\_map}; $p^{\otimes n}(T(q)) = \abs{T(q)} \prod_x p(x)^{N(x)}$ by
+\texttt{sum\_measure\_singleton}, \texttt{Measure.pi\_singleton} and \texttt{Finset.prod\_fiberwise'};
+the entropy is not introduced: $\prod_x p(x)^{N(x)} = \prod_x q(x)^{N(x)} \cdot e^{-n\KL(q\|p)}$
+directly, by Lemma~\ref{lem:pconc_kl_finite_sum}, and $\abs{T(q)} \prod_x q(x)^{N(x)} \le 1$.)
 \end{proof}
 
 \begin{lemma}[Number of types]\label{lem:num_types}
+\lean{InformationTheory.card_piAntidiag_univ, Nat.choose_add_le_add_one_pow, InformationTheory.card_le_pow_of_sum_eq, InformationTheory.card_piAntidiag_univ_le}\leanok
 The number of types of denominator $n$ on a set with $m \ge 1$ elements is
 $\binom{n + m - 1}{m - 1}$, and $\binom{n + m - 1}{m - 1} \le (n + 1)^{m - 1}$.
 \end{lemma}
 
+\textbf{Lean remark.} Types are identified with their count vectors. The count is Mathlib's
+\texttt{Finset.card\_finsuppAntidiag\_nat\_eq\_choose}, in the form
+$\#\{N : \mathcal X \to \N : \sum_x N(x) = n\} = \binom{m + n - 1}{n}$ (\texttt{card\_piAntidiag\_univ};
+$\binom{m + n - 1}{n} = \binom{n + m - 1}{m - 1}$ for $m \ge 1$), and the binomial bound is Mathlib's
+\texttt{Nat.choose\_add\_le\_add\_one\_pow} ($\binom{n + k}{k} \le (n + 1)^k$). The bound used by
+Theorem~\ref{thm:sanov_hp} is proved without binomial coefficients, for any finite set of count
+vectors of total $n$ (\texttt{card\_le\_pow\_of\_sum\_eq}): forgetting the coordinate of a fixed
+$x_0$ is injective on such vectors (the missing coordinate is $n$ minus the others) and lands in
+$\{0, \dots, n\}^{\mathcal X \setminus \{x_0\}}$, which has $(n + 1)^{m - 1}$ elements.
+
 \begin{proof}
+\leanok
 Types of denominator $n$ correspond bijectively to families $(N(x))_{x \in \mathcal X}$ of
 nonnegative integers with $\sum_x N(x) = n$ (via $N(x) = n q(x)$), i.e.\ to multisets of size
 $n$ over $\mathcal X$, whose number is the multichoose number $\binom{n + m - 1}{n} = \binom{n + m - 1}{m - 1}$
@@ -77,6 +142,7 @@ $\binom{n + m}{m} = \binom{n + m - 1}{m - 1} \cdot \frac{n + m}{m}$, Mathlib
 
 \begin{theorem}[Lemma 19: Sanov's high-probability bound]\label{thm:sanov_hp}
 \uses{lem:type_prob_le, lem:num_types}
+\lean{InformationTheory.measure_lt_klDiv_empiricalFreq_le, InformationTheory.measure_lt_klDiv_empiricalFreq_le_delta}\leanok
 For every $x \in \R$, $\Prob(\KL(\phat_n \| p) > x) \le (n + 1)^{m - 1} e^{-n x}$. Consequently,
 for every $\delta \in (0, 1)$, with probability at least $1 - \delta$,
 \[
@@ -86,6 +152,7 @@ for every $\delta \in (0, 1)$, with probability at least $1 - \delta$,
 
 \begin{proof}
 \uses{lem:type_prob_le, lem:num_types}
+\leanok
 Since $\phat_n$ is a type of denominator $n$, the event $\{\KL(\phat_n \| p) > x\}$ is the
 disjoint union, over the types $q$ of denominator $n$ with $\KL(q \| p) > x$, of the events
 $\{\phat_n = q\}$. By Lemma~\ref{lem:type_prob_le} each has probability at most
@@ -109,13 +176,19 @@ obtained from this theorem by a union bound over $n$ with the paper's rate
 and~\ref{lem:num_types}, and Theorem~\ref{thm:sanov_hp} is only referenced in remarks.
 \end{remark}
 
-\textbf{Lean remark.} The sample is \texttt{X : Fin n → Ω → Fin m} with
-\texttt{ProbabilityTheory.iIndepFun} and \texttt{HasLaw (X k) (weightedMeasure p)}; the empirical
-distribution is the \texttt{weightedMeasure} of the vector of frequencies. The proof of
+\textbf{Lean remark.} The sample is \texttt{X : Fin n → Ω → α} with \texttt{α} a
+\texttt{Fintype} with measurable singletons, \texttt{ProbabilityTheory.iIndepFun X μ} and
+\texttt{HasLaw (X k) (weightedMeasure p) μ} (with \texttt{0 ≤ p}); the empirical distribution is
+\texttt{weightedMeasure (empiricalFreq (fun k ↦ X k ω))}. The proof of
 Lemma~\ref{lem:type_prob_le} needs the law of the whole vector, \texttt{(fun ω k => X k ω)},
-to be the product measure (\texttt{iIndepFun\_iff\_map\_fun\_eq\_pi\_map}), and the statement of
+to be the product measure (\texttt{iIndepFun.map\_fun\_eq\_pi\_map}), and the statement of
 Theorem~\ref{thm:sanov_hp} compares \texttt{klDiv} (in \texttt{ℝ≥0∞}) with a real threshold
-through \texttt{ENNReal.ofReal}.
+through \texttt{ENNReal.ofReal}: \texttt{μ \{ω | ENNReal.ofReal x < klDiv …\} ≤ ENNReal.ofReal
+((n + 1) \^{} (card α - 1) * exp (-(n * x)))} for every real $x$ and every $n$
+(\texttt{measure\_lt\_klDiv\_empiricalFreq\_le}; for $x < 0$ the event is $\{\KL > 0\}$, and the bound
+is $\ge 1$ in both versions), and the confidence form holds for every $\delta > 0$ and $n \ge 1$
+(\texttt{measure\_lt\_klDiv\_empiricalFreq\_le\_delta}), with the threshold
+$((m - 1)\log(n + 1) + \log(1/\delta))/n$.
 
 \section{Ville's inequality and the Bernoulli maximal inequality}
 \label{sec:pconc_ville}
@@ -126,6 +199,7 @@ and conditional expectations are \texttt{MeasureTheory.condExp}; all (in)equalit
 random variables hold almost surely.
 
 \begin{lemma}[One-step bound for a Bernoulli variable]\label{lem:bernoulli_mgf_step}
+\lean{MeasureTheory.condExp_exp_sub_le_one}\leanok
 Let $\mathcal G \subseteq \mathcal F$ be a sub-$\sigma$-algebra, $X$ a random variable with
 values in $\{0, 1\}$ and $P$ a $\mathcal G$-measurable random variable with values in $[0, 1]$
 such that $\E[X \mid \mathcal G] = P$ (i.e.\ $P = \Prob(X = 1 \mid \mathcal G)$). Then
@@ -133,6 +207,7 @@ $\E[e^{P/2 - X} \mid \mathcal G] \le 1$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Since $X \in \{0, 1\}$, $e^{-X} = 1 - (1 - e^{-1}) X$ pointwise, so by linearity
 $\E[e^{-X} \mid \mathcal G] = 1 - (1 - e^{-1}) P$. As $e^{P/2}$ is bounded and
 $\mathcal G$-measurable, $\E[e^{P/2 - X} \mid \mathcal G] = e^{P/2}\big(1 - (1 - e^{-1})P\big)$
@@ -141,13 +216,22 @@ so $1 - (1 - e^{-1})P \le 1 - P/2 \le e^{-P/2}$ (using $P \ge 0$ and $1 + y \le 
 $y = -P/2$, \texttt{Real.add\_one\_le\_exp}). Multiplying by $e^{P/2} > 0$ gives the claim.
 \end{proof}
 
+\textbf{Lean remark.} \texttt{condExp\_exp\_sub\_le\_one}: on a finite measure space, for
+\texttt{m ≤ mΩ}, \texttt{X} strongly measurable with \texttt{∀ ω, X ω = 0 ∨ X ω = 1},
+\texttt{P} \texttt{m}-strongly measurable with \texttt{∀ ω, P ω ∈ [0, 1]} and
+\texttt{μ[X | m] =ᵐ[μ] P}, the conclusion is
+\texttt{μ[fun ω ↦ exp (P ω / 2 - X ω) | m] ≤ᵐ[μ] 1}. The value constraints on $X$ and $P$ are
+pointwise rather than almost sure.
+
 \begin{lemma}[Ville's maximal inequality]\label{lem:ville}
+\lean{MeasureTheory.Supermartingale.mul_measureReal_exists_le_le, MeasureTheory.Supermartingale.measure_exists_ge_le}\leanok
 Let $(M_t)_{t \ge 0}$ be a nonnegative supermartingale with respect to $(\mathcal F_t)$ with
 $\E[M_0] \le 1$. Then for every $c > 0$, $\Prob(\exists t \ge 0,\ M_t \ge c) \le 1/c$; in
 particular $\Prob(\exists t,\ M_t \ge 1/\delta) \le \delta$ for $\delta \in (0, 1]$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Let $\tau := \inf\{t : M_t \ge c\}$ (with $\inf \emptyset = \infty$), a stopping time of
 $(\mathcal F_t)$ (\texttt{hitting} of the closed set $[c, \infty)$,
 \texttt{MeasureTheory.hitting\_isStoppingTime}). Fix $N \ge 0$ and let $\tau_N := \tau \wedge N$,
@@ -162,7 +246,14 @@ $\Prob(\exists t, M_t \ge c) = \lim_N \Prob(\tau \le N) \le 1/c$
 (\texttt{MeasureTheory.tendsto\_measure\_iUnion\_atTop}). The second claim is $c = 1/\delta$.
 \end{proof}
 
-\textbf{Lean remark.} Mathlib's \texttt{MeasureTheory.maximal\_ineq} is Doob's inequality
+\textbf{Lean remark.} The Lean statement is the general form
+\texttt{μ \{ω | ∃ n, c ≤ M n ω\} ≤ ENNReal.ofReal ((∫ ω, M 0 ω ∂μ) / c)} for a supermartingale
+\texttt{M : ℕ → Ω → ℝ} with \texttt{∀ n ω, 0 ≤ M n ω}, \texttt{0 < c}, on a finite measure space
+(\texttt{Supermartingale.measure\_exists\_ge\_le}), via the finite-horizon bound
+$c\,\Prob(\exists n \le N, M_n \ge c) \le \E[M_0]$ (\texttt{mul\_measureReal\_exists\_le\_le}, which does
+not need $c > 0$). In this Mathlib the hitting time is \texttt{hittingBtwn M (Set.Ici c) 0 N}
+(\texttt{Adapted.isStoppingTime\_hittingBtwn}, \texttt{stoppedValue\_hittingBtwn\_mem}), and the
+limit is \texttt{Monotone.measure\_iUnion}. Mathlib's \texttt{MeasureTheory.maximal\_ineq} is Doob's inequality
 for nonnegative \emph{sub}martingales and does not apply directly; the proof above uses the
 stopped process. Alternatively, \texttt{Supermartingale.stoppedProcess} (the stopped
 supermartingale is a supermartingale) with \texttt{stoppedValue} at $N$ gives the same
@@ -172,6 +263,7 @@ Theorem~\ref{thm:bernoulli_concentration} and Theorem~\ref{thm:bernstein_self_no
 
 \begin{theorem}[Lemma 20: Bernoulli maximal inequality]\label{thm:bernoulli_concentration}
 \uses{lem:bernoulli_mgf_step, lem:ville}
+\lean{MeasureTheory.measure_exists_sum_lt_half_mul_sum_sub_le}\leanok
 Let $(X_i)_{i \ge 1}$ be random variables with values in $\{0, 1\}$, $X_i$ being
 $\mathcal F_i$-measurable, and $(P_i)_{i \ge 1}$ random variables with values in $[0, 1]$, $P_i$
 being $\mathcal F_{i - 1}$-measurable, with $\E[X_i \mid \mathcal F_{i-1}] = P_i$ for every
@@ -183,6 +275,7 @@ $i \ge 1$. Then for every $\delta \in (0, 1)$,
 
 \begin{proof}
 \uses{lem:bernoulli_mgf_step, lem:ville}
+\leanok
 Let $M_n := \exp\big(\sum_{i \le n} (P_i/2 - X_i)\big)$, $M_0 := 1$. Each $M_n$ is
 $\mathcal F_n$-measurable, positive, and bounded by $e^{n/2}$, hence integrable. For $n \ge 1$,
 $M_n = M_{n-1}\, e^{P_n/2 - X_n}$ with $M_{n-1}$ bounded and $\mathcal F_{n-1}$-measurable, so
@@ -197,7 +290,13 @@ $\sum_{i \le n}(P_i/2 - X_i) > \log(1/\delta)$, i.e.\ $M_n > 1/\delta$; so the e
 statement is contained in $\{\exists n, M_n \ge 1/\delta\}$.
 \end{proof}
 
-\textbf{Lean remark.} This is Lemma~F.4 of \cite{dann2017unifying}. The hypothesis
+\textbf{Lean remark.} This is Lemma~F.4 of \cite{dann2017unifying}. The Lean statement is
+$0$-indexed: \texttt{X P : ℕ → Ω → ℝ}, \texttt{X i ω ∈ \{0, 1\}}, \texttt{X i} is
+\texttt{ℱ (i + 1)}-measurable, \texttt{P i ω ∈ [0, 1]} is \texttt{ℱ i}-measurable,
+\texttt{μ[X i | ℱ i] =ᵐ[μ] P i}, and the conclusion is
+\texttt{μ \{ω | ∃ n, ∑ i ∈ range n, X i ω < 1 / 2 * ∑ i ∈ range n, P i ω - log (1 / δ)\} ≤ ENNReal.ofReal δ}
+for every $\delta > 0$ ($\delta < 1$ is not needed; $n = 0$ is allowed). The supermartingale
+property is \texttt{supermartingale\_nat} with the pull-out property. The hypothesis
 $\E[X_i \mid \mathcal F_{i-1}] = P_i$ is stated with \texttt{condExp}; in
 Chapter~\ref{chap:empirical} it is supplied by a conditional-law statement
 (\texttt{HasCondDistrib}, Lemma~\ref{lem:pseudo_counts_increments}), from which the
@@ -214,6 +313,7 @@ distribution of parameter $1$) and, for $b > 0$, $\varphi_b(\lambda) := e^{\lamb
 for $\lambda \in \R$.
 
 \begin{lemma}[Elementary properties of the Poisson Cramér transform]\label{lem:poisson_cramer}
+\lean{Real.poissonCramer, Real.expSubOneSub, Real.expSubOneSub_nonneg, Real.div_le_log_one_add, Real.sq_div_le_poissonCramer, Real.poissonCramer_nonneg, Real.mul_poissonCramer_eq, Real.le_sqrt_add_of_mul_poissonCramer_le}\leanok
 \begin{enumerate}
 \item[(i)] For $x \ge 0$: $h(x) \ge \dfrac{x^2}{2(1 + x/3)} \ge 0$. For $\lambda \ge 0$ and $b > 0$:
   $\varphi_b(\lambda) \ge 0$.
@@ -224,8 +324,17 @@ for $\lambda \in \R$.
 \end{enumerate}
 \end{lemma}
 
+\textbf{Lean remark.} \texttt{Real.poissonCramer x = (1 + x) * log (1 + x) - x} and
+\texttt{Real.expSubOneSub u = exp u - 1 - u}, so that $\varphi_b(\lambda)$ is
+\texttt{expSubOneSub (λ * b)}. (i) holds for every $u$: \texttt{expSubOneSub\_nonneg u}. (ii) is
+stated with $u := \hat\lambda b = \log(1 + s/c)$, in which $b$ disappears
+(\texttt{mul\_poissonCramer\_eq}: \texttt{log (1 + s / c) * s - c * expSubOneSub (log (1 + s / c)) =
+c * poissonCramer (s / c)} for $c > 0$, $s \ge 0$). (iii) is
+\texttt{le\_sqrt\_add\_of\_mul\_poissonCramer\_le}, with conclusion \texttt{s ≤ √(2 * c * l) + 2 / 3 * l}.
+
 \begin{proof}
-\uses{lem:sqrt_add_le}
+\uses{lem:sqrt_add_le, lem:pana_quadratic_root}
+\leanok
 (i) $\varphi_b(\lambda) \ge 0$ is $1 + u \le e^u$ with $u = \lambda b$ (\texttt{Real.add\_one\_le\_exp}).
 For $h$, let $\psi(x) := h(x) - \frac{3x^2}{2(3 + x)}$ on $[0, \infty)$. Then $\psi(0) = 0$,
 $\psi'(x) = \log(1 + x) - \frac{3x(6 + x)}{2(3 + x)^2}$ (using $h'(x) = \log(1 + x)$), $\psi'(0) = 0$,
@@ -233,6 +342,12 @@ and $\psi''(x) = \frac1{1 + x} - \frac{27}{(3 + x)^3} \ge 0$ because
 $(3 + x)^3 = 27 + 27x + 9x^2 + x^3 \ge 27(1 + x)$. Hence $\psi'$ is nondecreasing, so
 $\psi' \ge \psi'(0) = 0$, so $\psi$ is nondecreasing and $\psi \ge \psi(0) = 0$
 (\texttt{monotoneOn\_of\_deriv\_nonneg} twice). Finally $\frac{x^2}{2(1 + x/3)} = \frac{3x^2}{2(3 + x)} \ge 0$.
+(Lean: a single derivative suffices. The Padé-type bound
+$\log(1 + x) \ge \frac{6x + 5x^2}{6 + 8x + 2x^2}$ for $x \ge 0$ (\texttt{Real.div\_le\_log\_one\_add})
+holds because the difference vanishes at $0$ and has derivative
+$\frac1{1 + x} - \frac{36 + 60x + 28x^2}{(6 + 8x + 2x^2)^2} = \frac{x^3}{(1 + x)^2(3 + x)^2} \ge 0$
+(\texttt{monotoneOn\_of\_hasDerivWithinAt\_nonneg}); multiplying by $1 + x$ and using
+$6 + 8x + 2x^2 = 2(1 + x)(3 + x)$ gives exactly $h(x) \ge \frac{3x^2}{2(3 + x)}$.)
 
 (ii) Put $x := s/c \ge 0$, so $e^{\hat\lambda b} = 1 + x$ and $\varphi_b(\hat\lambda) = x - \log(1 + x)$.
 Then $\hat\lambda b s - c\varphi_b(\hat\lambda) = c\,[x \log(1 + x) - x + \log(1 + x)] = c\,[(1 + x)\log(1 + x) - x] = c\, h(x)$.
@@ -243,14 +358,18 @@ which is not needed below.)
 so $s^2 \le 2c\ell + \frac{2\ell}{3} s$, i.e.\ $(s - \ell/3)^2 \le \ell^2/9 + 2c\ell$. Hence
 $s \le \ell/3 + \sqrt{\ell^2/9 + 2c\ell} \le \ell/3 + \ell/3 + \sqrt{2c\ell}$ by
 Lemma~\ref{lem:sqrt_add_le} (\texttt{Real.sqrt\_le\_sqrt}, \texttt{abs\_le\_of\_sq\_le\_sq'}).
+(Lean: $s^2 \le \frac{2\ell}{3} s + 2c\ell$ and Lemma~\ref{lem:pana_quadratic_root},
+\texttt{Real.le\_add\_sqrt\_of\_sq\_le}, give the conclusion directly.)
 \end{proof}
 
 \begin{lemma}[A Taylor bound for the exponential of a bounded variable]\label{lem:pconc_exp_taylor_bound}
+\lean{Real.expSubOneSub_eq_tsum, Real.expSubOneSub_mul_le, Real.exp_mul_le_of_abs_le}\leanok
 For $b > 0$, $\lambda \ge 0$ and $y \in [-b, b]$:
 $e^{\lambda y} \le 1 + \lambda y + \dfrac{y^2}{b^2}\, \varphi_b(\lambda)$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 By the power series of the exponential (\texttt{Real.exp\_eq\_exp\_ℝ},
 \texttt{NormedSpace.exp\_eq\_tsum\_div}), $e^{\lambda y} - 1 - \lambda y = \sum_{k \ge 2} (\lambda y)^k/k!$
 and $\varphi_b(\lambda) = \sum_{k \ge 2} (\lambda b)^k/k!$, both series being absolutely convergent.
@@ -262,6 +381,7 @@ $e^{\lambda y} - 1 - \lambda y \le \frac{y^2}{b^2} \sum_{k \ge 2} (\lambda b)^k/
 
 \begin{lemma}[The exponential supermartingale]\label{lem:bernstein_exp_supermartingale}
 \uses{lem:pconc_exp_taylor_bound}
+\lean{ProbabilityTheory.selfNormSum, ProbabilityTheory.selfNormVar, ProbabilityTheory.abs_selfNormSum_le, ProbabilityTheory.selfNormVar_nonneg, ProbabilityTheory.selfNormVar_le, ProbabilityTheory.condExp_exp_mul_sub_le_one, ProbabilityTheory.supermartingale_exp_selfNorm, ProbabilityTheory.supermartingale_exp_neg_selfNorm}\leanok
 Let $b > 0$, $(Y_t)_{t \ge 1}$ random variables with $Y_t$ $\mathcal F_t$-measurable,
 $\abs{Y_t} \le b$ and $\E[Y_t \mid \mathcal F_{t-1}] = 0$, and $(w_t)_{t \ge 1}$ random variables
 with $w_t$ $\mathcal F_{t-1}$-measurable and $w_t \in [0, 1]$. Let $\sigma_t^2 := \E[Y_t^2 \mid \mathcal F_{t-1}]$
@@ -280,6 +400,7 @@ so that $\abs{S_t} \le tb$ and $0 \le V_t \le tb^2$. Then for every $\lambda \ge
 
 \begin{proof}
 \uses{lem:pconc_exp_taylor_bound}
+\leanok
 The bounds $\abs{S_t} \le tb$ and $V_t \le tb^2$ follow from $w_s \in [0, 1]$, $\abs{Y_s} \le b$
 and $\sigma_s^2 \le b^2$ (conditional expectation of a variable in $[0, b^2]$).
 
@@ -309,12 +430,20 @@ $(-Y_t)^2 = Y_t^2$), and its sums are $-S_t$ and $V_t$.
 \textbf{Lean remark.} The hypothesis $\lambda \ge 0$ is necessary: for $\lambda < 0$ the bound
 $\E[e^{\lambda Y}] \le \exp(\E[Y^2]\varphi_b(\lambda)/b^2)$ fails (take $Y = \pm b$ with probability
 $1/2$ each and $\lambda b = -2$: $\cosh 2 \approx 3.76 > \exp(e^{-2} + 1) \approx 3.11$); the
-outline's ``$\lambda \in \R$'' must be read with $\varphi_b(\abs\lambda)$, which is (iii). In Lean,
-$\sigma_t^2$ is \texttt{μ[Y t \^{} 2 | ℱ (t - 1)]} (a fixed version), $S$ and $V$ are
-\texttt{Finset.sum} over \texttt{Finset.Icc 1 t}, and the supermartingale property is
-proved by \texttt{supermartingale\_of\_setIntegral\_succ\_le} or by the \texttt{condExp}
-computation above; \texttt{ProbabilityTheory.variance} does not appear (the conditional
-variance is the conditional expectation of the square of a centered variable).
+outline's ``$\lambda \in \R$'' must be read with $\varphi_b(\abs\lambda)$, which is (iii). In Lean
+the processes are $0$-indexed: \texttt{Y w v : ℕ → Ω → ℝ} with \texttt{Y i}
+\texttt{ℱ (i + 1)}-measurable, \texttt{∀ᵐ ω, |Y i ω| ≤ b}, \texttt{μ[Y i | ℱ i] =ᵐ[μ] 0};
+\texttt{w i} \texttt{ℱ i}-measurable with values in $[0, 1]$; and $\sigma_i^2$ is a given
+\texttt{ℱ i}-measurable version \texttt{v i} with values in $[0, b^2]$ and
+\texttt{μ[fun ω ↦ Y i ω \^{} 2 | ℱ i] =ᵐ[μ] v i} (the version is a hypothesis rather than
+\texttt{μ[Y i \^{} 2 | ℱ i]} itself, which is only a.e.\ in $[0, b^2]$). Then
+\texttt{selfNormSum Y w t ω = ∑ i ∈ range t, w i ω * Y i ω} and
+\texttt{selfNormVar v w t ω = ∑ i ∈ range t, w i ω \^{} 2 * v i ω}; (i) is
+\texttt{condExp\_exp\_mul\_sub\_le\_one} (for one step, any sub-$\sigma$-algebra), (ii) is
+\texttt{supermartingale\_exp\_selfNorm} (by \texttt{supermartingale\_nat} and the pull-out property;
+the bound $M^\lambda_t \le e^{\lambda b t}$ holds a.s.), (iii) is
+\texttt{supermartingale\_exp\_neg\_selfNorm}. \texttt{ProbabilityTheory.variance} does not appear
+(the conditional variance is the conditional expectation of the square of a centered variable).
 
 The paper's Lemma~21 is proved in \cite{menard2021fast} by a peeling argument over
 $\lambda$. We use instead the method of mixtures: the exponential supermartingales of
@@ -325,6 +454,7 @@ paper's $4e(2t + 1)$. Write $\varphi := \varphi_1$, i.e.\ $\varphi(\mu) = e^\mu 
 
 \begin{lemma}[Lower bound on the exponential mixture]\label{lem:pconc_mixture_lower}
 \uses{lem:poisson_cramer}
+\lean{Real.lintegral_Ioc_exp_neg, Real.exp_one_div_four_le, Real.sub_sq_le_log_one_add, Real.ofReal_exp_div_le_lintegral_mixture}\leanok
 For all $s \ge 0$ and $v \ge 0$, with $T := (v + 1)\, h\big(s/(v + 1)\big)$,
 \[
   \int_0^\infty \exp\big(\mu s - \varphi(\mu)\, v - \mu\big)\, d\mu \ \ge\ \frac{e^{T}}{4\,(1 + \sqrt{s + v})}
@@ -332,8 +462,14 @@ For all $s \ge 0$ and $v \ge 0$, with $T := (v + 1)\, h\big(s/(v + 1)\big)$,
 (the left-hand side is the Lebesgue integral of a nonnegative continuous function, possibly $+\infty$).
 \end{lemma}
 
+\textbf{Lean remark.} The integral is the lower Lebesgue integral
+\texttt{∫⁻ u in Ioi 0, ENNReal.ofReal (exp (u * s - expSubOneSub u * v - u))} and the bound is
+its \texttt{ENNReal.ofReal}; in the case $s = v = 0$ the Lean proof uses
+$\int_0^{\log 2} e^{-u}\,du = 1/2 \ge 1/4$.
+
 \begin{proof}
 \uses{lem:poisson_cramer}
+\leanok
 If $s = v = 0$ then $T = h(0) = 0$ and the integral is $\int_0^\infty e^{-\mu}\,d\mu = 1 \ge 1/4$.
 Otherwise $s + v > 0$; put $x := s/(v + 1) \ge 0$, $\hat\mu := \log(1 + x) \ge 0$,
 $\theta_0 := 1/\sqrt{s + v} > 0$, $\ell := \log(1 + \theta_0) > 0$ and
@@ -367,6 +503,7 @@ integral is at least $e^{T - 1} \cdot (e/4) \cdot 1/(1 + \sqrt{s + v}) = e^T/(4(
 
 \begin{lemma}[The mixture supermartingale]\label{lem:pconc_bernstein_mixture}
 \uses{lem:bernstein_exp_supermartingale}
+\lean{ProbabilityTheory.bernsteinMixtureIntegrand, ProbabilityTheory.bernsteinMixture, ProbabilityTheory.measurable_bernsteinMixture, ProbabilityTheory.bernsteinMixture_zero_zero, ProbabilityTheory.ofReal_le_bernsteinMixture, ProbabilityTheory.supermartingale_bernsteinMixtureIntegrand, ProbabilityTheory.setLIntegral_selfNorm_mixture_le, ProbabilityTheory.lintegral_selfNorm_mixture_le_one, ProbabilityTheory.ae_bernsteinMixture_lt_top, ProbabilityTheory.selfNormMixture, ProbabilityTheory.selfNormMixture_zero, ProbabilityTheory.selfNormMixture_nonneg, ProbabilityTheory.supermartingale_selfNormMixture, ProbabilityTheory.ae_exp_div_le_selfNormMixture}\leanok
 In the setting of Lemma~\ref{lem:bernstein_exp_supermartingale}, define for $t \ge 0$
 \[
   M_t := \frac12 \int_0^\infty \Big[ \exp\Big(\frac{\mu S_t}{b} - \varphi(\mu)\frac{V_t}{b^2}\Big) + \exp\Big(-\frac{\mu S_t}{b} - \varphi(\mu)\frac{V_t}{b^2}\Big) \Big] e^{-\mu}\, d\mu .
@@ -379,8 +516,22 @@ a nonnegative supermartingale with respect to $(\mathcal F_t)$, and almost surel
 \]
 \end{lemma}
 
+\textbf{Lean remark.} The mixture is first defined as a function of $(s, v)$ with values in
+$[0, \infty]$, \texttt{bernsteinMixture b s v = ∫⁻ u in Ioi 0, ENNReal.ofReal
+(bernsteinMixtureIntegrand b s v u)} with integrand
+$\frac12\big(e^{us/b - \varphi(u)v/b^2} + e^{-us/b - \varphi(u)v/b^2}\big)e^{-u}$, which is measurable
+in $(s, v)$ (\texttt{Measurable.lintegral\_prod\_right'}); then
+\texttt{selfNormMixture b Y w v t ω = (bernsteinMixture b (S t ω) (V t ω)).toReal} ($0$ where the
+integral is infinite). The supermartingale property is proved in $[0, \infty]$
+(\texttt{setLIntegral\_selfNorm\_mixture\_le}: Tonelli \texttt{lintegral\_lintegral\_swap}, then
+\texttt{Supermartingale.setIntegral\_le} for each fixed $u$) and transferred with
+\texttt{integral\_toReal} (\texttt{supermartingale\_of\_setIntegral\_succ\_le}); the lower bound is
+\texttt{ae\_exp\_div\_le\_selfNormMixture}: almost surely, for all $t$,
+$e^{T_t}/(8(1 + \sqrt{2t})) \le M_t$.
+
 \begin{proof}
 \uses{lem:bernstein_exp_supermartingale, lem:pconc_mixture_lower}
+\leanok
 For $\mu \ge 0$ let $\lambda := \mu/b \ge 0$, so that $\mu S_t/b - \varphi(\mu)V_t/b^2 = \lambda S_t - \varphi_b(\lambda)V_t/b^2$
 and the two exponentials are the processes $M^{\lambda}_t$ and their $-Y$ versions of
 Lemma~\ref{lem:bernstein_exp_supermartingale}(ii)--(iii), which are nonnegative supermartingales
@@ -410,6 +561,7 @@ $1 + \sqrt{s + v} \le 1 + \sqrt{2t}$.
 
 \begin{theorem}[Lemma 21: self-normalized Bernstein inequality]\label{thm:bernstein_self_normalized}
 \uses{lem:bernstein_exp_supermartingale}
+\lean{ProbabilityTheory.measure_exists_log_le_selfNorm_poissonCramer_le, ProbabilityTheory.eight_mul_one_add_sqrt_le, ProbabilityTheory.measure_exists_log_le_selfNorm_poissonCramer_le'}\leanok
 Let $b > 0$, $(Y_t)_{t \ge 1}$, $(w_t)_{t \ge 1}$, $S_t$ and $V_t$ be as in
 Lemma~\ref{lem:bernstein_exp_supermartingale} ($Y_t$ adapted, $\abs{Y_t} \le b$, centered
 conditionally on $\mathcal F_{t-1}$; $w_t$ predictable with values in $[0, 1]$). Then for every
@@ -425,6 +577,7 @@ and, since $8(1 + \sqrt{2t}) \le 4e(2t + 1)$ for $t \ge 1$, also
 
 \begin{proof}
 \uses{lem:pconc_bernstein_mixture, lem:ville}
+\leanok
 Let $M$ be the mixture supermartingale of Lemma~\ref{lem:pconc_bernstein_mixture}: it is
 nonnegative with $M_0 = 1$, so Lemma~\ref{lem:ville} gives $\Prob(\exists t, M_t \ge 1/\delta) \le \delta$.
 Almost surely, for every $t \ge 1$, $M_t \ge e^{T_t}/(8(1 + \sqrt{2t}))$; hence if
@@ -438,6 +591,7 @@ the first.
 
 \begin{corollary}[Explicit form of the self-normalized Bernstein inequality]\label{cor:bernstein_explicit}
 \uses{thm:bernstein_self_normalized}
+\lean{ProbabilityTheory.measure_exists_sqrt_add_lt_abs_selfNormSum_le, ProbabilityTheory.measure_exists_sqrt_add_lt_abs_selfNormSum_le'}\leanok
 In the setting of Theorem~\ref{thm:bernstein_self_normalized}, for every $\delta \in (0, 1)$,
 with probability at least $1 - \delta$, for all $t \ge 1$,
 \[
@@ -448,6 +602,7 @@ and in fact $\abs{S_t} \le \sqrt{2(V_t + b^2) L_t} + \frac23 b L_t$.
 
 \begin{proof}
 \uses{thm:bernstein_self_normalized, lem:poisson_cramer, lem:sqrt_add_le}
+\leanok
 On the complement of the event of Theorem~\ref{thm:bernstein_self_normalized} (second form), which
 has probability at least $1 - \delta$, for every $t \ge 1$: $c\, h(s/c) < L_t$ with
 $c := V_t/b^2 + 1 > 0$ and $s := \abs{S_t}/b \ge 0$, and $L_t \ge 0$. Lemma~\ref{lem:poisson_cramer}(iii)
@@ -455,7 +610,8 @@ gives $s \le \sqrt{2cL_t} + \frac23 L_t$, i.e., multiplying by $b$ and using
 $b\sqrt{2(V_t/b^2 + 1)L_t} = \sqrt{2(V_t + b^2)L_t}$, the second claim
 $\abs{S_t} \le \sqrt{2(V_t + b^2)L_t} + \frac23 bL_t$. By Lemma~\ref{lem:sqrt_add_le},
 $\sqrt{2(V_t + b^2)L_t} \le \sqrt{2V_tL_t} + b\sqrt{2L_t}$. Since $\delta < 1$ and $t \ge 1$,
-$L_t \ge \log(12e) > 2$, so $2L_t \le L_t^2$ and $\sqrt{2L_t} \le L_t$; therefore
+$L_t \ge \log(12e) > 2$ (in fact $L_t \ge \log(4e) > 2$ already for $t = 0$, since $e < 4$), so
+$2L_t \le L_t^2$ and $\sqrt{2L_t} \le L_t$; therefore
 $\abs{S_t} \le \sqrt{2V_tL_t} + bL_t + \frac23 bL_t = \sqrt{2V_tL_t} + \frac53 bL_t \le \sqrt{2V_tL_t} + 3bL_t$.
 \end{proof}
 
@@ -471,21 +627,32 @@ $\log(8e(n + 1)/\delta')$ is absorbed the same way. The theorem is stated for $\
 for $\delta \ge 1$ it is trivial.
 \end{remark}
 
-\textbf{Lean remark.} The theorem is library material (\texttt{Essakine2026Tight/Mathlib/}),
-with the filtration \texttt{ℱ : Filtration ℕ mΩ}, \texttt{Y w : ℕ → Ω → ℝ},
-\texttt{Adapted ℱ Y}, \texttt{∀ t, StronglyMeasurable[ℱ (t-1)] (w (t))} (predictability),
-\texttt{∀ t, ∀ᵐ ω, |Y t ω| ≤ b}, \texttt{∀ t, μ[Y t | ℱ (t-1)] =ᵐ[μ] 0}. The mixture is
-\texttt{fun t ω => (1/2) * ∫ μ in Set.Ioi 0, (...) * Real.exp (-μ)}; its measurability uses
-\texttt{StronglyMeasurable.integral\_prod\_right'} (or \texttt{Measurable.lintegral\_prod\_right}
-after passing to \texttt{ENNReal.ofReal}), its integrability Tonelli
-(\texttt{MeasureTheory.lintegral\_prod}, \texttt{integrable\_prod\_iff}), and the set-integral
-inequality \texttt{MeasureTheory.integral\_prod} together with
-\texttt{Supermartingale.setIntegral\_le}. The final union over $t$ is the countable union
-inside Lemma~\ref{lem:ville}; the bounds $\abs{S_t} \le tb$, $V_t \le tb^2$ are
-\texttt{Finset.sum\_le\_card\_nsmul}. The analytic Lemma~\ref{lem:pconc_mixture_lower} needs only
-$\int_a^{a + \ell} e^{-\mu}\,d\mu = e^{-a}(1 - e^{-\ell})$
-(\texttt{intervalIntegral.integral\_eq\_sub\_of\_hasDerivAt}) and the monotonicity of the
-integral in the domain (\texttt{MeasureTheory.setIntegral\_mono\_set}, nonnegative integrand).
+\textbf{Lean remark.} The theorem is library material
+(\texttt{Essakine2026Tight/Mathlib/Probability/Moments/SelfNormalizedBernstein.lean}), with the
+$0$-indexed hypotheses of the Lean remark after Lemma~\ref{lem:bernstein_exp_supermartingale}
+on a probability space. Both theorems quantify over all \texttt{t : ℕ} (at $t = 0$ the event is
+empty) and hold for every $\delta > 0$:
+\texttt{μ \{ω | ∃ t : ℕ, log (1 / δ) + log (8 * (1 + √(2 * t))) ≤ (V t ω / b \^{} 2 + 1) *
+poissonCramer (b * |S t ω| / (V t ω + b \^{} 2))\} ≤ ENNReal.ofReal δ}, and the same with
+\texttt{log (4 * exp 1 * (2 * t + 1))} ($8(1 + \sqrt{2t}) \le 4e(2t + 1)$ holds for all $t \in \N$,
+\texttt{eight\_mul\_one\_add\_sqrt\_le}). The corollary is stated as a bound on the bad event for
+$\delta \in (0, 1)$ and all \texttt{t : ℕ}:
+\texttt{μ \{ω | ∃ t, √(2 * (V t ω + b \^{} 2) * L t) + 2 / 3 * b * L t < |S t ω|\} ≤ ENNReal.ofReal δ}
+and \texttt{μ \{ω | ∃ t, √(2 * V t ω * L t) + 3 * b * L t < |S t ω|\} ≤ ENNReal.ofReal δ} with
+\texttt{L t = log (4 * exp 1 * (2 * t + 1) / δ)}.
+The mixture is built in $[0, \infty]$ (Lean remark after
+Lemma~\ref{lem:pconc_bernstein_mixture}): measurability by \texttt{Measurable.lintegral\_prod\_right'},
+Tonelli by \texttt{lintegral\_lintegral\_swap}, and the set-integral inequality by
+\texttt{Supermartingale.setIntegral\_le} for each fixed $u$, transferred to the real-valued
+process with \texttt{integral\_toReal}. The final union over $t$ is the countable union inside
+Lemma~\ref{lem:ville} (applied with $c = 1/\delta$, the event being contained in Ville's event up to
+a null set, \texttt{measure\_mono\_ae}); the bounds $\abs{S_t} \le tb$, $V_t \le tb^2$ are
+\texttt{abs\_selfNormSum\_le}, \texttt{selfNormVar\_le}. The analytic
+Lemma~\ref{lem:pconc_mixture_lower} needs only $\int_a^{c} e^{-u}\,du = e^{-a} - e^{-c}$
+(\texttt{lintegral\_Ioc\_exp\_neg}, from \texttt{intervalIntegral.integral\_comp\_neg} and
+\texttt{integral\_exp}) and the monotonicity of the lower integral in the domain
+(\texttt{lintegral\_mono\_set}); the bound $e < 3$ of the corollary is
+\texttt{Real.exp\_one\_lt\_three} (\texttt{Mathlib.Analysis.Complex.ExponentialBounds}).
 
 \section{KL--Bernstein and variance transport inequalities}
 \label{sec:pconc_kl}
@@ -494,11 +661,13 @@ In this section $\mathcal X$ is a finite set, $p, q$ are probability vectors on 
 $f, g : \mathcal X \to \R$; the conventions are those of the beginning of the chapter.
 
 \begin{lemma}[Gibbs variational inequality on a finite set]\label{lem:donsker_varadhan_finite}
+\lean{InformationTheory.ofReal_integral_sub_log_integral_exp_le_klDiv, InformationTheory.integral_sub_log_integral_exp_le_of_klDiv_le}\leanok
 For every $g : \mathcal X \to \R$: $\KL(p \| q) \ge pg - \log\big(q e^{g}\big)$, where
 $q e^g := \sum_x q(x) e^{g(x)}$ (the inequality is trivial when $\KL(p\|q) = +\infty$).
 \end{lemma}
 
 \begin{proof}
+\leanok
 Assume $p$ is dominated by $q$. Let $Z := q e^g > 0$ and $r(x) := q(x) e^{g(x)}/Z$, a probability
 vector with $r(x) > 0$ whenever $q(x) > 0$, hence whenever $p(x) > 0$. For $x$ with $p(x) > 0$,
 $\log(p(x)/q(x)) = \log(p(x)/r(x)) + g(x) - \log Z$, so summing against $p(x)$,
@@ -510,15 +679,20 @@ It remains to see $\KL(p \| r) \ge 0$ (Gibbs' inequality): by $\log u \ge 1 - 1/
 $\sum_{x : p(x) > 0} p(x)\log\frac{p(x)}{r(x)} \ge \sum_{x : p(x) > 0} (p(x) - r(x)) = 1 - \sum_{x : p(x) > 0} r(x) \ge 0$.
 \end{proof}
 
-\textbf{Lean remark.} Mathlib's \texttt{InformationTheory.klDiv} is defined through the
-log-likelihood ratio (\texttt{llr}) and \texttt{klFun}; nonnegativity for probability
-measures is available (\texttt{klDiv\_eq\_zero\_iff}/\texttt{integral\_llr\_nonneg}-type
-lemmas), and the identity above is the chain \texttt{toReal\_klDiv} for
-\texttt{weightedMeasure}s (finite sums). The Donsker--Varadhan variational formula is not
-needed in its full generality: only this one-sided inequality with the tilted vector $r$.
+\textbf{Lean remark.} The Lean statement holds for arbitrary probability measures $\mu, \nu$
+and $g$ with $g \in L^1(\mu)$, $e^g \in L^1(\nu)$:
+\texttt{ENNReal.ofReal (∫ x, g x ∂μ - log (∫ x, exp (g x) ∂ν)) ≤ klDiv μ ν}
+(\texttt{ofReal\_integral\_sub\_log\_integral\_exp\_le\_klDiv}), and in the form used under a KL
+constraint $\KL(\mu\|\nu) \le a$, $a \ge 0$ (\texttt{integral\_sub\_log\_integral\_exp\_le\_of\_klDiv\_le}).
+The tilted vector $r$ is Mathlib's tilted measure \texttt{ν.tilted g}: the identity
+$\KL(\mu\|r) = \KL(\mu\|\nu) - \mu g + \log(\nu e^g)$ is \texttt{integral\_llr\_tilted\_right} and
+Gibbs' inequality $\KL(\mu \| r) \ge 0$ is \texttt{integral\_llr\_add\_sub\_measure\_univ\_nonneg}
+(with \texttt{absolutelyContinuous\_tilted} for $\mu \ll r$). The Donsker--Varadhan variational
+formula is not needed in its full generality: only this one-sided inequality.
 
 \begin{lemma}[Bernstein bound on the log-moment generating function]\label{lem:bernstein_mgf_bounded}
 \uses{lem:pconc_exp_taylor_bound}
+\lean{ProbabilityTheory.log_integral_exp_mul_sub_le}\leanok
 Let $b > 0$, $f$ with values in $[0, b]$, and $\lambda \ge 0$. Then
 $\log\big(q\, e^{\lambda(f - qf)}\big) \le \Var_q(f)\, \varphi_b(\lambda)/b^2$,
 where $\varphi_b(\lambda) = e^{\lambda b} - 1 - \lambda b$.
@@ -526,6 +700,7 @@ where $\varphi_b(\lambda) = e^{\lambda b} - 1 - \lambda b$.
 
 \begin{proof}
 \uses{lem:pconc_exp_taylor_bound}
+\leanok
 Since $f \in [0, b]$, $qf \in [0, b]$ and $y(x) := f(x) - qf \in [-b, b]$ for every $x$. By
 Lemma~\ref{lem:pconc_exp_taylor_bound}, $e^{\lambda y(x)} \le 1 + \lambda y(x) + y(x)^2 \varphi_b(\lambda)/b^2$;
 averaging under $q$, with $q y = 0$ and $q y^2 = \Var_q(f)$,
@@ -534,6 +709,7 @@ $q e^{\lambda(f - qf)} \le 1 + \Var_q(f)\varphi_b(\lambda)/b^2 \le \exp(\Var_q(f
 \end{proof}
 
 \begin{lemma}[Lemma 22: KL--Bernstein inequality]\label{lem:kl_bernstein}
+\lean{InformationTheory.integral_sub_integral_le_of_klDiv_le, InformationTheory.abs_integral_sub_integral_le_of_klDiv_le}\leanok
 Let $\alpha \ge 0$, $b > 0$ and $f$ with values in $[0, b]$. If $\KL(p \| q) \le \alpha$, then
 \[
   \abs{pf - qf} \le \sqrt{2 \Var_q(f)\, \alpha} + \frac23\, b\, \alpha .
@@ -542,6 +718,7 @@ Let $\alpha \ge 0$, $b > 0$ and $f$ with values in $[0, b]$. If $\KL(p \| q) \le
 
 \begin{proof}
 \uses{lem:donsker_varadhan_finite, lem:bernstein_mgf_bounded, lem:poisson_cramer}
+\leanok
 Put $d := pf - qf$ and $\sigma^2 := \Var_q(f) \ge 0$. For every $\lambda \ge 0$,
 Lemma~\ref{lem:donsker_varadhan_finite} with $g := \lambda(f - qf)$ (note
 $pg = \lambda(pf - qf) = \lambda d$, since $p(qf) = qf$) and Lemma~\ref{lem:bernstein_mgf_bounded} give
@@ -561,12 +738,18 @@ satisfies $pf' - qf' = -d > 0$ and $\Var_q(f') = \Var_q(f)$.
 
 \textbf{Lean remark.} This is Lemma~3 of \cite{talebi2018variance} (with the constant $2/3$ of
 the classical Bernstein inequality; the paper's statement has $\alpha > 0$, and the version with
-$\alpha \ge 0$ costs nothing). The hypothesis $\KL(p\|q) \le \alpha$ is
-\texttt{klDiv (weightedMeasure p) (weightedMeasure q) ≤ ENNReal.ofReal α}, which forces
-absolute continuity (\texttt{klDiv\_of\_not\_ac}), and the conclusion uses
-\texttt{ProbabilityTheory.variance f (weightedMeasure q)} and the integral $pf$.
+$\alpha \ge 0$ costs nothing). The Lean statement is for arbitrary probability measures
+\texttt{μ} (for $p$) and \texttt{ν} (for $q$) and $f$ a.e.-strongly measurable with values in
+$[0, b]$ $\nu$-a.e.: the hypothesis $\KL(p\|q) \le \alpha$ is
+\texttt{klDiv μ ν ≤ ENNReal.ofReal α}, which forces absolute continuity
+(\texttt{klDiv\_ne\_top\_iff}), and the conclusion is
+\texttt{|∫ x, f x ∂μ - ∫ x, f x ∂ν| ≤ √(2 * variance f ν * α) + 2 / 3 * b * α}
+(\texttt{abs\_integral\_sub\_integral\_le\_of\_klDiv\_le}; the case $d \ge 0$ is
+\texttt{integral\_sub\_integral\_le\_of\_klDiv\_le}). For probability vectors, take
+\texttt{μ = weightedMeasure p}, \texttt{ν = weightedMeasure q} (Lemma~\ref{lem:pconc_weighted_measure}).
 
 \begin{lemma}[Lemma 25: variance transport under a KL constraint]\label{lem:kl_transport_var}
+\lean{InformationTheory.variance_le_two_mul_variance_add_of_klDiv_le, InformationTheory.variance_le_two_mul_variance_add_of_klDiv_le'}\leanok
 Let $\alpha \ge 0$, $b > 0$ and $f$ with values in $[0, b]$. If $\KL(p \| q) \le \alpha$, then
 \[
   \Var_q(f) \le 2\Var_p(f) + 4b^2\alpha \qquad \text{and} \qquad \Var_p(f) \le 2\Var_q(f) + 4b^2\alpha .
@@ -574,7 +757,8 @@ Let $\alpha \ge 0$, $b > 0$ and $f$ with values in $[0, b]$. If $\KL(p \| q) \le
 \end{lemma}
 
 \begin{proof}
-\uses{lem:kl_bernstein, lem:var_le_range_mean, lem:sqrt_mul_le}
+\uses{lem:kl_bernstein, lem:var_le_range_mean, lem:sqrt_mul_le, lem:transport_var}
+\leanok
 Recall that for any constant $m$, $p(f - m)^2 = \Var_p(f) + (pf - m)^2 \ge \Var_p(f)$, and that
 $\abs{f(x) - m} \le b$ whenever $m \in [0, b]$, so that $(f - m)^2$ takes values in $[0, b^2]$.
 
@@ -596,9 +780,17 @@ $\Var_p(f) \le \frac32\Var_q(f) + \frac53 b^2\alpha \le 2\Var_q(f) + 4b^2\alpha$
 
 \textbf{Lean remark.} This is Lemma~11 of \cite{menard2021fast}; the proof there is the same
 (KL--Bernstein applied to the squared centered function). The constants $10/3$ and $5/3$ show
-that $4$ is not tight; the analysis chapters use $4$.
+that $4$ is not tight; the analysis chapters use $4$. In Lean, for arbitrary probability measures
+\texttt{μ} ($p$), \texttt{ν} ($q$) with \texttt{klDiv μ ν ≤ ENNReal.ofReal α} and $f \in [0, b]$
+$\nu$-a.e.: \texttt{variance f ν ≤ 2 * variance f μ + 4 * b \^{} 2 * α}
+(\texttt{variance\_le\_two\_mul\_variance\_add\_of\_klDiv\_le}) and
+\texttt{variance f μ ≤ 2 * variance f ν + 4 * b \^{} 2 * α} (the primed version). The minimization
+property $\Var_q(f) \le q(f - m)^2$ is \texttt{variance\_le\_integral\_sub\_sq}
+(Lemma~\ref{lem:transport_var}); the first inequality needs the bound on $qg - pg$, i.e.\ the
+absolute value in Lemma~\ref{lem:kl_bernstein}.
 
 \begin{lemma}[Lemma 26: variance transport between functions and between measures]\label{lem:transport_var}
+\lean{ProbabilityTheory.integrable_of_ae_mem_Icc, ProbabilityTheory.variance_le_integral_sub_sq, ProbabilityTheory.variance_le_two_mul_variance_add, ProbabilityTheory.variance_le_variance_add_sum_abs_sub}\leanok
 Let $b \ge 0$ and $f, g$ with values in $[0, b]$. Then
 \[
   \Var_p(f) \le 2\Var_p(g) + 2b\, p\abs{f - g} \qquad \text{and} \qquad
@@ -608,6 +800,7 @@ where $\abs{f - g}(x) := \abs{f(x) - g(x)}$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 \emph{First inequality.} $\Var_p(f) \le p(f - pg)^2$ (variance minimizes the centered second
 moment: $p(f - m)^2 = \Var_p(f) + (pf - m)^2$). Pointwise,
 $(f - pg)^2 = \big((f - g) + (g - pg)\big)^2 \le 2(f - g)^2 + 2(g - pg)^2$
@@ -625,14 +818,25 @@ $3$ in the second inequality; the proof gives $1$. Only the first inequality is 
 analysis (Lemmas~\ref{lem:concentration_pos} and~\ref{lem:concentration_neg}); the second is
 kept for completeness. In Lean, $p\abs{f - g}$ is the integral of \texttt{fun x => |f x - g x|}
 and $\norm{p - q}_1$ is \texttt{∑ x, |p x - q x|} (for \texttt{weightedMeasure}s it is twice the
-total variation distance).
+total variation distance). The first inequality is proved for an arbitrary probability measure
+\texttt{μ} and a.e.\ bounds (\texttt{variance\_le\_two\_mul\_variance\_add}); the second for
+probability measures \texttt{μ ν} on a finite type with measurable singletons and
+$\norm{\mu - \nu}_1 = $ \texttt{∑ x, |μ.real \{x\} - ν.real \{x\}|}, in the sharp form
+\texttt{variance f ν ≤ variance f μ + b \^{} 2 * ∑ x, |μ.real \{x\} - ν.real \{x\}|}
+(\texttt{variance\_le\_variance\_add\_sum\_abs\_sub}; the weakening to $3b^2$ is not stated). The
+hypothesis $b \ge 0$ is not needed (it follows from $f \in [0, b]$).
 
 \begin{lemma}[Variance bounded by the range times the mean]\label{lem:var_le_range_mean}
+\lean{ProbabilityTheory.variance_le_expectation_sq, ProbabilityTheory.variance_le_mul_integral}\leanok
 Let $b \ge 0$ and $f$ with values in $[0, b]$. Then $\Var_p(f) \le pf^2 \le b\, pf$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 $\Var_p(f) = pf^2 - (pf)^2 \le pf^2$ since $(pf)^2 \ge 0$ (\texttt{variance\_def'}), and
 $f(x)^2 = f(x) \cdot f(x) \le b\, f(x)$ for every $x$ because $0 \le f(x) \le b$
 (\texttt{mul\_le\_mul\_of\_nonneg\_right}); averaging under $p$ gives $pf^2 \le b\,pf$.
+(Lean: the first inequality is Mathlib's \texttt{variance\_le\_expectation\_sq}; the combined
+bound \texttt{variance f μ ≤ b * ∫ x, f x ∂μ} for an arbitrary probability measure and
+$f \in [0, b]$ a.e.\ is \texttt{variance\_le\_mul\_integral}.)
 \end{proof}

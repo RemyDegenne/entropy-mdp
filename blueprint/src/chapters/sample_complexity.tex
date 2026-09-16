@@ -53,6 +53,7 @@ statement thanks to the case $n = 0$ of \texttt{rateMin}.
 
 \begin{lemma}[The rates as real functions]\label{lem:sc_rates_real}
 \uses{def:rates}
+\lean{Essakine2026Tight.rateReal, Essakine2026Tight.alphaKL_eq_rateReal, Essakine2026Tight.alphaStar_eq_rateReal, Essakine2026Tight.rateReal_mono, Essakine2026Tight.rateReal_div_le_div, Essakine2026Tight.le_rateReal, Essakine2026Tight.one_le_log_eight_mul_exp_one_mul, Essakine2026Tight.log_eight_mul_exp_one_mul_div_le_div}\leanok
 Let $\delta \in (0, 1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$,
 viewed as a function of a real argument $x \ge 0$. Then
 \begin{enumerate}
@@ -63,6 +64,7 @@ viewed as a function of a real argument $x \ge 0$. Then
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:rates}
 Write $a_0 := \log(3SAH/\delta)$ and $\alpha(x) = a_0 + k\log(8e(x+1))$ with $k = S$ or $k = 1$.
 (i) $x \mapsto \log(8e(x+1))$ is increasing. (ii) $\alpha(x)/x = a_0/x + k\,\log(8e(x+1))/x$;
@@ -73,8 +75,17 @@ $8e(x+1) \ge 8e > 1$, and $a_0 \ge \log 3 > 1$ because $3SAH/\delta \ge 3$ ($S, 
 $\delta \le 1$) and $\log 3 > 1.09$.
 \end{proof}
 
+\textbf{Lean remark.} \texttt{rateReal a₀ k x} is $a_0 + k\log(8e(x+1))$, and the two rates are
+\texttt{rateReal} at the natural numbers with $a_0 = \alpha^{\mathrm{cnt}}(\delta)$ and $k = S$ or $k = 1$.
+(i)--(iii) are proved for any $k \ge 0$ and $a_0 \ge 0$ ((iii) in the form $\alpha(x) \ge a_0$; the bound
+$a_0 > 1$ is Lemma~\ref{lem:rates_props}). (ii) holds on $(0, \infty)$ and is proved without derivatives:
+for $0 < x \le y$, $\log(8e(y+1)) = \log(8e(x+1)) + \log\frac{y+1}{x+1}$ and
+$\log\frac{y+1}{x+1} \le \frac{y-x}{x+1}$, so $x\log(8e(y+1)) \le x\log(8e(x+1)) + (y-x)\frac{x}{x+1}
+\le y\log(8e(x+1))$ because $\frac{x}{x+1} \le 1 \le \log(8e(x+1))$.
+
 \begin{lemma}[Rate terms against pseudo-counts: the arithmetic]\label{lem:sc_rate_min_arith}
 \uses{def:rate_min}
+\lean{Essakine2026Tight.rateMin_le_four_mul_div, Essakine2026Tight.rateMin_rateReal_le, Essakine2026Tight.rateMin_le_one}\leanok
 Let $a_0 \ge 1$ and let $\alpha : [0,\infty) \to \R$ satisfy
 (i) $\alpha$ nondecreasing, (ii) $x \mapsto \alpha(x)/x$ nonincreasing on $[1,\infty)$ and
 (iii) $\alpha(x) \ge a_0$ for all $x \ge 0$. Let $n \in \N$ and $\nbar \ge 0$ be such that
@@ -85,6 +96,7 @@ $n \ge \nbar/2 - a_0$. Then
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:rate_min}
 This is the case analysis of \cite[Lemma~7]{menard2021fast}.
 
@@ -103,6 +115,10 @@ If $\nbar \le 1$ the right-hand side is $4a_0 \ge 4 \ge 1$; if $\nbar > 1$ it is
 $4a_0/\nbar > 4a_0/(4a_0) = 1$. Hence $\rho_\alpha(n) \le 1 \le 4\alpha(\nbar)/\max\{\nbar,1\}$.
 \end{proof}
 
+\textbf{Lean remark.} \texttt{rateMin\_le\_four\_mul\_div} takes the rate on the integers
+$\alpha : \N \to \R$ and a real function $f$ with $\alpha(n) = f(n)$, and hypotheses (i)--(iii) on $f$ in
+pointwise form; \texttt{rateMin\_rateReal\_le} is the instance $f = $ \texttt{rateReal a₀ k}.
+
 \begin{remark}[On the paper's Lemma~27]\label{rem:sc_lemma27}
 The paper states Lemma~27 (from \cite[Lemma~7]{menard2021fast}) for every rate $\alpha$ that is
 nondecreasing with $\alpha(x)/x$ nonincreasing on $x \ge 1$, and for $t \ge 1$. These hypotheses
@@ -120,6 +136,7 @@ $1 \le 4\alpha(0)$).
 
 \begin{lemma}[Lemma~27: rate terms against pseudo-counts]\label{lem:pseudo_counts_bound}
 \uses{def:rate_min, def:pseudo_counts, def:rates, def:event_cnt}
+\lean{Essakine2026Tight.klRateMinAt_le_of_mem_eventCnt, Essakine2026Tight.starRateMinAt_le_of_mem_eventCnt, Essakine2026Tight.rateMin_le_of_mem_eventCnt, Essakine2026Tight.pseudoCount_nonneg, Essakine2026Tight.pseudoCount_le}\leanok
 Let $\delta \in (0, 1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$.
 For every run of any algorithm in the episode environment of $\mathcal M$, on the event
 $\evCnt$, for all $t \in \N$, $h \in [H]$, $(s,a) \in \Ss\times\As$, with
@@ -132,7 +149,8 @@ $\rho^{*t}_h(s,a) \le 4\alpha^*(t,\delta)/\max\{\nbar_h^t(s,a),1\}$ on $\evCnt$.
 \end{lemma}
 
 \begin{proof}
-\uses{lem:sc_rate_min_arith, lem:sc_rates_real, lem:pseudo_counts_increments, def:event_cnt}
+\leanok
+\uses{lem:sc_rate_min_arith, lem:sc_rates_real, lem:rates_props, def:event_cnt}
 On $\evCnt$, $n \ge \nbar/2 - \alpha^{\mathrm{cnt}}(\delta)$ (Definition~\ref{def:event_cnt}, with the
 random pseudo-counts of deviation~10). Lemma~\ref{lem:sc_rates_real} gives the hypotheses
 (i)--(iii) of Lemma~\ref{lem:sc_rate_min_arith} with $a_0 := \alpha^{\mathrm{cnt}}(\delta) \ge 1$,
@@ -141,8 +159,15 @@ which yields the first inequality. For the second, $\nbar_h^t(s,a) \le t$
 nondecreasing.
 \end{proof}
 
+\textbf{Lean remark.} The Lean statements give the second inequality, with $\alpha(t)$; the first
+one is \texttt{rateMin\_rateReal\_le} applied on the event. $S \ge 1$ comes from the initial state $s_1$,
+$A \ge 1$ from \texttt{Nonempty A} and $H \ge 1$ from $h$. The bound $\nbar_h^t(s,a) \le t$ is proved
+directly from the definition of the pseudo-counts and \texttt{occupancy\_le\_one}
+(\texttt{pseudoCount\_le}), so Lemma~\ref{lem:pseudo_counts_increments} is not used.
+
 \begin{lemma}[Counting argument]\label{lem:sum_counts_bound}
 \uses{def:rate_min, def:pseudo_counts, def:occupancy, def:event_cnt, def:rates, def:episode_env}
+\lean{Essakine2026Tight.sum_occupancy_mul_klRateMinAt_le, Essakine2026Tight.sum_occupancy_mul_starRateMinAt_le, Essakine2026Tight.sum_occupancy_mul_rateMin_le, Essakine2026Tight.sum_sum_occupancy_mul_rateMin_le}\leanok
 Let $\delta \in (0,1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$.
 For every run of any algorithm in the episode environment of $\mathcal M$, with
 $\pi^{t+1} := X_t$, on the event $\evCnt$, for every integer $T \ge 1$,
@@ -153,7 +178,8 @@ $\pi^{t+1} := X_t$, on the event $\evCnt$, for every integer $T \ge 1$,
 \end{lemma}
 
 \begin{proof}
-\uses{lem:pseudo_counts_bound, lem:pseudo_counts_increments, lem:log_sum_bound, lem:sc_rates_real}
+\leanok
+\uses{lem:pseudo_counts_bound, lem:log_sum_bound, lem:sc_rates_real, lem:occupancy_sum_one}
 Fix $h$ and $(s,a)$ and put $u_{t+1} := p^{\pi^{t+1}}_h(s,a) \in [0,1]$ and
 $U_t := \sum_{i=1}^t u_i$ for $t \ge 0$. By Lemma~\ref{lem:pseudo_counts_increments},
 $U_t = \nbar_h^t(s,a)$ (both vanish at $t = 0$ and have the same increments). By
@@ -164,10 +190,15 @@ is nondecreasing, Lemma~\ref{lem:sc_rates_real}). Hence
   \sum_{t=0}^{T-1} u_{t+1}\,\rho_\alpha\big(n_h^t(s,a)\big) \le 4\alpha(T-1)\sum_{t=0}^{T-1}\frac{u_{t+1}}{\max\{U_t,1\}}
   \le 4\alpha(T-1)\cdot 4\log(U_T + 1) \le 16\,\alpha(T-1)\log(T+1),
 \]
-by Lemma~\ref{lem:log_sum_bound} (applied with its $T$ equal to $T - 1 \ge 0$) and
+by Lemma~\ref{lem:log_sum_bound} (applied with the same $T$) and
 $U_T = \nbar_h^T(s,a) \le T$. Summing over the $SAH$ triples $(h, s, a)$ gives the first bound;
 the second follows from $\alpha(T-1) \le \alpha(T)$.
 \end{proof}
+
+\textbf{Lean remark.} Stated with $\alpha(T - 1)$ in natural-number subtraction and without the
+hypothesis $T \ge 1$ (for $T = 0$ both sides vanish); the second inequality is \texttt{alphaKL\_mono}
+and \texttt{alphaStar\_mono}. The identity $U_t = \nbar_h^t(s,a)$ holds by definition in Lean, and
+$u_{t+1} \in [0,1]$ is \texttt{occupancy\_nonneg} and \texttt{occupancy\_le\_one}.
 
 \begin{remark}[On the paper's constant]\label{rem:sc_counting_constant}
 The paper's Appendix~B.1 states this bound with the constant $3$ (``$\le 3SAH\alpha(\tau-1,\delta)\log(\tau+1)$'').
@@ -288,6 +319,7 @@ of $\mathcal M$ from $s_1$ satisfies
 
 \begin{proof}
 \uses{lem:pac_pos, lem:pac_neg, def:entropic_pac, def:bpi_alg, def:episode_env, lem:entropic_bpi_run}
+\leanok
 Fix $\mathcal M \in \mathcal M_r$. The PAC property is a statement about the law of the output
 of the algorithm in the episode environment of $\mathcal M$, which is the same for every run
 (Definition~\ref{def:bpi_alg}); a run exists (the canonical run of LML). Let
@@ -315,7 +347,13 @@ project \texttt{colt-2026-83}, \texttt{LinearBandit.isPAC\_of\_forall\_isRun}). 
 \texttt{IsPAC.measureReal\_bad\_of\_isRun} gives $\Prob(\mathrm{bad}) \le \delta$ in every run; this
 direction is the one used by the lower bound (Lemma~\ref{lem:hard_pac_event}). The event
 $\{V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps\}$ is measurable since the policy type is finite
-(discrete $\sigma$-algebra).
+(discrete $\sigma$-algebra). The proof takes the second route: for $\mathcal M \in \mathcal M_r$, the canonical run
+\texttt{(entropicBPI r β δ ε s₁).isRun\_runMeasure (statesEnv M s₁)} (its observation process
+\texttt{fun n ω ↦ IT.obs n ω.1} is definitionally \texttt{fun \_ \_ ↦ ()}, the observation type being
+\texttt{Unit}), \texttt{IsRun.hasLaw\_output} and \texttt{HasLaw.measureReal\_eq} turn the PAC property into
+the run statement \texttt{measureReal\_bad\_le\_of\_pos} or \texttt{measureReal\_bad\_le\_of\_neg}
+(Lemmas~\ref{lem:pac_pos}, \ref{lem:pac_neg}) by a case split on the sign of $\beta$. Only $\delta \in (0, 1]$ and
+$\eps > 0$ are used.
 
 \begin{theorem}[Theorem~4, sample complexity]\label{thm:upper_bound_complexity}
 \lean{Essakine2026Tight.probReal_stoppingTime_entropicBPI_le_ge}\leanok
@@ -330,7 +368,8 @@ in particular $\Prob(\tau < \infty) \ge 1 - \delta$.
 \end{theorem}
 
 \begin{proof}
-\uses{lem:stopping_time_bound_pos, lem:stopping_time_bound_neg, lem:good_event, def:good_event}
+\uses{lem:stopping_time_bound_pos, lem:stopping_time_bound_neg, lem:good_event, def:good_event, lem:pac_pos, lem:pac_neg}
+\leanok
 Fix $\mathcal M \in \mathcal M_r$ and a run. If $\beta > 0$, Lemma~\ref{lem:stopping_time_bound_pos}
 gives $\tau \le \mathrm{upperBound}(S,A,H,\beta,\eps,\delta,\Gmax(\mathcal M))$ (in particular
 $\tau < \infty$) at every $\omega \in \evGood^+$, and $\Prob(\evGood^+) \ge 1 - \delta$ by
@@ -347,6 +386,10 @@ $\tau$ the hitting time of the stopping set by the history process, so that the 
 $\{\tau \le B\}$ are events of the same probability space; no law transfer is needed here, the
 statement being about an arbitrary run (deviation~6 separates the two conclusions of Theorem~4
 because this one is naturally a statement about runs while the PAC one is about the output law).
+The proof is the second statement of Lemma~\ref{lem:pac_pos} or Lemma~\ref{lem:pac_neg}
+(\texttt{one\_sub\_le\_measureReal\_stoppingTime\_le\_of\_pos}, \texttt{…\_of\_neg}) after a case split on the sign
+of $\beta$; the event $\{\tau \le \mathrm{upperBound}\}$ is not shown to be measurable (the lower bound on its
+probability uses only $\Prob(F) + \Prob(F^c) \ge 1$). Only $\delta \in (0, 1]$ and $\eps > 0$ are used.
 
 \begin{remark}[On the hypotheses]\label{rem:sc_hypotheses}
 The paper states Theorem~4 for $\delta \in [0,1]$ and $\eps > 0$ ``small enough'', made precise

@@ -128,6 +128,7 @@ is the pair of backups at the step \texttt{h : Fin H}. The finite maxima and min
 finite nonempty type.
 
 \begin{lemma}[Ranges and order of the backups]\label{lem:backups_range}
+\lean{Essakine2026Tight.bonus_nonneg, Essakine2026Tight.stepU_mem, Essakine2026Tight.optZ_mem, Essakine2026Tight.stepUAt_mem, Essakine2026Tight.optZ_eq, Essakine2026Tight.stepUAt_fst_le_optZ, Essakine2026Tight.optZ_fst_eq_stepUAt_greedy, Essakine2026Tight.optZ_snd_le_stepUAt, Essakine2026Tight.optZ_snd_eq_stepUAt_greedy, Essakine2026Tight.alphaKL_nonneg, Essakine2026Tight.alphaStar_nonneg}\leanok
 \uses{def:backups, def:bonus, lem:rates_props, lem:emp_trans_simplex}
 For every $t$, $h \le H$, $(s, a)$ with $n_h^t(s, a) \ge 1$: $b_h^t(s, a) \ge 0$. For every $t$,
 $h \le H$ and $(s, a)$:
@@ -144,6 +145,7 @@ values are $1$). In particular $\Zt^t_{h+1}$ and $\Zl^t_{h+1}$ take values in $[
 
 \begin{proof}
 \uses{def:backups, def:bonus, lem:rates_props, lem:emp_trans_simplex}
+\leanok
 Fix $t$. We prove by backward induction on $h = H + 1, H, \dots, 1$ the statement $P(h)$:
 \emph{for all $s$, $\Zl^t_h(s) \le \Zt^t_h(s)$ and both lie in $I_h := [\min(1, e^{\beta(H + 1 - h)}), \max(1, e^{\beta(H + 1 - h)})]$},
 proving along the way the claims about $b$, $\Ul$ and $\Ut$ at the step $h$. $P(H + 1)$: both
@@ -177,11 +179,17 @@ minimum over $a$ gives $P(h)$.
 The final claims restate $P(h + 1)$ and positivity of the lower bounds.
 \end{proof}
 
-\textbf{Lean remark.} The induction is on \texttt{j} for \texttt{optZ r β δ hist j}
-(\texttt{optZ\_le}, \texttt{optZ\_mem\_Icc}), and the one-step statement is a lemma about
-\texttt{stepU} with hypotheses on \texttt{Zt}, \texttt{Zl} (\texttt{stepU\_fst\_le},
-\texttt{stepU\_mem\_Icc}); the bonus nonnegativity is \texttt{bonus\_nonneg} (for
-\texttt{0 < n}, or unconditionally, the value at \texttt{n = 0} being $0$).
+\textbf{Lean remark.} File \texttt{EV2026/Backups.lean}. The one-step statement is
+\texttt{stepU\_mem} (for a reward in $[0, 1]$, a probability vector $\phat$ and next-step values
+$\Zl \le \Zt$ in the range with \texttt{k} steps to go), and the induction is on the number
+\texttt{j ≤ H} of steps to go for \texttt{optZ r β δ hist j} (\texttt{optZ\_mem}); the ranges are
+written \texttt{Set.Icc (min 1 (Real.exp (β * j))) (max 1 (Real.exp (β * j)))}, which covers both
+signs of $\beta$ at once (the branch \texttt{¬ 0 < β} also covers $\beta = 0$). The bonus
+nonnegativity \texttt{bonus\_nonneg} holds unconditionally for $\delta \in (0, 1]$ (the rates are
+nonnegative, \texttt{alphaKL\_nonneg}, \texttt{alphaStar\_nonneg}). The identities between the
+values and the backups at the greedy action are \texttt{optZ\_eq},
+\texttt{optZ\_fst\_eq\_stepUAt\_greedy} and \texttt{stepUAt\_fst\_le\_optZ} ($\beta > 0$),
+\texttt{optZ\_snd\_eq\_stepUAt\_greedy} and \texttt{optZ\_snd\_le\_stepUAt} ($\beta \le 0$).
 
 \section{Greedy policy and certificate}
 \label{sec:algorithm_certificate}
@@ -258,6 +266,7 @@ composed certificate ($\pi_h \cert^t_h$ at the step with \texttt{j} steps to the
 \texttt{if n = 0 then clip else min clip (…)}; \texttt{certAt r β δ X Y t ω h}.
 
 \begin{lemma}[Range of the certificate]\label{lem:certificate_range}
+\lean{Essakine2026Tight.cert_mem}\leanok
 \uses{def:certificate, lem:backups_range, lem:emp_trans_simplex}
 For every $t$, $h \le H + 1$ and $s$: $0 \le (\pi^{t+1}_h \cert^t_h)(s) \le c_h$, with
 $c_{H+1} := 0$; in particular $\pi^{t+1}_{h+1}\cert^t_{h+1}$ takes values in $[0, e^{\beta(H - h)}]$
@@ -266,6 +275,7 @@ $c_{H+1} := 0$; in particular $\pi^{t+1}_{h+1}\cert^t_{h+1}$ takes values in $[0
 
 \begin{proof}
 \uses{def:certificate, lem:backups_range, lem:emp_trans_simplex}
+\leanok
 Backward induction on $h$. At $h = H + 1$ the certificate is $0$. Let $h \le H$ and assume
 $0 \le \pi_{h+1}\cert^t_{h+1} \le c_{h+1}$; fix $s$, $a = \pi_h(s)$. If $n = 0$ the value is $c_h \in [0, c_h]$
 ($c_h > 0$). If $n \ge 1$: $b_h^t(s, a) \ge 0$ (Lemma~\ref{lem:backups_range}),
@@ -353,6 +363,7 @@ variable length and one \texttt{output} kernel on them (the previous statement-o
 formalization used a stopping predicate \texttt{stop n hist} and a family \texttt{output n}).
 
 \begin{lemma}[Runs of Entropic-BPI]\label{lem:entropic_bpi_run}
+\lean{Essakine2026Tight.ae_action_eq_greedy, Essakine2026Tight.stopCond_histAt_stoppingTime, Essakine2026Tight.not_stopCond_histAt_of_lt_stoppingTime, Essakine2026Tight.stoppingTime_le_of_stopCond, Essakine2026Tight.ae_output_eq_greedy}\leanok
 \uses{def:entropic_bpi, def:bpi_alg, def:greedy, def:stopping_rule, def:episode_env}
 Let $(X, Y, \hat\pi)$ be a run of Entropic-BPI in the episode environment of an MDP
 $\mathcal M \in \mathcal M_r$ from $s_1$, on $(\Omega, \Prob)$, and let $\tau$ be its stopping time.
@@ -369,6 +380,7 @@ Almost surely:
 
 \begin{proof}
 \uses{def:entropic_bpi, def:bpi_alg, def:greedy, def:stopping_rule}
+\leanok
 (i) $(X, Y)$ is an algorithm-environment sequence for the sampling rule of Entropic-BPI, a
 deterministic algorithm whose next action after the history $\hist_t$ is $\pi^{t+1} = \mathrm{greedy}(\hist_t)$.
 The defining property of an algorithm-environment sequence is that the conditional law of
@@ -390,7 +402,9 @@ history of the first $\tau$ episodes, so $\hat\pi = \mathrm{greedy}(\hist_\tau) 
 (which is also $X_\tau$ by (i)).
 \end{proof}
 
-\textbf{Lean remark.} (i) is LML's \texttt{IsDeterministicAlg.action\_ae\_all\_eq} (or
+\textbf{Lean remark.} File \texttt{EV2026/EntropicBPIRun.lean}; the statements hold for runs in
+any environment, not only in the episode environment of an MDP. (i) is LML's
+\texttt{IsDeterministicAlg.action\_ae\_all\_eq} (or
 \texttt{action\_detAlgorithm\_ae\_all\_eq}) for \texttt{detAlgorithm}: \texttt{∀ᵐ ω ∂P, ∀ t, X t ω = greedy r β δ (histAt X Y t ω)};
 its proof is \texttt{hasCondDistrib\_action} with the deterministic policy kernel and
 \texttt{ae\_eq\_of\_hasCondDistrib\_deterministic}. (ii) is the characterization of

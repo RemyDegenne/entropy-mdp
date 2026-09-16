@@ -114,6 +114,43 @@ status:
     labelled lemmas with complete proof sketches, and the errors found in the paper are listed
     in `notes/paper-errata.md`.
 
-    Phase 2 (proofs) has not started.
-  sorry_count: 3
+    Phase 2 (proofs) started on 2026-09-16 and follows the blueprint chapter by chapter. Done:
+    chapter "Elementary inequalities" (`chap:pre_analysis`: square-root and exponential bounds,
+    the normalized variance bound for exponential transforms, the logarithmic sum bound, the
+    corrected self-bounding inequality), 7 files under `Essakine2026Tight/Mathlib/`, every
+    statement and proof `\leanok`; Mathlib's `variance_le_sub_mul_sub` provides the
+    Bhatia–Davis inequality. The plan for the remaining chapters is `notes/phase2-plan.md`.
+
+    Progress on 2026-09-16 (evening). Theorem 3 is proved
+    (`EV2026/{HardTree,HardParams,HardMDP,LowerBound}.lean`, only the standard axioms): the hard
+    instances are built on arbitrary finite types through `Fintype.equivFin`, their state
+    sequences are computed by backward induction, and the change of measure is LML's one-sided
+    form for the law of the output. Also proved, every statement and proof `\leanok`: the
+    chapters "Model" (`chap:mdp`: Markov property of the trajectory law, Bellman equations
+    under finite exponential moments, ranges, optimal values), "Change of measure"
+    (`chap:pre_info`), "Concentration inequalities" (`chap:pre_concentration`), "Finite-horizon
+    MDP theory" (`chap:pre_mdp`: iterated Markov property, occupancy measures, unrolling,
+    Cauchy–Schwarz along a trajectory, entropic variances, visits of a state-action pair),
+    "Algorithm" (`chap:algorithm`), and the rate lemmas and the counting argument of
+    `chap:sample_complexity` (`EV2026/RateBounds.lean`), the analysis on the good event for both
+    signs of `β` (`EV2026/Analysis{Common,Pos,Neg}.lean`: concentration, optimism, the auxiliary
+    values, the certificate, soundness of stopping, the certificate recursion), and the
+    time-uniform KL concentration of the empirical distribution
+    (`Mathlib/InformationTheory/KLTimeUniform.lean`, by the Laplace mixture), and the
+    probabilities of the concentration events and of the good event in every run
+    (`EV2026/Events.lean`), the tail of the analysis for both signs of `β`
+    (`EV2026/Tail{Common,Pos,Neg}.lean`: unrolled certificate, normalized certificate bound,
+    progress, stopping-time bound, run-level PAC) and Theorem 4.
+
+    Phase 2 complete on 2026-09-16: the three headline theorems are proved, with no `sorry` in
+    the library, and depend only on the axioms `propext`, `Classical.choice`, `Quot.sound`.
+    `lake build Essakine2026Tight --wfail` and `lake exe runLinter Essakine2026Tight` pass, every
+    blueprint statement used by the headline theorems is `\leanok` with its proof, and
+    `lake exe checkdecls blueprint/lean_decls` passes. The statements and the definitions in
+    their closure are unchanged since phase 1; the comparator challenges were regenerated (only
+    their import lists, namespace stubs and one `open` changed). Findings of phase 2 (hypotheses
+    that are not needed, slack in the constants, implicit assumptions of the paper's proofs) are
+    listed in `notes/paper-errata.md`; library material to upstream in
+    `notes/upstreaming-candidates.md`.
+  sorry_count: 0
   sorry_in_definitions: 0

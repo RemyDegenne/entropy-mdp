@@ -58,7 +58,16 @@ involved before Lemma~\ref{lem:pac_pos}).
 history $\mathrm{histAt}\ X\ Y\ t\ \omega$ (\texttt{Essakine2026Tight/EV2026/Run.lean}:
 \texttt{UtildeAt}, \texttt{ZtildeAt}, \texttt{certAt}, \texttt{ringZAt}, \ldots), and the
 events $\evGood^+$ etc.\ are subsets of $\Omega$; a lemma ``on $\evGood^+$, for all $t, h, s, a$,
-$\ldots$'' is a Lean statement \texttt{∀ ω ∈ goodEvent X Y M β δ P, ∀ t h s a, \ldots}. The
+$\ldots$'' is a Lean statement with the hypothesis \texttt{hω : ω ∈ goodEvent X Y M s₁ β δ} and
+the arguments \texttt{t h s a} (\texttt{EV2026/AnalysisPos.lean}, section \texttt{Run}). No hypothesis
+that $(X, Y)$ is a run of Entropic-BPI is needed before Lemma~\ref{lem:stopping_time_bound_pos}: all the
+quantities are functions of the history, and the lemmas are about these functions. Every lemma is
+first proved for a fixed history \texttt{hist} under the pointwise consequences of the good event at
+that history (Definition~\ref{def:pos_hist_concentration}), and the run version is a one-line
+corollary (Lemma~\ref{lem:pos_hist_concentration}); both names are listed in the \texttt{\textbackslash lean}
+tags. The standing hypotheses are \texttt{hM : M.HasRewardFn r}, \texttt{hr : ∀ h s a, r h s a ∈ Set.Icc 0 1},
+\texttt{hβ : 0 < β}, \texttt{hδ : 0 < δ} and \texttt{hδ1 : δ ≤ 1} ($\delta = 1$ is allowed), and
+$\eps \ge 0$ suffices in Lemma~\ref{lem:pac_at_stopping_pos}. The
 step $h$ of the paper is the Lean index $h - 1$; the backward recursions are indexed by the
 number $j = H + 1 - h$ of steps to the end, so ``backward induction on $h$ from $H + 1$ down to
 $1$'' is an induction on $j$ from $0$ to $H$, and the ranges $B_h = e^{\beta(H-h)}$,
@@ -67,10 +76,125 @@ The pair $(s, a)$ with $n_h^t(s,a) = 0$ (never visited) is a separate case of ev
 backward induction below (deviation~1 of Chapter~\ref{chap:mdp}): its backups are the clips
 $\Ut = c_h$, $\Ul = 1$, its certificate is $c_h$ and its rate terms are $\rho = \rho^* = 1$.
 
+\section{Concentration at a history and sign-independent cores}
+\label{sec:pos_cores}
+
+This section records the auxiliary objects of the Lean proofs of this chapter and of
+Chapter~\ref{chap:analysis_neg} (\texttt{EV2026/AnalysisCommon.lean}): the pointwise content of the
+good event at a history, the concentration lemmas of Chapter~\ref{chap:pre_concentration} for
+probability vectors, and the parts of the proofs below that do not depend on the sign of $\beta$.
+
+\begin{definition}[Concentration at a history]\label{def:pos_hist_concentration}
+\lean{Essakine2026Tight.HistConcentration, Essakine2026Tight.bernRange}\leanok
+\uses{def:event_kl, def:event_bern, def:good_event, def:counts, def:emp_trans, def:rates, def:opt_value}
+A history of $t$ episodes satisfies the concentration inequalities (for $\mathcal M$, $\beta$, $\delta$)
+if for all $h \le H$ and $(s, a)$, $\KL(\phat_h^t(\cdot \mid s, a) \,\|\, p_h(\cdot \mid s, a)) \le \alpha(n, \delta)/n$
+with $n = n_h^t(s, a)$ (the threshold being $\infty$ for $n = 0$), and for every visited pair
+$\abs{(\phat_h^t - p_h)Z^*_{h+1}(s, a)} \le \sqrt{2\Var_{p_h}(Z^*_{h+1})(s, a)\alpha^*(n, \delta)/n} + 3B_h\alpha^*(n, \delta)/n$,
+where $B_h = e^{\beta(H - h)}$ if $\beta > 0$ and $B_h = 1 - e^{\beta(H - h)}$ otherwise.
+\end{definition}
+
+\begin{lemma}[The good event gives concentration at every history]\label{lem:pos_hist_concentration}
+\lean{Essakine2026Tight.histConcentration_histAt, Essakine2026Tight.HistConcentration.klDiv_le_ofReal}\leanok
+\uses{def:pos_hist_concentration, def:good_event}
+For $\omega \in \evGood^\pm$ and every $t$, the history of the first $t$ episodes satisfies the
+concentration inequalities; at a visited pair the KL threshold is $\alpha(n, \delta)/n$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:good_event, def:event_kl, def:event_bern}
+\leanok
+These are the first two components of the good event, read at the episode $t$.
+\end{proof}
+
+\begin{lemma}[KL inequalities for probability vectors]\label{lem:pos_vec_kl}
+\lean{Essakine2026Tight.integral_eq_vecExp_of_measureReal, Essakine2026Tight.variance_eq_vecVar_of_measureReal, Essakine2026Tight.abs_vecExp_sub_le_of_klDiv_le, Essakine2026Tight.vecVar_le_two_mul_vecVar_add_of_klDiv_le, Essakine2026Tight.vecVar_le_two_mul_vecVar_add_of_klDiv_le', Essakine2026Tight.vecVar_le_two_mul_vecVar_add, Essakine2026Tight.vecVar_le_mul_vecExp}\leanok
+\uses{lem:kl_bernstein, lem:kl_transport_var, lem:transport_var, lem:var_le_range_mean, lem:pconc_weighted_measure}
+Let $p$ be a probability vector on a finite set, $\nu$ a probability measure on it with vector
+$q = (\nu\{x\})_x$, $a \ge 0$, $b \ge 0$, $c \in \R$, and $f, g$ with values in $[c, c + b]$. If
+$\KL(\sum_x p(x)\delta_x \,\|\, \nu) \le a$, then
+$\abs{pf - qf} \le \sqrt{2\Var_q(f)a} + \frac23 ba$, $\Var_q(f) \le 2\Var_p(f) + 4b^2a$ and
+$\Var_p(f) \le 2\Var_q(f) + 4b^2a$. Without the KL assumption,
+$\Var_p(f) \le 2\Var_p(g) + 2b\,p\abs{f - g}$, and $\Var_p(f) \le b\,pf$ if $c = 0$. (The integral and
+the variance under $\nu$ are $qf$ and $\Var_q(f)$.)
+\end{lemma}
+
+\begin{proof}
+\uses{lem:kl_bernstein, lem:kl_transport_var, lem:transport_var, lem:var_le_range_mean, lem:pconc_weighted_measure}
+\leanok
+If $b = 0$, $f$ is constant and all the claims are trivial. Otherwise apply
+Lemmas~\ref{lem:kl_bernstein}, \ref{lem:kl_transport_var}, \ref{lem:transport_var}
+and~\ref{lem:var_le_range_mean} to $f - c$ and $g - c$ (values in $[0, b]$), under the weighted
+measure of $p$ (Lemma~\ref{lem:pconc_weighted_measure}) and $\nu$; the means shift by $c$ and the
+variances are invariant. On a finite set, $\int f\,d\nu = \sum_x\nu\{x\}f(x)$
+(\texttt{integral\_fintype}) and $\Var_\nu(f) = \sum_x \nu\{x\}(f(x) - \nu f)^2$.
+\end{proof}
+
+\begin{lemma}[Core of Lemmas~7 and~12]\label{lem:pos_core_concentration}
+\lean{Essakine2026Tight.abs_vecExp_sub_le_bonus_add}\leanok
+\uses{lem:pos_vec_kl}
+Let $p, \nu, q$ be as in Lemma~\ref{lem:pos_vec_kl}, $0 \le \alpha^\star \le \alpha$ (the rates divided by
+$n$), $B \ge 0$, $H \ge 1$, and $f, g$ with values in $[c, c + B]$. If $\KL(p \,\|\, \nu) \le \alpha$ and
+$\abs{pf - qf} \le \sqrt{2\Var_q(f)\alpha^\star} + 3B\alpha^\star$, then
+\[
+  \abs{pf - qf} \le 2\sqrt2\sqrt{\Var_p(g)\alpha^\star} + 5B\alpha + 4HB\alpha + \frac1H p\abs{g - f} .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pos_vec_kl, lem:sqrt_mul_le}
+\leanok
+The computation of the proof of Lemma~\ref{lem:concentration_pos}: with $D := p\abs{g - f}$,
+$2\Var_q(f)\alpha^\star \le 8\Var_p(g)\alpha^\star + 8BD\alpha^\star + 8B^2\alpha\alpha^\star$, and this is at most
+$a_1^2 + a_2^2 + a_3^2 \le (a_1 + a_2 + a_3)^2$ for $a_1 := 2\sqrt2\sqrt{\Var_p(g)\alpha^\star}$,
+$a_2 := D/H + 2HB\alpha^\star$ (as $a_2^2 \ge 4(D/H)(2HB\alpha^\star)$) and $a_3 := 2\sqrt2 B\alpha$ (as
+$\alpha^\star \le \alpha$). Hence $\abs{pf - qf} \le a_1 + D/H + (2H + 2\sqrt2 + 3)B\alpha$, and
+$2\sqrt2 + 3 \le 5 + 2H$.
+\end{proof}
+
+\begin{lemma}[Core of the third term of Lemmas~11 and~16]\label{lem:pos_core_third_term}
+\lean{Essakine2026Tight.vecExp_sub_vecExp_le_of_klDiv_le}\leanok
+\uses{lem:pos_vec_kl}
+Let $p, \nu, q$ be as in Lemma~\ref{lem:pos_vec_kl}, $\alpha \ge 0$, $B \ge 0$, $H \ge 1$, and $f$ with
+values in $[0, B]$. If $\KL(p \,\|\, \nu) \le \alpha$, then $qf - pf \le \frac1H pf + (5 + 4H)B\alpha$.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pos_vec_kl, lem:sqrt_mul_le}
+\leanok
+As in the proof of Lemma~\ref{lem:certificate_pos}: $2\Var_q(f)\alpha \le 4B\alpha\,pf + 8B^2\alpha^2$ by
+Lemma~\ref{lem:pos_vec_kl}, which is at most $(pf/H + HB\alpha)^2 + (2\sqrt2B\alpha)^2$, so
+$qf - pf \le pf/H + (H + 2\sqrt2 + \frac23)B\alpha \le pf/H + (5 + 4H)B\alpha$.
+\end{proof}
+
+\begin{lemma}[Cores of the certificate recursion]\label{lem:pos_core_recursion}
+\lean{Essakine2026Tight.vecExp_le_one_add_mul_vecExp_add, Essakine2026Tight.bonusTerm_le_of_klDiv_le, Essakine2026Tight.three_mul_add_le}\leanok
+\uses{lem:pos_vec_kl}
+Let $p, \nu, q$ be as in Lemma~\ref{lem:pos_vec_kl}, $0 \le \alpha^\star \le \alpha$, $B \ge 0$, $H \ge 1$ and
+$\KL(p \,\|\, \nu) \le \alpha$.
+\begin{enumerate}
+  \item[(i)] If $g$ has values in $[0, B]$, then $pg \le (1 + \frac1H)qg + 2HB\alpha$.
+  \item[(ii)] If $G, Z$ have values in $[c, c + B]$ and $q\abs{G - Z} \le \Delta$, then
+        $2\sqrt2\sqrt{\Var_p(G)\alpha^\star} + 5B\alpha + 4HB\alpha \le 6\sqrt{\Var_q(Z)\alpha^\star} + \frac1H\Delta + 23HB\alpha$.
+  \item[(iii)] (Arithmetic.) If $\sigma, \Delta, \rho, B' \ge 0$, $B, B' \le C$, $b \le 6\sigma + \frac1H\Delta + 23HB\rho$
+        and $\hat g \le (1 + \frac1H)\Delta + 2HB'\rho$, then
+        $3b + (1 + \frac3H)\hat g \le 36\sigma + (1 + \frac{13}H)\Delta + 84HC\rho$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pos_vec_kl, lem:sqrt_mul_le}
+\leanok
+(i) and (ii) are steps (i) and (ii) of the proof of Lemma~\ref{lem:cert_true_recursion_pos}, with every
+square root bounded by comparing squares as in Lemma~\ref{lem:pos_core_concentration}. (iii): $(1 + \frac3H)(1 + \frac1H) \le 1 + \frac7H$,
+$(1 + \frac3H)2HB'\rho \le 8HB'\rho$ and $69HB\rho + 8HB'\rho \le 77HC\rho \le 84HC\rho$.
+\end{proof}
+
 \section{Concentration and optimism}
 \label{sec:pos_optimism}
 
 \begin{lemma}[Concentration of the optimal exponential value; Lemma~7 of the paper]\label{lem:concentration_pos}
+\lean{Essakine2026Tight.abs_vecExp_sub_le_bonus_add_of_pos, Essakine2026Tight.abs_vecExp_sub_le_bonusAt_add_of_pos}\leanok
 \uses{def:good_event, def:backups, def:emp_trans, def:counts, def:rates, def:opt_value, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $(s,a)$ with $n = n_h^t(s,a) \ge 1$,
 \[
@@ -86,7 +210,8 @@ $\abs{(p_h - \phat) Z^*_{h+1}(s,a)} \le b + \frac1H \phat\abs{\Zt^t_{h+1} - Z^*_
 \end{lemma}
 
 \begin{proof}
-\uses{def:good_event, def:event_bern, def:event_kl, lem:opt_exp_value_range, lem:backups_range, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:emp_trans_simplex}
+\uses{def:good_event, def:event_bern, def:event_kl, lem:opt_exp_value_range, lem:backups_range, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:emp_trans_simplex, lem:pos_core_concentration, lem:pos_hist_concentration}
+\leanok
 Fix $\omega \in \evGood^+$, $t$, $h$, $(s,a)$ with $n \ge 1$. Write $f := Z^*_{h+1} - 1$ and
 $g := \Zt^t_{h+1} - 1$; both take values in $[0, B_h - 1] \subseteq [0, B_h]$
 (Lemmas~\ref{lem:opt_exp_value_range} and~\ref{lem:backups_range}) and variances are invariant
@@ -172,6 +297,7 @@ Two points about the bonus:
 \end{remark}
 
 \begin{lemma}[Optimism and pessimism; Lemma~8 of the paper]\label{lem:optimism_pos}
+\lean{Essakine2026Tight.optExpValue_mem_Icc_optZ_of_pos, Essakine2026Tight.optExpQ_mem_Icc_stepUAt_of_pos, Essakine2026Tight.optExpQ_le_stepUAt_fst_of_pos, Essakine2026Tight.stepUAt_snd_le_optExpQ_of_pos, Essakine2026Tight.optExpValue_mem_Icc_ZlowerAt_ZtildeAt_of_pos, Essakine2026Tight.optExpQ_mem_Icc_UlowerAt_UtildeAt_of_pos, Essakine2026Tight.optExpValue_mem_Icc_of_pos, Essakine2026Tight.optZ_mem_of_pos}\leanok
 \uses{def:good_event, def:backups, def:opt_value, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$, $s \in \Ss$ and $a \in \As$,
 \[
@@ -183,6 +309,7 @@ On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$, $s \in \Ss$ and 
 
 \begin{proof}
 \uses{lem:concentration_pos, lem:opt_exp_value_range, lem:opt_bellman, lem:emp_trans_simplex, def:backups, lem:backups_range}
+\leanok
 Fix $\omega \in \evGood^+$ and $t$. We prove by backward induction on $h$ (from $H + 1$ down to
 $1$) the statement $P(h)$: ``for all $s$, $\Zl_h^t(s) \le Z^*_h(s) \le \Zt_h^t(s)$'', proving the
 $U$-inequalities at step $h \le H$ along the way from $P(h+1)$.
@@ -230,12 +357,15 @@ by Definition~\ref{def:backups}, $\Zt_h^t(s) = \max_a\Ut_h^t(s,a)$ and $\Zl_h^t(
 the maximum over $a$ is monotone, which gives $P(h)$.
 \end{proof}
 
-\textbf{Lean remark.} The induction is on $j = H + 1 - h$ with the statement $P$ about $Z$ only;
-the $U$-inequalities are a separate lemma taking $P(h+1)$ as a hypothesis (one lemma for the
-upper bound, one for the lower bound), which keeps each declaration small. The maxima over
-$a$ are \texttt{Finset.sup'} over the finite type $\As$ (or LML's \texttt{argmax}), and
-``monotone'' is \texttt{Finset.sup'\_mono}-type reasoning. The positivity of $\phat$ is
-\texttt{vecExp} of a nonnegative function under a probability vector.
+\textbf{Lean remark.} The induction is \texttt{Fin.reverseInduction} on the Lean step
+\texttt{h : Fin (H + 1)} (the values at \texttt{h} are \texttt{optZ r β δ hist (H - h)}), with the statement $P$
+about $Z$ only, in the form $Z^*_h(s) \in [\Zl^t_h(s), \Zt^t_h(s)]$
+(\texttt{optExpValue\_mem\_Icc\_optZ\_of\_pos}); the $U$-inequalities are separate lemmas taking
+$P(h+1)$ as a hypothesis (\texttt{optExpQ\_le\_stepUAt\_fst\_of\_pos} for the upper bound,
+\texttt{stepUAt\_snd\_le\_optExpQ\_of\_pos} for the lower bound), and the unconditional $U$-statement
+is \texttt{optExpQ\_mem\_Icc\_stepUAt\_of\_pos}. The maxima over $a$ are LML's \texttt{Function.max}
+(\texttt{optZ\_eq}), handled with \texttt{Function.le\_max} and \texttt{argmax\_spec}. The positivity of
+$\phat$ is \texttt{vecExp\_mono}.
 
 \section{The ring value and the certificate}
 \label{sec:pos_certificate}
@@ -248,6 +378,7 @@ $\pi\cert^t$ dominates $\Zt^t - \Zr^t$. We first record the trivial lower bound 
 which the paper uses implicitly.
 
 \begin{lemma}[The ring value is at least one]\label{lem:pos_ring_range}
+\lean{Essakine2026Tight.one_le_ringZ_of_pos, Essakine2026Tight.one_le_ringU_of_pos, Essakine2026Tight.one_le_ringUAux_of_pos, Essakine2026Tight.one_le_ringZAt_of_pos, Essakine2026Tight.one_le_ringUAt_of_pos}\leanok
 \uses{def:ring, def:entropic_bpi}
 For all $t \ge 0$, $h \in \{1, \dots, H + 1\}$, $s$ and $a$: $\Zr_h^t(s) \ge 1$ and, for $h \le H$,
 $\Ur_h^t(s,a) \ge 1$.
@@ -255,6 +386,7 @@ $\Ur_h^t(s,a) \ge 1$.
 
 \begin{proof}
 \uses{def:ring, lem:exp_value_monotone}
+\leanok
 Backward induction on $h$; $\Zr_{H+1}^t = 1$. If $\Zr_{h+1}^t \ge 1$ pointwise then
 $e^{\beta r_h(s,a)}(p_h\Zr^t_{h+1})(s,a) \ge (p_h \Zr^t_{h+1})(s,a) \ge (p_h 1)(s,a) = 1$ ($\beta r_h \ge 0$;
 Lemma~\ref{lem:exp_value_monotone}: $p_h$ is positive and $p_h 1 = 1$). For a visited pair,
@@ -264,6 +396,7 @@ Finally $\Zr_h^t(s) = \Ur_h^t(s, \pi_h(s)) \ge 1$.
 \end{proof}
 
 \begin{lemma}[The ring value is a lower bound; Lemma~10 of the paper]\label{lem:ring_pos}
+\lean{Essakine2026Tight.ringZ_le_optZ_snd_and_expValue_of_pos, Essakine2026Tight.ringU_le_stepUAt_snd_and_expQ_of_pos, Essakine2026Tight.ringU_le_stepUAt_snd_of_pos, Essakine2026Tight.ringU_le_expQ_of_pos, Essakine2026Tight.ringZAt_le_ZlowerAt_and_expValue_of_pos, Essakine2026Tight.ringUAt_le_UlowerAt_and_expQ_of_pos}\leanok
 \uses{def:ring, def:backups, def:greedy, def:exp_value, def:entropic_bpi}
 For all $t \ge 0$ (no event is needed), $h \in \{1, \dots, H + 1\}$, $s$ and $a$, with $\pi = \pi^{t+1}$,
 \[
@@ -275,6 +408,7 @@ For all $t \ge 0$ (no event is needed), $h \in \{1, \dots, H + 1\}$, $s$ and $a$
 
 \begin{proof}
 \uses{def:ring, def:backups, def:greedy, lem:exp_value_monotone, lem:exp_bellman, def:exp_value, lem:emp_trans_simplex}
+\leanok
 Backward induction on $h$ with the statement $P(h)$: ``for all $s$,
 $\Zr_h^t(s) \le \min\{\Zl_h^t(s), Z^\pi_h(s)\}$''. Base case: all three values are $1$ at $h = H + 1$.
 Let $h \le H$, assume $P(h+1)$, fix $(s,a)$.
@@ -303,6 +437,7 @@ $\Zr_h^t(s) \le U^\pi_h(s, \pi_h(s)) = Z^\pi_h(s)$ (Lemma~\ref{lem:exp_bellman})
 \end{proof}
 
 \begin{lemma}[One-step certificate bound; Lemma~11 of the paper]\label{lem:certificate_pos}
+\lean{Essakine2026Tight.stepUAt_fst_sub_ringU_le_of_pos, Essakine2026Tight.UtildeAt_sub_ringUAt_le_of_pos}\leanok
 \uses{def:good_event, def:ring, def:backups, def:bonus, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $(s,a)$ with $n = n_h^t(s,a) \ge 1$,
 \[
@@ -312,7 +447,8 @@ On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $(s,a)$ with $n =
 \end{lemma}
 
 \begin{proof}
-\uses{lem:concentration_pos, lem:optimism_pos, lem:ring_pos, lem:pos_ring_range, lem:kl_bernstein, lem:kl_transport_var, lem:var_le_range_mean, lem:sqrt_add_le, lem:sqrt_mul_le, lem:emp_trans_simplex, lem:backups_range, lem:opt_exp_value_range, def:event_kl, def:bonus}
+\uses{lem:concentration_pos, lem:optimism_pos, lem:ring_pos, lem:pos_ring_range, lem:kl_bernstein, lem:kl_transport_var, lem:var_le_range_mean, lem:sqrt_add_le, lem:sqrt_mul_le, lem:emp_trans_simplex, lem:backups_range, lem:opt_exp_value_range, def:event_kl, def:bonus, lem:pos_core_third_term}
+\leanok
 Fix $\omega \in \evGood^+$, $t$, $h$, $(s,a)$ with $n \ge 1$, and write $\Delta := \phat(\Zt^t_{h+1} - \Zr^t_{h+1}) \ge 0$
 (Lemmas~\ref{lem:ring_pos}, \ref{lem:optimism_pos}: $\Zr^t_{h+1} \le \Zl^t_{h+1} \le Z^*_{h+1} \le \Zt^t_{h+1}$
 pointwise). Throughout, $\Ut_h^t(s,a) \le X := e^{\beta r_h}[\phat\Zt^t_{h+1} + b + \frac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})]$
@@ -383,6 +519,7 @@ why the bonus needs an $H\alpha/n$ term.
 \end{remark}
 
 \begin{lemma}[The certificate dominates the optimistic--ring gap]\label{lem:cert_dominates_gap_pos}
+\lean{Essakine2026Tight.optZ_fst_sub_ringZ_le_cert_of_pos, Essakine2026Tight.ZtildeAt_sub_ringZAt_le_certAt_of_pos}\leanok
 \uses{def:good_event, def:certificate, def:backups, def:ring, def:greedy, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$,
 \[
@@ -392,6 +529,7 @@ On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, 
 
 \begin{proof}
 \uses{lem:certificate_pos, lem:backups_range, lem:pos_ring_range, lem:emp_trans_simplex, def:certificate, def:greedy, def:ring, lem:certificate_range}
+\leanok
 Fix $\omega \in \evGood^+$ and $t$; backward induction on $h$. Base case $h = H + 1$: both sides
 are $0$ ($\Zt_{H+1}^t = \Zr_{H+1}^t = 1$, $\cert_{H+1}^t = 0$). Induction step: let $h \le H$, $s \in \Ss$
 and $a := \pi_h(s)$; by Definitions~\ref{def:greedy} and~\ref{def:ring},
@@ -410,6 +548,7 @@ $\Zt_h^t(s) - \Zr_h^t(s) \le e^{\beta r_h(s,a)}[3b + (1 + \frac3H)\phat(\pi_{h+1
 \end{proof}
 
 \begin{lemma}[The certificate dominates the suboptimality gap; Lemma~9 of the paper]\label{lem:stopping_pos}
+\lean{Essakine2026Tight.optExpValue_sub_expValue_le_cert_of_pos, Essakine2026Tight.optExpValue_sub_expValue_le_certAt_of_pos}\leanok
 \uses{def:good_event, def:certificate, def:opt_value, def:exp_value, def:greedy, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$,
 \[
@@ -419,12 +558,14 @@ On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, 
 
 \begin{proof}
 \uses{lem:optimism_pos, lem:ring_pos, lem:cert_dominates_gap_pos}
+\leanok
 $Z^*_h(s) \le \Zt_h^t(s)$ (Lemma~\ref{lem:optimism_pos}) and $\Zr_h^t(s) \le Z^\pi_h(s)$
 (Lemma~\ref{lem:ring_pos}), so $Z^*_h(s) - Z^\pi_h(s) \le \Zt_h^t(s) - \Zr_h^t(s) \le (\pi_h\cert_h^t)(s)$
 (Lemma~\ref{lem:cert_dominates_gap_pos}).
 \end{proof}
 
 \begin{lemma}[Soundness of the stopping rule]\label{lem:pac_at_stopping_pos}
+\lean{Essakine2026Tight.optEntropicValue_sub_entropicValue_le_of_stopCond_of_pos, Essakine2026Tight.optEntropicValue_sub_entropicValue_greedyAt_le_of_pos}\leanok
 \uses{def:good_event, def:stopping_rule, def:entropic_value, def:opt_value, def:greedy, def:entropic_bpi}
 On $\evGood^+$, for every $t \ge 0$ such that the stopping condition of
 Definition~\ref{def:stopping_rule} holds after $t$ episodes, i.e.\
@@ -434,6 +575,7 @@ one has $V^*_1(s_1) - V^\pi_1(s_1) \le \eps$.
 
 \begin{proof}
 \uses{lem:cert_dominates_gap_pos, lem:ring_pos, lem:stopping_pos, lem:value_gap_log, lem:exp_value_range}
+\leanok
 Write $g := (\pi_1\cert_1^t)(s_1) \ge 0$. Multiplying the stopping condition by $e^{\beta\eps} > 0$
 gives $e^{\beta\eps} g \le (e^{\beta\eps} - 1)\Zt_1^t(s_1)$, i.e.\ $g \le (e^{\beta\eps} - 1)(\Zt_1^t(s_1) - g)$.
 By Lemma~\ref{lem:cert_dominates_gap_pos} and Lemma~\ref{lem:ring_pos},
@@ -452,6 +594,7 @@ Lemma~\ref{lem:value_gap_log}; here only real arithmetic is used.
 \label{sec:pos_true_kernel}
 
 \begin{lemma}[Certificate recursion under the true kernel]\label{lem:cert_true_recursion_pos}
+\lean{Essakine2026Tight.cert_le_of_pos, Essakine2026Tight.certAt_le_of_pos, Essakine2026Tight.expValue_mem_Icc_of_pos}\leanok
 \uses{def:good_event, def:certificate, def:rate_min, def:exp_value, def:greedy, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$ and
 $a := \pi_h(s)$,
@@ -466,7 +609,8 @@ where $\rho^t_h(s,a) = \min\{\alpha(n,\delta)/n, 1\}$ and $\rho^{*t}_h(s,a) = \m
 \end{lemma}
 
 \begin{proof}
-\uses{lem:certificate_range, def:certificate, def:bonus, def:event_kl, lem:kl_bernstein, lem:var_le_range_mean, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:opt_exp_value_eq, lem:optimism_pos, lem:ring_pos, lem:cert_dominates_gap_pos, lem:backups_range, lem:exp_value_range, lem:exp_value_monotone, lem:emp_trans_simplex}
+\uses{lem:certificate_range, def:certificate, def:bonus, def:event_kl, lem:kl_bernstein, lem:var_le_range_mean, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:opt_exp_value_eq, lem:optimism_pos, lem:ring_pos, lem:cert_dominates_gap_pos, lem:backups_range, lem:exp_value_range, lem:exp_value_monotone, lem:emp_trans_simplex, lem:pos_core_recursion}
+\leanok
 Fix $\omega \in \evGood^+$, $t$, $h$, $s$, $a = \pi_h(s)$; write $g := \pi_{h+1}\cert^t_{h+1} : \Ss \to [0, B_h]$
 (Lemma~\ref{lem:certificate_range}, the clip at step $h + 1$ being $c_{h+1} = B_h$),
 $\Delta_p := (p_h g)(s,a) \ge 0$ and $\rho, \rho^*$ as in the statement. All three terms in the
@@ -544,7 +688,58 @@ the truncated rates $\rho = \min\{\alpha/n, 1\}$ (the paper's $\alpha(n)/n \wedg
 $1$ for never-visited pairs, so that the statement has no $\alpha(0)/0$.
 \end{remark}
 
+\textbf{Lean remark.} For the Lean step \texttt{h : Fin H} (the paper's $h + 1$) the statement is
+about \texttt{cert r β δ hist (H - h) s} (\texttt{certAt X Y r β δ t ω h.castSucc s}) and the certificate
+at the next step \texttt{cert r β δ hist (H - 1 - h)} (\texttt{certAt X Y r β δ t ω h.succ}); the clip
+$c_h$ is \texttt{Real.exp (β * (H - h : ℕ))}, the variance is
+\texttt{vecVar (M.transVec h s a) (expValue M β π h.succ)} and the rate terms are
+\texttt{rateMin (alphaStar …) n} and \texttt{rateMin (alphaKL …) n} (\texttt{starRateMinAt},
+\texttt{klRateMinAt} for a run). The proof follows the three steps above: step (i) is
+Lemma~\ref{lem:pos_core_recursion}(i) with range $B_h$, step (ii) is Lemma~\ref{lem:pos_core_recursion}(ii)
+with $G = \Zt^t_{h+1}$, $Z = Z^\pi_{h+1}$ and $c = 1$, and step (iii) is Lemma~\ref{lem:pos_core_recursion}(iii)
+with $B = B' = B_h$ and $C = c_h$ (the proof gives the constant $77 B_h \le 84 c_h$).
+
+\begin{lemma}[Unrolling with the factor $1 + c/H$; the terms of the unrolled bound]\label{lem:pos_core_unroll}
+\lean{Learning.MDP.Episodic.le_exp_mul_sum_integral_of_backward, Learning.MDP.Episodic.sum_integral_exp_mul_sqrt_vecVar_mul_le, Learning.MDP.Episodic.sum_integral_exp_mul_mul_le, Learning.MDP.Episodic.integrable_comp_obs_action}\leanok
+\uses{def:exp_value, def:step_law, def:occupancy}
+Let $\pi$ be a policy, $s_1 \in \Ss$, $\beta \in \R$, $r : [H] \times \Ss \times \As \to \R$,
+$\E^\pi = \E^\pi_{(s_1, 1)}$ and $w_h := e^{\beta\sum_{i \le h} r_i(S_i, A_i)}$ for $h \in [H]$.
+\begin{enumerate}
+  \item[(i)] Let $c \ge 0$, $u_h \ge 0$ and $g_h : \Ss \to \R$ ($h \le H + 1$) with $g_{H+1} = 0$ and
+  $g_h(s) \le e^{\beta r_h(s,\pi_h(s))}[u_h(s, \pi_h(s)) + (1 + \frac cH)(p_h g_{h+1})(s, \pi_h(s))]$
+  for all $h \le H$ and $s \in \Ss$. Then $g_1(s_1) \le e^c\sum_{h=1}^H\E^\pi[w_h\,u_h(S_h, A_h)]$.
+  \item[(ii)] If $\mathcal M$ has the reward function $r$ and $\rho_h \ge 0$, then
+  \[
+    \sum_{h=1}^H\E^\pi\Big[w_h\sqrt{\Var_{p_h}(Z^\pi_{h+1})(S_h, A_h)\,\rho_h(S_h, A_h)}\Big]
+    \le \sqrt{\Var_{\Prob^\pi}(e^{\beta R_1^\pi})}\,\sqrt{\sum_{h=1}^H\sum_{s,a}p^\pi_h(s,a)\rho_h(s,a)} .
+  \]
+  \item[(iii)] If $\rho_h \ge 0$ and $w_h\,c_h(S_h, A_h) \le C$ on every trajectory, then
+  $\sum_h\E^\pi[w_h\,c_h(S_h, A_h)\,\rho_h(S_h, A_h)] \le C\sum_h\sum_{s,a}p^\pi_h(s,a)\rho_h(s,a)$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{lem:unroll_recursion, lem:one_add_div_pow_le_exp, lem:cauchy_schwarz_traj, lem:entropic_variance_sum, lem:occupancy_expectation}
+\leanok
+(i) Lemma~\ref{lem:unroll_recursion} with $\kappa = 1 + c/H \ge 1$, and $\kappa^{h-1} \le e^c$ for
+$1 \le h \le H$ (Lemma~\ref{lem:one_add_div_pow_le_exp}); the expectations are nonnegative.
+(ii) Lemma~\ref{lem:cauchy_schwarz_traj} with the weights $w_h$, $v_h := \Var_{p_h}(Z^\pi_{h+1})(S_h, A_h) \ge 0$
+and $u_h := \rho_h(S_h, A_h) \ge 0$; since $w_h^2 = e^{2\beta\sum_{i \le h} r_i(S_i,A_i)}$, the first factor is
+$\Var_{\Prob^\pi}(e^{\beta R_1^\pi})$ by Lemma~\ref{lem:entropic_variance_sum}, and the second is the occupancy
+sum by Lemma~\ref{lem:occupancy_expectation}. (iii) Integrate the pointwise bound
+$w_h\,c_h\,\rho_h \le C\rho_h$ and apply Lemma~\ref{lem:occupancy_expectation}.
+\end{proof}
+
+\textbf{Lean remark.} These statements are MDP-general
+(\texttt{LeanMachineLearning/ReinforcementLearning/MDP/UnrollBounds.lean}); they are recorded here
+because they are the parts of Lemmas~\ref{lem:cert_unrolled_pos}, \ref{lem:ratio_bound_pos},
+\ref{lem:cert_unrolled_neg} and~\ref{lem:ratio_bound_neg} that do not depend on the algorithm, and
+would fit in Chapter~\ref{chap:pre_mdp}. The integrability side conditions are
+\texttt{integrable\_exp\_sum\_mul} and \texttt{integrable\_comp\_obs\_action} (bounded functions of finitely
+many rounds).
+
 \begin{lemma}[Unrolled certificate]\label{lem:cert_unrolled_pos}
+\lean{Essakine2026Tight.cert_le_exp_mul_sum_integral_of_pos, Essakine2026Tight.certAt_le_exp_mul_sum_integral_of_pos}\leanok
 \uses{def:good_event, def:certificate, def:rate_min, def:exp_value, def:step_law, def:greedy, def:entropic_bpi}
 On $\evGood^+$, for all $t \ge 0$, with $\pi = \pi^{t+1}$ and $\E^\pi = \E^\pi_{(s_1, 1)}$,
 \[
@@ -555,7 +750,8 @@ On $\evGood^+$, for all $t \ge 0$, with $\pi = \pi^{t+1}$ and $\E^\pi = \E^\pi_{
 \end{lemma}
 
 \begin{proof}
-\uses{lem:cert_true_recursion_pos, lem:unroll_recursion, lem:one_add_div_pow_le_exp, def:certificate}
+\uses{lem:cert_true_recursion_pos, lem:unroll_recursion, lem:one_add_div_pow_le_exp, def:certificate, lem:pos_core_unroll}
+\leanok
 Fix $\omega \in \evGood^+$ and $t$. Apply Lemma~\ref{lem:unroll_recursion} to the policy $\pi$, the
 functions $g_h := \pi_h\cert_h^t$ ($h \le H + 1$; $g_{H+1} = 0$ by Definition~\ref{def:certificate}), the
 nonnegative functions
@@ -572,8 +768,12 @@ $0 \le h - 1 \le H$); all the summands are nonnegative.
 $\mathrm{stepLaw}\ M\ \pi\ (s_1, 0)$ of a bounded measurable function of the first $H$ rounds;
 the rate terms $\rho^t_h(S_h, A_h)$ are, for the fixed $\omega$, deterministic functions of $(h, s, a)$
 (the history is frozen), so no measurability issue in $\omega$ arises inside the expectation.
+The proof is Lemma~\ref{lem:pos_core_unroll}(i) with $c = 13$ and $g_h$ the certificate. For the
+$0$-indexed Lean step $h$ the clip is \texttt{Real.exp (β * (H - h : ℕ))} ($= c_{h+1}$ in the
+$1$-indexed notation above) and the weight is $e^{\beta\sum_{i \in \mathrm{Iic}\,h} r_i(S_i, A_i)}$.
 
 \begin{lemma}[Normalized certificate bound]\label{lem:ratio_bound_pos}
+\lean{Essakine2026Tight.cert_div_optZ_fst_le_of_pos, Essakine2026Tight.certAt_div_ZtildeAt_le_of_pos}\leanok
 \uses{def:good_event, def:certificate, def:backups, def:rate_min, def:occupancy, def:gmax, def:upper_bound_const, def:greedy, def:entropic_bpi}
 Let $V_G := (e^{\beta\Gmax} - 1)^2/e^{\beta\Gmax}$ with $\Gmax = \Gmax(\mathcal M)$ (Definition~\ref{def:gmax};
 this is the $V_G$ of Definition~\ref{def:upper_bound_const}). On $\evGood^+$, for all $t \ge 0$, with
@@ -588,7 +788,8 @@ where $p^\pi_h$ is the occupancy measure of $\pi$ from $s_1$ (Definition~\ref{de
 \end{lemma}
 
 \begin{proof}
-\uses{lem:cert_unrolled_pos, lem:optimism_pos, lem:opt_exp_value_eq, lem:exp_value_range, lem:cauchy_schwarz_traj, lem:entropic_variance_sum, lem:variance_ratio_le, lem:gmax_le_horizon, lem:occupancy_expectation, def:entropic_variance}
+\uses{lem:cert_unrolled_pos, lem:optimism_pos, lem:opt_exp_value_eq, lem:exp_value_range, lem:cauchy_schwarz_traj, lem:entropic_variance_sum, lem:variance_ratio_le, lem:gmax_le_horizon, lem:occupancy_expectation, def:entropic_variance, lem:pos_core_unroll}
+\leanok
 Fix $\omega \in \evGood^+$ and $t$. \emph{Denominator.} $\Zt_1^t(s_1) \ge Z^*_1(s_1) \ge Z^\pi_1(s_1) \ge 1 > 0$
 (Lemma~\ref{lem:optimism_pos}, Lemma~\ref{lem:opt_exp_value_eq} for $\beta > 0$,
 Lemma~\ref{lem:exp_value_range}), so the left-hand side is at most $(\pi_1\cert_1^t)(s_1)/Z^\pi_1(s_1)$,
@@ -615,12 +816,18 @@ $\E^\pi[\sum_h w_h\,84Hc_h\rho^t_h(S_h,A_h)]/Z^\pi_1(s_1) \le 84He^{\beta(H+1)}\
 the whole trajectory up to step $h$ (here on the past rewards), not only on $(S_h, A_h)$, which
 is needed here. The identity of Lemma~\ref{lem:entropic_variance_sum} is where the entropic
 variance $\sigma V^\pi_1(s_1)$ of Definition~\ref{def:entropic_variance} is identified with the
-variance of $e^{\beta R_1^\pi}$ under $\Prob^\pi_{(s_1,1)}$.
+variance of $e^{\beta R_1^\pi}$ under $\Prob^\pi_{(s_1,1)}$. The variance and rate terms are
+Lemma~\ref{lem:pos_core_unroll}(ii) and~(iii) (with $c_h = 84He^{\beta(H+1-h)}$ and
+$C = 84He^{\beta(H+1)}$). The Lean statement writes $e^{|\beta|(H+1)}$ (equal to $e^{\beta(H+1)}$ here), so
+that both signs produce the same hypothesis for Lemma~\ref{lem:pos_core_stopping_time}; the
+ratio uses the greedy policy of the history, and the occupancy sums are
+$\sum_{h, s, a}\texttt{occupancy M π s₁ h s a} \cdot \rho$.
 
 \section{Bounding the stopping time}
 \label{sec:pos_stopping_time}
 
 \begin{lemma}[Progress at a non-stopping episode]\label{lem:progress_pos}
+\lean{Essakine2026Tight.progress_le_cert_div_optZ_fst_of_pos, Essakine2026Tight.progress_le_certAt_div_ZtildeAt_of_pos}\leanok
 \uses{def:good_event, def:stopping_rule, def:certificate, def:backups, def:upper_bound_const, def:entropic_bpi}
 Let $\kappa(\beta, \eps) := (e^{|\beta|\eps} - 1)e^{-2|\beta|\eps}/2$ (Definition~\ref{def:upper_bound_const}).
 On $\evGood^+$, for every $t \ge 0$ such that the stopping condition of Definition~\ref{def:stopping_rule}
@@ -632,21 +839,61 @@ On $\evGood^+$, for every $t \ge 0$ such that the stopping condition of Definiti
 
 \begin{proof}
 \uses{def:stopping_rule, lem:backups_range}
+\leanok
 Failure of the condition means $(\pi_1\cert_1^t)(s_1) > \frac{e^{\beta\eps} - 1}{e^{\beta\eps}}\Zt_1^t(s_1)$, and
 $\Zt_1^t(s_1) \ge 1 > 0$ (Lemma~\ref{lem:backups_range}), so the ratio exceeds
 $(e^{\beta\eps} - 1)e^{-\beta\eps} \ge (e^{\beta\eps} - 1)e^{-2\beta\eps}/2 = \kappa(\beta,\eps)$ (as $e^{-\beta\eps} \le 1$ and $\frac12 \le 1$;
 here $|\beta| = \beta$). No event is actually needed.
 \end{proof}
 
+\textbf{Lean remark.} No event is assumed; $\eps \ge 0$ and $\delta \in (0, 1]$ suffice ($\delta$ enters
+through the range $\Zt_1^t(s_1) \ge 1$ of Lemma~\ref{lem:backups_range}).
+
+\begin{lemma}[Core of the bound on the stopping time]\label{lem:pos_core_stopping_time}
+\lean{Essakine2026Tight.natCast_le_upperBound, Essakine2026Tight.natCast_le_upperBound_of_mul_progress_le, ENat.toENNReal_le_ofReal_of_forall_natCast_le, Essakine2026Tight.one_le_upperBound, Essakine2026Tight.one_le_coeffLin, Essakine2026Tight.progress_pos, Essakine2026Tight.progress_le_one, Essakine2026Tight.progress_mul_coeffSqrt, Essakine2026Tight.progress_mul_coeffLin, Essakine2026Tight.varianceFactor_nonneg, Essakine2026Tight.exp_thirteen_le}\leanok
+\uses{def:upper_bound_const, def:rates}
+Let $\beta \ne 0$, $\eps > 0$, $\delta \in (0, 1]$, integers $S, A \ge 1$, $H \ge 0$, $G \in \R$, $V_G$, $\kappa = \kappa(\beta, \eps)$ as in
+Definition~\ref{def:upper_bound_const}.
+\begin{enumerate}
+  \item[(i)] Let $T \in \N$ and $x_t \ge 0$, $y_t \in \R$ ($t < T$) be such that
+  $\kappa \le e^{13}[36\sqrt{V_Gx_t} + 84He^{|\beta|(H+1)}y_t]$ for every $t < T$,
+  $\sum_{t<T}x_t \le 16SAH\,\alpha^*(T-1,\delta)\log(T+1)$ and $\sum_{t<T}y_t \le 16SAH\,\alpha(T-1,\delta)\log(T+1)$.
+  Then $T \le \mathrm{upperBound}(S, A, H, \beta, \eps, \delta, G)$.
+  \item[(ii)] If $\tau \in \N \cup \{\infty\}$, $U \in \R$ and every integer $T \le \tau$ satisfies $T \le U$, then
+  $\tau \le U$; in particular $\tau < \infty$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{lem:self_bounding, lem:rates_props}
+\leanok
+(i) This is Steps~1--3 of the proof of Lemma~\ref{lem:stopping_time_bound_pos}, with the sequences
+$x_t$, $y_t$ abstracted. If $T = 0$ the claim is $0 \le \mathrm{upperBound}$, and $\mathrm{upperBound} \ge 1$
+because $A_0 \ge 0$ ($3SAH/\delta \ge 3$, or $\log 0 = 0$ if $H = 0$), $C \ge 0$ and $D \ge 0$. If $T \ge 1$ and
+$H = 0$, the counting hypotheses give $x_0 \le 0$ and the hypothesis at $t = 0$ gives $\kappa \le 0$,
+contradicting $\kappa > 0$. If $T, H \ge 1$: with $L = \log(8eT)$, Steps~1--3 give
+$T\kappa \le 144e^{13}\sqrt{V_GSAH}\sqrt{T(A_0L + L^2)} + 1344e^{13}e^{|\beta|(H+1)}H^2SA(A_0L + SL^2)$
+(the nonnegativity of $y_t$ is not needed), and $e^{13} \le 3^{13} = 1594323$ gives
+$144e^{13} \le 10^9$ and $1344e^{13} \le 10^{10}$. Since $\kappa C = 10^9\sqrt{V_GSAH}$ and
+$\kappa D = 10^{10}e^{|\beta|(H+1)}H^2SA$, dividing by $\kappa > 0$ gives the hypothesis of
+Lemma~\ref{lem:self_bounding} ($A = A_0 \ge 0$, $B = 1$, $E = S \ge 1$, $\alpha = 8e$, $C \ge 0$, $D \ge 1$ because
+$\kappa \le 1$ and $H^2SA \ge 1$), whose conclusion is $T \le \mathrm{upperBound}$.
+(ii) If $\tau = \infty$, the integer $T = \lfloor U\rfloor_+ + 1 \le \tau$ satisfies $T > U$; otherwise take $T = \tau$.
+\end{proof}
+
 \begin{lemma}[Bound on the stopping time]\label{lem:stopping_time_bound_pos}
+\lean{Essakine2026Tight.stoppingTime_le_upperBound_of_pos}\leanok
 \uses{def:good_event, def:entropic_bpi, def:upper_bound_const, def:gmax}
-On $\evGood^+$, the stopping time of the run satisfies
+At every $\omega \in \evGood^+$ at which the policies played are the greedy policies
+($X_t(\omega) = \pi^{t+1}$ for all $t$, which holds almost surely by Lemma~\ref{lem:entropic_bpi_run}),
+the stopping time of the run satisfies
 $\tau \le \mathrm{upperBound}(S, A, H, \beta, \eps, \delta, \Gmax(\mathcal M))$ (Definition~\ref{def:upper_bound_const});
 in particular $\tau < \infty$.
 \end{lemma}
 
 \begin{proof}
-\uses{lem:progress_pos, lem:ratio_bound_pos, lem:sum_counts_bound, lem:entropic_bpi_run, lem:self_bounding, def:rates, def:upper_bound_const, lem:rates_props, def:rate_min}
+\uses{lem:progress_pos, lem:ratio_bound_pos, lem:sum_counts_bound, lem:entropic_bpi_run, lem:self_bounding, def:rates, def:upper_bound_const, lem:rates_props, def:rate_min, lem:pos_core_stopping_time}
+\leanok
 Fix $\omega \in \evGood^+$ (in particular $\omega \in \evCnt$) and write $\kappa := \kappa(\beta,\eps) > 0$,
 $A_0 := \log(3SAH/\delta) > 0$, $C := 10^9\sqrt{V_G SAH}/\kappa$ and $D := 10^{10}e^{\beta(H+1)}H^2SA/\kappa$ (the
 constants of Definition~\ref{def:upper_bound_const}, with $|\beta| = \beta$).
@@ -703,25 +950,55 @@ The proof is organized as: (a) a lemma ``for all $T \ge 1$ with $(T : \texttt{�
 $T \le \mathrm{upperBound}$'' proved on $\evGood^+$ by Steps~1--3; (b) the deduction $\tau \le \mathrm{upperBound}$
 by a case split on $\tau = \top$. The step $T\kappa \le \sum_t(\cdot)$ is a sum of $T$ inequalities each
 valid at an $\omega$ of the event, the sums $\sum_{t<T}x_t$ are \texttt{Finset.sum (Finset.range T)},
-and the final numeric inequalities are \texttt{norm\_num} with the bound
-\texttt{Real.exp 13 ≤ 4.43e5} (obtained from \texttt{Real.exp\_one\_lt\_d9}). When
+and the final numeric inequalities only need $e^{13} \le 3^{13}$ (from \texttt{Real.exp\_one\_lt\_three}:
+$144 \cdot 3^{13} \approx 2.3\cdot 10^8$ and $1344 \cdot 3^{13} \approx 2.1\cdot 10^9$). When
 $\Gmax(\mathcal M) = 0$ (all returns vanish a.s.), $V_G = 0$ and $C = 0$, which Lemma~\ref{lem:self_bounding}
-allows.
+allows. Steps~1--3 and~4 are Lemma~\ref{lem:pos_core_stopping_time}(i) and~(ii), with
+$x_t = \sum_{h,s,a}p^{X_t}_h(s,a)\rho^{*t}_h(s,a)$ and $y_t$ likewise: the counting bound of
+Lemma~\ref{lem:sum_counts_bound} is about the policies $X_t$ played, the normalized certificate bound about
+the greedy policies $\pi^{t+1}$, hence the hypothesis $X_t(\omega) = \pi^{t+1}$ in the statement (Lean:
+\texttt{hX : ∀ t, X t ω = greedyAt X Y r β δ t ω}). The Lean hypotheses are $\delta \in (0, 1]$ and
+$\eps > 0$; the conclusion is \texttt{(τ ω : ℝ≥0∞) ≤ ENNReal.ofReal (upperBound …)}, and no hypothesis that
+$(X, Y)$ is a run is needed (the characterization of $\tau$ as a hitting time is pointwise).
 
 \begin{remark}[The constant $C_1$]\label{rem:pos_c1_constant}
 \uses{lem:self_bounding, def:upper_bound_const}
-The outline of this blueprint states Lemma~\ref{lem:self_bounding} with
-$C_1 = \frac85\log(11\alpha^2(A + E)(C + D))$, and Definition~\ref{def:upper_bound_const} copies this form
-with $\alpha = 8e$, $A + E = A_0 + S$. Chapter~\ref{chap:pre_analysis}, as written, proves the lemma with
-$C_1 = \frac85\log(11\alpha^2(A + E)(C + \sqrt D)^2)$, and with $(C + D)^2$ in place of $(C + \sqrt D)^2$ when
-$D \ge 1$ (which holds here); for $C + D \ge 1$ this is larger than the outline's $C_1$ by
-$\frac85\log(C + D)$. The two must agree: $\mathrm{upperBound}$ is only meaningful with the $C_1$ that
-Lemma~\ref{lem:self_bounding} actually provides, so Definition~\ref{def:upper_bound_const} should be
-read (and, if needed, amended) with that $C_1$. Nothing else in this chapter depends on the form
-of $C_1$; the asymptotic form $\tilde O(\kappa^{-2}V_GSAH)$ of the bound is the same in both cases.
+The paper's Lemma~29 states the self-bounding inequality with
+$C_1 = \frac85\log(11\alpha^2(A + E)(C + D))$, which is false
+(Remark~\ref{rem:pana_self_bounding_paper}). Chapter~\ref{chap:pre_analysis} proves it with
+$C_1 = \frac85\log(11\alpha^2(A + E)(C + \sqrt D)^2)$, and with $(C + D)^2$ in place of
+$(C + \sqrt D)^2$ when $D \ge 1$ (which holds here); Definition~\ref{def:upper_bound_const}
+uses this last form with $\alpha = 8e$, $A + E = A_0 + S$, so that the two agree. For
+$C + D \ge 1$ this $C_1$ is larger than the paper's by $\frac85\log(C + D)$. Nothing else in
+this chapter depends on the form of $C_1$; the asymptotic form $\tilde O(\kappa^{-2}V_GSAH)$ of
+the bound is the same in both cases.
 \end{remark}
 
+\begin{lemma}[From an event of probability at least $1 - \delta$ to the probability statements]\label{lem:pos_core_pac}
+\lean{Essakine2026Tight.one_sub_le_measureReal_stoppingTime_le, Essakine2026Tight.measureReal_bad_le, Essakine2026Tight.stoppingTime_ne_top_of_le}\leanok
+\uses{def:entropic_bpi, def:stopping_rule}
+Let $(X, Y, \mathrm{out})$ be a run of Entropic-BPI (with any parameters) in any environment, $E \subseteq \Omega$ with
+$\Prob(E^c) \le \delta$, $U \in \R$, and call $\omega$ \emph{greedy} if $X_t(\omega) = \pi^{t+1}$ for all $t$.
+\begin{enumerate}
+  \item[(i)] If $\tau(\omega) \le U$ for every greedy $\omega \in E$, then $\Prob(\tau \le U) \ge 1 - \delta$.
+  \item[(ii)] If $\tau(\omega) < \infty$ for every greedy $\omega \in E$, and for every $\omega \in E$ and $t$ such that the
+  stopping condition holds after $t$ episodes $V^*_1(s_1) - V^{\pi^{t+1}}_1(s_1) \le \eps$, then
+  $\Prob(V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps) \le \delta$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{lem:entropic_bpi_run}
+\leanok
+Let $N$ be the null set of Lemma~\ref{lem:entropic_bpi_run}. (i) $\{\tau \le U\}^c \setminus N \subseteq E^c$, so
+$\Prob(\{\tau \le U\}^c) \le \delta$ and $\Prob(\tau \le U) \ge 1 - \Prob(\{\tau \le U\}^c)$ (subadditivity, no
+measurability needed). (ii) For $\omega \in E \setminus N$, $\tau(\omega) < \infty$, the stopping condition holds after
+$\tau(\omega)$ episodes and $\mathrm{out}(\omega) = \pi^{\tau(\omega)+1}$, so $\omega$ is not in the bad event; hence the bad
+event is contained in $E^c \cup N$.
+\end{proof}
+
 \begin{lemma}[PAC guarantee and sample complexity of Entropic-BPI for $\beta > 0$]\label{lem:pac_pos}
+\lean{Essakine2026Tight.measureReal_bad_le_of_pos, Essakine2026Tight.one_sub_le_measureReal_stoppingTime_le_of_pos}\leanok
 \uses{def:entropic_bpi, def:entropic_value, def:opt_value, def:upper_bound_const, def:gmax, def:good_event}
 In the standing setting,
 \[
@@ -734,7 +1011,8 @@ output $\mathrm{out}$ is whatever policy the run assigns).
 \end{lemma}
 
 \begin{proof}
-\uses{lem:stopping_time_bound_pos, lem:entropic_bpi_run, lem:pac_at_stopping_pos, lem:good_event}
+\uses{lem:stopping_time_bound_pos, lem:entropic_bpi_run, lem:pac_at_stopping_pos, lem:good_event, lem:pos_core_pac}
+\leanok
 By Lemma~\ref{lem:good_event}, $\Prob(\evGood^+) \ge 1 - \delta$, so it suffices to show that, up to a
 $\Prob$-null set $N$, $\evGood^+ \setminus N$ is contained in both events. Let $N$ be the null set
 outside of which the conclusions of Lemma~\ref{lem:entropic_bpi_run} hold (the actions are the
@@ -752,4 +1030,7 @@ Theorem~\ref{thm:upper_bound_complexity}. The measurability of the events $\{V^*
 and $\{\tau \le \mathrm{upperBound}\}$ is immediate: the policy type is finite and $\tau$ is a stopping time.
 The proof needs $\evGood^+$ only through its three defining properties, and the inclusion
 $\evGood^+ \setminus N \subseteq \{\tau \le \mathrm{upperBound}\} \cap \{V^*_1 - V^{\mathrm{out}}_1 \le \eps\}$ is proved
-pointwise.
+pointwise. In Lean the two statements are two lemmas for a run in \texttt{statesEnv M s₁}, with $\delta \in (0, 1]$
+and $\eps > 0$, each an instance of Lemma~\ref{lem:pos_core_pac} with $E = \evGood^+$ and
+$\Prob((\evGood^+)^c) \le \delta$ (\texttt{measure\_compl\_goodEvent\_le}, Lemma~\ref{lem:good_event}); in fact no
+measurability of the events is used (outer measure and complements).

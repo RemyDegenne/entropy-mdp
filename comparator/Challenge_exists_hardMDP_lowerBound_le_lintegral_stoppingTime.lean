@@ -12,6 +12,22 @@ import Mathlib.MeasureTheory.Function.EssSup
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Data.Nat.Log
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Mathlib.InformationTheory.KullbackLeibler.DataProcessing
+import Mathlib.Probability.Distributions.Bernoulli
+import Mathlib.MeasureTheory.Measure.Decomposition.Lebesgue
+import Mathlib.Analysis.SpecialFunctions.BinaryEntropy
+import Mathlib.Analysis.Convex.Jensen
+import Mathlib.Topology.Instances.ENNReal.Lemmas
+import Mathlib.Data.ENat.SuccOrder
+import Mathlib.Probability.Moments.Variance
+import Mathlib.Algebra.Order.Field.Basic
+import Mathlib.Tactic.FieldSimp
+import Mathlib.Tactic.Linarith
+import Mathlib.Tactic.Positivity
+import Mathlib.Tactic.Ring
+import Mathlib.Probability.Kernel.Composition.Lemmas
+import Mathlib.Algebra.BigOperators.Intervals
+import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 /-! # Standalone extraction for `Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime`
 Definitions are copied verbatim; theorem proofs are replaced by `sorry`.
@@ -24,6 +40,8 @@ set_option quotPrecheck false
 -- Namespace stubs (so later `open`s resolve).
 namespace MeasureTheory
 end MeasureTheory
+namespace ProbabilityTheory
+end ProbabilityTheory
 namespace Learning
 end Learning
 namespace Learning.MDP
@@ -34,6 +52,8 @@ namespace Learning.MDP.Episodic.EpisodicMDP
 end Learning.MDP.Episodic.EpisodicMDP
 namespace Essakine2026Tight
 end Essakine2026Tight
+namespace InformationTheory
+end InformationTheory
 
 -- ═══ vendored from LML: LeanMachineLearning.ForMathlib.MeasureTheory.MeasurableSpace.Embedding ═══
 -- The declarations of https://github.com/LeanMachineLearning/LML that the statement rests on,
@@ -740,7 +760,7 @@ end
 
 -- ═══ EV2026.LowerBound ═══
 section
-open MeasureTheory ProbabilityTheory Learning Learning.MDP.Episodic
+open MeasureTheory ProbabilityTheory Learning Learning.MDP.Episodic InformationTheory
 open scoped ENNReal
 universe u v
 namespace Essakine2026Tight

@@ -7,6 +7,9 @@ module
 
 public import Essakine2026Tight.EV2026.Algorithm
 public import Essakine2026Tight.EV2026.Constants
+public import Essakine2026Tight.EV2026.TailNeg
+public import Essakine2026Tight.EV2026.TailPos
+public import Essakine2026Tight.LeanMachineLearning.SequentialLearning.IdentificationAlg
 
 /-!
 # Theorem 4: sample complexity of Entropic-BPI
@@ -40,7 +43,12 @@ theorem isEntropicPAC_entropicBPI (r : Fin H → S → A → ℝ) (hr : ∀ h s 
     {β δ ε : ℝ} (hβ : β ≠ 0) (hδ : δ ∈ Set.Ioo 0 1)
     (hε : ε ∈ Set.Ioc 0 (2 / (|β| * H * Fintype.card S))) (s₁ : S) :
     IsEntropicPAC (entropicBPI r β δ ε s₁) r β ε δ s₁ := by
-  sorry
+  intro M
+  have hrun := (entropicBPI r β δ ε s₁).isRun_runMeasure (statesEnv M.1 s₁)
+  rw [← hrun.hasLaw_output.measureReal_eq (Set.to_countable _).measurableSet]
+  rcases hβ.lt_or_gt with hneg | hpos
+  · exact measureReal_bad_le_of_neg M.2 hr hneg hδ.1 hδ.2.le hε.1 hrun
+  · exact measureReal_bad_le_of_pos M.2 hr hpos hδ.1 hδ.2.le hε.1 hrun
 
 /-- **Theorem 4, second part** (Essakine, Vernade 2026; sample complexity). For every reward
 function `r` with values in `[0, 1]`, `β ≠ 0`, `δ ∈ (0, 1)`, `ε ∈ (0, 2 / (|β| H S)]` and every
@@ -58,6 +66,8 @@ theorem probReal_stoppingTime_entropicBPI_le_ge (r : Fin H → S → A → ℝ)
       ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤
         ENNReal.ofReal
           (upperBound (Fintype.card S) (Fintype.card A) H β ε δ (maxReturn M s₁))} := by
-  sorry
+  rcases hβ.lt_or_gt with hneg | hpos
+  · exact one_sub_le_measureReal_stoppingTime_le_of_neg hM hr hneg hδ.1 hδ.2.le hε.1 h
+  · exact one_sub_le_measureReal_stoppingTime_le_of_pos hM hr hpos hδ.1 hδ.2.le hε.1 h
 
 end Essakine2026Tight

@@ -59,6 +59,7 @@ For integers $S \ge 6$ and $A \ge 2$ let $N := (S - 3)(A - 1) + 1$ and
 
 \begin{lemma}[Properties of the depth]\label{lem:tree_depth_props}
 \uses{def:tree_depth}
+\lean{Essakine2026Tight.two_le_treeDepth, Essakine2026Tight.le_geomCount_treeDepth, Essakine2026Tight.geomCount, Essakine2026Tight.geomCount_succ, Essakine2026Tight.sub_one_mul_geomCount}\leanok
 For $S \ge 6$ and $A \ge 2$: $d \ge 2$, $A^{d-1} < N \le A^d$, and consequently
 \[
   \frac{A^{d-1} - 1}{A - 1} < S - 3 \le \frac{A^d - 1}{A - 1} .
@@ -69,6 +70,7 @@ nodes and that the full tree of depth $d - 1$ has at least $S - 3$ nodes.
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:tree_depth}
 $N \ge 3(A - 1) + 1 = 3A - 2 > A$ because $A \ge 2$, so $\log_A N > 1$ and $d \ge 2$. The
 ceiling gives $d - 1 < \log_A N \le d$, i.e.\ $A^{d-1} < N \le A^d$ (Mathlib:
@@ -76,8 +78,13 @@ ceiling gives $d - 1 < \log_A N \le d$, i.e.\ $A^{d-1} < N \le A^d$ (Mathlib:
 $1$ and dividing by $A - 1 \ge 1$, using $N - 1 = (S-3)(A-1)$, gives the displayed inequalities.
 \end{proof}
 
+\textbf{Lean remark.} With $n := S - 3$ nodes and \texttt{geomCount A k} $= \sum_{i<k} A^i = (A^k - 1)/(A - 1)$,
+Lean proves $d \ge 2$ and the upper inequality $S - 3 \le (A^d - 1)/(A-1)$ (\texttt{le\_geomCount\_treeDepth});
+the lower inequality is not needed.
+
 \begin{definition}[The tree]\label{def:hard_tree}
 \uses{def:tree_depth, lem:tree_depth_props}
+\lean{Essakine2026Tight.nodeDepth, Essakine2026Tight.childIdx, Essakine2026Tight.leafFinset, Essakine2026Tight.nodeDepth_mul_add, Essakine2026Tight.childIdx_of_lt, Essakine2026Tight.childIdx_lt, Essakine2026Tight.nodeDepth_childIdx}\leanok
 The tree states are $x_0, x_1, \dots, x_{S-4}$ ($S - 3$ nodes), $x_0$ being the root, numbered in
 the breadth-first order of the infinite $A$-ary tree. For $j \ge 1$ the \emph{parent} of $x_j$ is
 $x_{\mathrm{par}(j)}$ with $\mathrm{par}(j) := \lfloor (j - 1)/A \rfloor$, and the \emph{depth} is
@@ -95,21 +102,19 @@ function} is
 so that $\mathrm{dep}(\mathrm{child}(x, a)) = \mathrm{dep}(x) + 1$ for every internal $x$ and every $a$.
 \end{definition}
 
-\textbf{Lean remark.} The state type of the hard instances has $S$ elements: an inductive type
-\texttt{HardState S} with constructors \texttt{w}, \texttt{g}, \texttt{b} and
-\texttt{node (j : Fin (S - 3))} (or \texttt{Fin S} with $s_w, s_g, s_b = 0, 1, 2$ and
-$x_j = j + 3$), with \texttt{Fintype.card (HardState S) = S}. Actions are \texttt{Fin A}, the
-paper's $a \in [A]$ being \texttt{a.val + 1}. The depth is best \emph{defined} by the closed
-form \texttt{Nat.log A ((A - 1) * j + 1)} and the recursion proved as a lemma; the child
-function and leaf predicate are index arithmetic (\texttt{A * i + a + 1 ≤ S - 4}).
+\textbf{Lean remark.} \texttt{EV2026/HardTree.lean}, at the level of natural numbers, for a tree of
+$n$ nodes $0, \dots, n - 1$: the actions are indexed by $k < A$ (the paper's $a = k + 1$), the parent of
+the node $j + 1$ is $j / A$, the depth \texttt{nodeDepth A j} is \emph{defined} by the recursion through the
+parent, the children of $j$ are $Aj + k + 1$, the node $j$ is internal iff $Aj + 1 < n$
+(\texttt{leafFinset n A} is the set of the other nodes), and \texttt{childIdx n A j k} is the child
+function. \texttt{nodeDepth\_mul\_add} and \texttt{nodeDepth\_childIdx} are the depth of a child.
 
 \begin{lemma}[Leaves]\label{lem:tree_leaves}
 \uses{def:hard_tree, lem:tree_depth_props}
+\lean{Essakine2026Tight.card_leafFinset, Essakine2026Tight.nodeDepth_lt_treeDepth, Essakine2026Tight.exists_walk, Essakine2026Tight.treeWalk}\leanok
 For $S \ge 6$ and $A \ge 2$:
 \begin{enumerate}
-  \item[(i)] the internal nodes are $x_0, \dots, x_{I-1}$ with $I := \lceil (S-4)/A \rceil$, every
-        internal node except possibly $x_{I-1}$ has all its $A$ children, and
-        $L = (S - 3) - \lceil (S-4)/A \rceil$;
+  \item[(i)] every node $x_j$ with $2j + 1 \ge S - 3$ is a leaf;
   \item[(ii)] $L \ge (S-3)/2 \ge S/4$ (in particular $L \ge S/6$), and $L \ge 2$;
   \item[(iii)] $\mathrm{dep}(x_j) \le d - 1$ for every $j \le S - 4$;
   \item[(iv)] for every $j \ge 1$, $a_j := j - A\,\mathrm{par}(j) \in [A]$ and
@@ -119,17 +124,14 @@ For $S \ge 6$ and $A \ge 2$:
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:hard_tree, lem:tree_depth_props}
-(i) $x_i$ is internal iff $Ai + 1 \le S - 4$ iff $i \le (S-5)/A$ iff
-$i \le \lfloor (S-5)/A \rfloor = \lceil (S-4)/A \rceil - 1$ (for integers $m \ge 1$,
-$\lfloor (m-1)/A \rfloor + 1 = \lceil m/A \rceil$). It has all its children iff $Ai + A \le S - 4$
-iff $i \le (S-4)/A - 1$, which holds for $i \le I - 2 < (S-4)/A - 1$. The leaves are the
-remaining $S - 3 - I$ nodes.
+(i) $x_j$ is internal iff $Aj + 1 \le S - 4$; if $2j + 1 \ge S - 3$ then
+$Aj + 1 \ge 2j + 1 \ge S - 3 > S - 4$.
 
-(ii) $\lceil (S-4)/A \rceil \le \lceil (S-4)/2 \rceil \le (S-3)/2$ (for $S$ even
-$\lceil (S-4)/2\rceil = (S-4)/2$, for $S$ odd it is $(S-3)/2$), so
-$L \ge (S-3) - (S-3)/2 = (S-3)/2$; and $(S-3)/2 \ge S/4$ iff $S \ge 6$. As $L$ is an integer
-and $(S-3)/2 \ge 3/2$, $L \ge 2$.
+(ii) By (i) the $S - 3 - \lfloor (S-3)/2 \rfloor = \lceil (S-3)/2 \rceil$ nodes $x_j$ with
+$\lfloor (S-3)/2 \rfloor \le j \le S - 4$ are leaves, so $L \ge (S-3)/2$; and $(S-3)/2 \ge S/4$ iff
+$S \ge 6$. As $L$ is an integer and $(S-3)/2 \ge 3/2$, $L \ge 2$.
 
 (iii) By strong induction on $j$, $\mathrm{dep}(x_j) = k$ iff
 $(A^k - 1)/(A-1) \le j < (A^{k+1}-1)/(A-1)$: for $j = 0$ both sides say $k = 0$; for $j \ge 1$ with
@@ -146,7 +148,13 @@ $x_j, x_{\mathrm{par}(j)}, \dots, x_0$ (a chain of length $\mathrm{dep}(x_j)$) g
 sequence.
 \end{proof}
 
-One checks in the same way that every leaf has depth $d - 2$ or $d - 1$; this is not needed.
+\textbf{Lean remark.} (i) and (ii) are \texttt{card\_leafFinset} in the form $n + 3 \le 4L$ for $n = S - 3 \ge 3$
+nodes (i.e.\ $L \ge S/4$; $L \ge 2$ follows); (iii) is \texttt{nodeDepth\_lt\_treeDepth}; (iv) is
+\texttt{exists\_walk}, which gives the action indices of a walk \texttt{treeWalk} from the root through
+internal nodes.
+
+One checks that the internal nodes are $x_0, \dots, x_{I-1}$ with $I := \lceil (S-4)/A \rceil$, so that
+$L = (S - 3) - \lceil (S-4)/A \rceil$, and that every leaf has depth $d - 2$ or $d - 1$; this is not needed.
 
 \section{Parameters of the hard instances}
 \label{sec:lb_params}
@@ -169,6 +177,7 @@ cases by \texttt{if 0 < β then \dots\ else \dots}; Theorem~\ref{thm:lower_bound
 
 \begin{definition}[Parameters of the hard instances]\label{def:hard_params}
 \uses{def:tree_depth}
+\lean{Essakine2026Tight.hardC, Essakine2026Tight.hardQ, Essakine2026Tight.hardPMinus, Essakine2026Tight.hardDelta, Essakine2026Tight.hardPPlus, Essakine2026Tight.effHorizon, Essakine2026Tight.exp_mul_eq_hardC_add_one, Essakine2026Tight.exp_mul_eq_inv_hardC_add_one, Essakine2026Tight.hardPMinus_of_pos, Essakine2026Tight.hardPMinus_of_neg, Essakine2026Tight.hardDelta_of_pos, Essakine2026Tight.hardDelta_of_neg}\leanok
 Let $S \ge 6$, $A \ge 2$, $H \ge 3d$ (Definition~\ref{def:tree_depth}), $\beta \ne 0$ and $\eps > 0$.
 Define
 \[
@@ -194,8 +203,10 @@ $c, q, m, p_\pm, \Delta$.
 
 \textbf{Lean remark.} \texttt{hardPMinus β H' : ℝ}, \texttt{hardDelta β H' ε : ℝ},
 \texttt{hardPPlus β H' ε : ℝ} as functions of $(\beta, H', \eps)$ (case split on the sign of $\beta$),
-and \texttt{effHorizon S A H := H - H / 3 - treeDepth S A}, \texttt{waitHorizon H := H / 3},
-\texttt{rewardStart S A H := H / 3 + treeDepth S A + 1}.
+with \texttt{hardC β H'} $= c$, \texttt{hardQ β ε} $= q$, and \texttt{effHorizon S A H := H - H / 3 - treeDepth S A}.
+The identities are not stated separately: the exponential values enter through
+\texttt{hardZ β H' p} $= 1 + p(e^{\beta H'} - 1)$ and the gap identity \texttt{inv\_mul\_log\_hardZ\_div}
+(Lemma~\ref{lem:hard_eps_suboptimal}).
 
 \begin{remark}[Design of the parameters; comparison with the paper]\label{rem:lb_params}
 By Lemma~\ref{lem:hard_exp_value} the exponential value of a policy $\pi$ in an instance is
@@ -219,6 +230,7 @@ respect to the baseline $p_-$ (indeed $1 + c(p_- + \Delta/2) = q\,m$ for $\beta 
 
 \begin{lemma}[Admissibility of the parameters]\label{lem:hard_params_valid}
 \uses{def:hard_params, def:condition_a}
+\lean{Essakine2026Tight.hardParams_valid, Essakine2026Tight.hardC_pos, Essakine2026Tight.one_lt_hardQ, Essakine2026Tight.hardDelta_pos, Essakine2026Tight.conditionA_of_pos, Essakine2026Tight.conditionA_of_neg, Essakine2026Tight.valid_of_margin}\leanok
 Let $\beta \ne 0$, $\eps > 0$, $H' \ge 1$, and let $c, q, m, p_-, \Delta, p_+$ be as in
 Definition~\ref{def:hard_params}. Then $c > 0$, $q > 1$, $\Delta > 0$, $0 < p_- < 1$,
 $1 - p_- = (2c+1)/(2(c+1))$ if $\beta > 0$ and $1 - p_- = 1/(2(c+1))$ if $\beta < 0$, and
@@ -229,6 +241,7 @@ Condition~A for $(\beta, H', \eps)$ is equivalent to $\Delta \le (1 - p_-)/2$. U
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:hard_params, def:condition_a}
 $c = e^{|\beta|H'} - 1 > 0$ since $|\beta| H' > 0$, and $q > 1$ since $|\beta|\eps > 0$; hence
 $\Delta > 0$ (all factors are positive; $2q - 1 > 1$). $p_- = 1/(2(c+1)) \in (0, 1/2]$ for
@@ -251,6 +264,10 @@ $p_- = 1/(2(c+1))$ and $(1-p_-)/2 = (2c+1)/(4(c+1)) \ge 1/4$ (as $2c + 1 \ge c +
 $p_+(1-p_+) \ge 1/(8(c+1))$. If $\beta < 0$, $p_- \ge 1/2$ and $(1-p_-)/2 = 1/(4(c+1))$, so again
 $p_+(1-p_+) \ge 1/(8(c+1))$.
 \end{proof}
+
+\textbf{Lean remark.} Only the implication from Condition~A to $\Delta \le (1 - p_-)/2$ is formalized
+(\texttt{conditionA\_of\_pos}, \texttt{conditionA\_of\_neg}); \texttt{hardParams\_valid} is the displayed
+conclusion.
 
 \begin{remark}[On Condition~A]\label{rem:lb_condition_a}
 \emph{The effective horizon.} The paper states Condition~A with $c = e^{|\beta|H} - 1$ while its
@@ -283,6 +300,7 @@ more demanding for $c \le 3.1$ and less demanding for $c \ge 3.2$ (no cap at $16
 
 \begin{definition}[The hard instances]\label{def:hard_mdp}
 \uses{def:hard_tree, def:hard_params, def:episodic_mdp, def:reward_fn, lem:tree_leaves}
+\lean{Essakine2026Tight.stateAt, Essakine2026Tight.sIdx, Essakine2026Tight.aIdx, Essakine2026Tight.nextIdx, Essakine2026Tight.IsLeafIdx, Essakine2026Tight.leafProb, Essakine2026Tight.hardTransFun, Essakine2026Tight.hardTrans, Essakine2026Tight.hardReward, Essakine2026Tight.hardMDP, Essakine2026Tight.hasRewardFn_hardMDP, Essakine2026Tight.hardReward_mem_Icc, Essakine2026Tight.hardTriples, Essakine2026Tight.card_hardTriples}\leanok
 Let $S \ge 6$, $A \ge 2$, $H \ge 3d$, $\beta \ne 0$, $\eps > 0$ and the parameters of
 Definition~\ref{def:hard_params}. The state space is
 $\Ss := \{s_w, s_g, s_b\} \cup \{x_0, \dots, x_{S-4}\}$ ($S$ states: the waiting state, the good
@@ -320,18 +338,25 @@ instead of $p_-$. The definition requires $p_\pm \in [0,1]$, which holds under C
 (Lemma~\ref{lem:hard_params_valid}).
 \end{definition}
 
-\textbf{Lean remark.} \texttt{hardMDP S A H β ε (u : Option (HardTriple S A H)) : EpisodicMDP (HardState S) (Fin A) H}
-with $\mathcal M_0 = $ \texttt{hardMDP \dots\ none}, built from a transition function
-\texttt{Fin H → HardState S → Fin A → Measure (HardState S)} by \texttt{Kernel.ofFunOfCountable}
-(finite discrete types) and the deterministic reward \texttt{hardReward S A H} through
-\texttt{EpisodicMDP.ofDet}. The leaf transition is the Bernoulli measure of the parameter
-\emph{clamped} to $[0,1]$ (\texttt{Set.projIcc}), so that the definition makes sense for all
-parameters and agrees with the above under Condition~A. The triple type is
-\texttt{HardTriple S A H := Fin (H / 3) × Leaf S A × Fin A}, the paper's $h_e \in [\bar H]$ being
-\texttt{h.val + 1}.
+\textbf{Lean remark.} \texttt{EV2026/HardMDP.lean}. The theorem is stated for arbitrary finite types
+\texttt{S}, \texttt{A} with $S \ge 6$ and $A \ge 2$ elements, so the construction goes through the indices
+\texttt{sIdx s}, \texttt{aIdx a} of \texttt{Fintype.equivFin} and \texttt{stateAt S i}: the state of index $0$
+is $s_w$, $1$ is $s_g$, $2$ is $s_b$ and $j + 3$ is the node $x_j$; the waiting action has index $0$.
+Steps are $0$-indexed, so the paper's step $h$ is \texttt{h - 1}: the waiting state keeps waiting at step
+$h$ iff $h + 2 \le H/3$, and the reward is $1$ in $s_g$ from the step $H/3 + d$ on (\texttt{hardReward}).
+The instance is \texttt{hardMDP H β ε (u : Option (ℕ × ℕ × ℕ))}, with $\mathcal M_0$ for \texttt{u = none},
+built with \texttt{EpisodicMDP.ofDet} from the transition kernel \texttt{hardTrans} (next-state index
+\texttt{nextIdx}, leaf predicate \texttt{IsLeafIdx}). A triple is encoded as
+(arrival step, leaf index, action index), so that $\mathcal M_u$ changes the leaf probability exactly at
+the step, leaf and action of $u$; the leaf transition is \texttt{bernoulliMeasure} of the parameter
+\texttt{leafProb} \emph{clamped} to $[0,1]$ (\texttt{Set.projIcc}), which agrees with the above under
+Condition~A (\texttt{coe\_succProb}). The set $\mathcal U$ is \texttt{hardTriples}, the image of
+$[\bar H] \times \mathcal L \times [A]$ by $(h_e, \ell, a) \mapsto (h_e + 1 + \mathrm{dep}(\ell), \ell, a)$, with
+$|\mathcal U| = \bar H L A$ (\texttt{card\_hardTriples}).
 
 \begin{definition}[Exit step, leaf, leaf action; the triple of a policy]\label{def:hard_triple}
 \uses{def:hard_mdp, def:hard_tree, def:policy, lem:tree_leaves}
+\lean{Essakine2026Tight.actIdx, Essakine2026Tight.pathIdx, Essakine2026Tight.PathInv, Essakine2026Tight.arrival, Essakine2026Tight.arrival_lt, Essakine2026Tight.arrival_lt_H, Essakine2026Tight.isLeafIdx_pathIdx_arrival, Essakine2026Tight.hardTriple, Essakine2026Tight.pathSeq}\leanok
 Let $\pi = (\pi_h)_{h \le H}$ be a policy (Definition~\ref{def:policy}). Its \emph{exit step} is
 \[
   h_e(\pi) := \min\big(\{h \in [\bar H] : \pi_h(s_w) \ne a_w\} \cup \{\bar H\}\big) \in [\bar H] .
@@ -363,20 +388,23 @@ $N_u(\tau)$ is its value at the stopping time on $\{\tau < \infty\}$; $E_u := \{
 is the event that the output realizes $u$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{exitStep π : Fin (H / 3)} by \texttt{Nat.find} on a decidable
-predicate over a finite range (or a fold over \texttt{List.range}); the tree walk by recursion on
-$k \le d$ (\texttt{treeWalk π k : HardState S}), \texttt{arrivalDepth π := Nat.find} of the first
-leaf (bounded by $d - 1$ by Lemma~\ref{lem:tree_leaves}), \texttt{hardTriple π : HardTriple S A H},
-\texttt{Realizes π u := hardTriple π = u}; \texttt{hardTraj π : Bool → Traj (HardState S) H}
-is $\Phi_\pi$ (\texttt{Traj S H := Fin (H + 1) → S}). $N_u(t)$ is a \texttt{Finset.card} of a
-filtered range, a measurable function of the history.
+\textbf{Lean remark.} The exit step is not defined separately: \texttt{pathIdx π h} is the index of the
+state at step $h$ of the deterministic prefix (the path of state indices followed by $\pi$ through the
+deterministic transitions), \texttt{arrival π} the first step at which it is a leaf
+(\texttt{Nat.sInf}, with \texttt{arrival\_lt}: $h'(\pi) < H/3 + d$, and \texttt{PathInv} the invariant of
+the prefix), and \texttt{hardTriple π} $= (h'(\pi), \ell(\pi), a(\pi))$ as indices (arrival step, leaf
+index, action index), which determines the paper's triple. $\Phi_\pi$ is \texttt{pathSeq π}. The counts
+$N_u(\tau)$ are not defined: the proof of Theorem~\ref{thm:lower_bound} sums LML's pull counts
+$N_\pi(\tau)$ of the policies directly.
 
 \begin{lemma}[A realizing policy exists]\label{lem:lb_realizing_exists}
 \uses{def:hard_triple, lem:tree_leaves}
+\lean{Essakine2026Tight.exists_hardTriple_eq, Essakine2026Tight.actionAt, Essakine2026Tight.aIdx_actionAt}\leanok
 For every $u = (h_e, \ell^*, a^*) \in \mathcal U$ there is a policy $\pi$ with $u(\pi) = u$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:hard_triple, lem:tree_leaves}
 Let $a_1, \dots, a_{k}$ ($k = \mathrm{dep}(\ell^*)$) be the action sequence of
 Lemma~\ref{lem:tree_leaves}~(iv) leading from $x_0$ to $\ell^*$ through the nodes
@@ -389,8 +417,12 @@ $y_i = z_i$, which is internal for $i < k$ and a leaf for $i = k$, so $K(\pi) = 
 $\ell(\pi) = \ell^*$, $h'(\pi) = h_e + 1 + k$ and $a(\pi) = \pi_{h_e+1+k}(\ell^*) = a^*$.
 \end{proof}
 
+\textbf{Lean remark.} Stated for the elements of \texttt{hardTriples}, i.e.\ for the encoded triples
+(arrival step, leaf, action index).
+
 \begin{lemma}[Trajectories of the hard instances]\label{lem:hard_trajectory}
 \uses{def:hard_mdp, def:hard_triple, def:step_law, def:episode_return, lem:hard_params_valid}
+\lean{Essakine2026Tight.statesLaw_hardMDP, Essakine2026Tight.stateSeqLaw_hardMDP_path, Essakine2026Tight.stateSeqLaw_hardMDP_arrival, Essakine2026Tight.stateSeqLaw_hardMDP_absorbing, Essakine2026Tight.hardTransFun_absorbing, Essakine2026Tight.hardTransFun_path, Essakine2026Tight.hardTransFun_arrival, Essakine2026Tight.hardMDP_trans_apply, Learning.MDP.Episodic.stateSeqLaw, Learning.MDP.Episodic.stateSeqLaw_castSucc, Learning.MDP.Episodic.stateSeqLaw_last, Learning.MDP.Episodic.statesLaw_eq_map_stateSeqLaw, ProbabilityTheory.ae_bernoulliMeasure}\leanok
 Let $\mathcal M \in \{\mathcal M_0\} \cup \{\mathcal M_u : u \in \mathcal U\}$ (under
 Condition~A) and let $\pi$ be a policy, $h' := h'(\pi)$ and
 $p := p^{\mathcal M}_{h'}(\ell(\pi), a(\pi))$. Under $\Prob^{\pi}_{(s_w, 1)}$ of $\mathcal M$
@@ -406,6 +438,7 @@ $R^\pi_1 = H'\,\indic\{S_{\tilde H} = s_g\}$ a.s.
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{lem:step_law_markov, def:hard_mdp, def:hard_triple, def:episode_return}
 (i) By induction on $h$ with the Markov property (Lemma~\ref{lem:step_law_markov}), which says
 that given $S_h = s$ the action is $\pi_h(s)$ and $S_{h+1} \sim p_h(\cdot \mid s, \pi_h(s))$.
@@ -426,16 +459,19 @@ $R^\pi_1 = \sum_{h=1}^H r_h(S_h, A_h) = \sum_{h=\tilde H}^{H}\indic\{S_h = s_g\}
 $S_h = S_{\tilde H}$ for $h \ge \tilde H$ and $H - \tilde H + 1 = H'$.
 \end{proof}
 
-\textbf{Lean remark.} The useful form is the law statement: for the episode kernel
-\texttt{statesKernel (hardMDP \dots\ u) w : Kernel (Policy \dots) (Traj \dots)}
-(Definition~\ref{def:episode_env}),
-\texttt{statesKernel (hardMDP \dots) w π = (bernoulliMeasure p).map (hardTraj π)}. It follows
-from Lemma~\ref{lem:step_law_markov} by induction on the steps of the deterministic prefix
-(each step being a \texttt{Kernel.deterministic}); this is the one place where the concrete
-kernels of Definition~\ref{def:hard_mdp} are unfolded.
+\textbf{Lean remark.} Only the law of the state sequence is formalized:
+\texttt{statesLaw\_hardMDP}, \texttt{statesLaw (hardMDP H β ε u) (stateAt S 0) π = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map (pathSeq π)}.
+It is proved by backward induction on the steps with the law of the state sequence from a step
+(\texttt{Learning.MDP.Episodic.stateSeqLaw}, whose one-step recursion \texttt{stateSeqLaw\_castSucc} comes
+from Lemma~\ref{lem:step_law_markov}): absorbing states after the arrival
+(\texttt{stateSeqLaw\_hardMDP\_absorbing}), the Bernoulli step at the arrival
+(\texttt{stateSeqLaw\_hardMDP\_arrival}) and the Dirac steps of the prefix
+(\texttt{stateSeqLaw\_hardMDP\_path}). The return is not computed: the exponential values are obtained
+directly from the Bellman equation (Lemma~\ref{lem:hard_exp_value}).
 
 \begin{lemma}[Success probabilities]\label{lem:hard_success}
 \uses{lem:hard_trajectory, def:hard_triple, def:hard_mdp}
+\lean{Essakine2026Tight.succProb, Essakine2026Tight.coe_succProb, Essakine2026Tight.coe_projIcc_of_mem}\leanok
 For an instance $\mathcal M$ and a policy $\pi$ let
 $p^{\mathcal M}(\pi) := \Prob^{\pi}_{(s_w,1)}(S_{\tilde H} = s_g)$ under $\mathcal M$. Then
 $p^{\mathcal M}(\pi) = p^{\mathcal M}_{h'(\pi)}(\ell(\pi), a(\pi))$; hence
@@ -446,6 +482,7 @@ $p^{\mathcal M_0}(\pi) = p_-$ for every $\pi$, and for $u \in \mathcal U$,
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{lem:hard_trajectory, def:hard_triple, def:hard_mdp}
 The first claim is Lemma~\ref{lem:hard_trajectory}~(ii) ($S_{\tilde H} = S_{h'+1}$). In
 $\mathcal M_0$ all leaf probabilities are $p_-$. In $\mathcal M_u$ with $u = (h_e, \ell^*, a^*)$,
@@ -454,8 +491,13 @@ $\ell(\pi) = \ell^*$, $a(\pi) = a^*$ and $h_e(\pi) + 1 + \mathrm{dep}(\ell^*) = 
 i.e.\ iff $u(\pi) = u$ (Definition~\ref{def:hard_triple}: $h'(\pi) = h_e(\pi) + 1 + \mathrm{dep}(\ell(\pi))$).
 \end{proof}
 
+\textbf{Lean remark.} The success probability \texttt{succProb β ε H u π} is defined as the leaf parameter
+at the triple of $\pi$, and \texttt{coe\_succProb} is the displayed dichotomy
+($p_+$ iff \texttt{u = some (hardTriple π)}) under Condition~A.
+
 \begin{lemma}[Exponential values]\label{lem:hard_exp_value}
 \uses{def:exp_value, lem:hard_trajectory, lem:hard_success, def:hard_params}
+\lean{Essakine2026Tight.hardZ, Essakine2026Tight.hardZ_pos, Essakine2026Tight.expValue_hardMDP_start, Essakine2026Tight.expValue_hardMDP_path, Essakine2026Tight.expValue_hardMDP_good, Essakine2026Tight.expValue_hardMDP_bad, Essakine2026Tight.vecExp_hardMDP_transVec, Essakine2026Tight.integrable_exp_hardMDP, Essakine2026Tight.rewardCount, Essakine2026Tight.hardReward_path}\leanok
 For every instance $\mathcal M$ and policy $\pi$, with $p := p^{\mathcal M}(\pi)$,
 \[
   Z^\pi_1(s_w) = 1 + p\,(e^{\beta H'} - 1) = \begin{cases} 1 + c\,p & (\beta > 0), \\ e^{\beta H'}\big(1 + c\,(1 - p)\big) & (\beta < 0). \end{cases}
@@ -463,12 +505,18 @@ For every instance $\mathcal M$ and policy $\pi$, with $p := p^{\mathcal M}(\pi)
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:exp_value, lem:hard_trajectory, lem:hard_success}
 By Lemma~\ref{lem:hard_trajectory}, $R^\pi_1 = H' B$ a.s.\ with $B \sim \mathrm{Ber}(p)$, so
 $Z^\pi_1(s_w) = \E[e^{\beta R^\pi_1}] = (1 - p) + p\,e^{\beta H'}$. For $\beta > 0$ this is
 $1 + c p$ with $c = e^{\beta H'} - 1$. For $\beta < 0$, $e^{\beta H'} = 1/(c+1)$ and
 $(1-p) + p/(c+1) = \frac{(1-p)(c+1) + p}{c+1} = e^{\beta H'}\big(1 + c(1-p)\big)$.
 \end{proof}
+
+\textbf{Lean remark.} \texttt{expValue\_hardMDP\_start}: $Z^\pi_1(s_w) = $ \texttt{hardZ β H' (succProb β ε H u π)}
+$= 1 + p(e^{\beta H'} - 1)$, proved by backward induction with the Bellman equation of Chapter~\ref{chap:mdp}:
+the values in $s_g$ and $s_b$ (\texttt{expValue\_hardMDP\_good}, \texttt{expValue\_hardMDP\_bad}, with the
+number of rewarding steps \texttt{rewardCount}) and then along the path (\texttt{expValue\_hardMDP\_path}).
 
 \begin{lemma}[Optimal exponential values]\label{lem:hard_opt_value}
 \uses{def:opt_value, lem:opt_exp_value_eq, lem:hard_exp_value, lem:hard_success, lem:lb_realizing_exists, def:hard_params, lem:hard_params_valid}
@@ -495,7 +543,8 @@ are the identities of Definition~\ref{def:hard_params}.
 \end{proof}
 
 \begin{lemma}[Missing the triple is more than $\eps$-suboptimal]\label{lem:hard_eps_suboptimal}
-\uses{def:entropic_value, def:opt_value, lem:hard_opt_value, lem:hard_exp_value, lem:hard_success, lem:hard_params_valid, def:condition_a}
+\uses{def:entropic_value, def:opt_value, lem:hard_exp_value, lem:hard_success, lem:hard_params_valid, def:condition_a}
+\lean{Essakine2026Tight.lt_optEntropicValue_sub_entropicValue_hardMDP, Essakine2026Tight.inv_mul_log_hardZ_div, Essakine2026Tight.lt_inv_mul_log_hardZ_div}\leanok
 Under Condition~A, for every $u \in \mathcal U$ and every policy $\pi$ that does not realize
 $u$, in $\mathcal M_u$,
 \[
@@ -506,7 +555,8 @@ Equivalently: if $V^*_1(s_w) - V^\pi_1(s_w) \le \eps$ in $\mathcal M_u$ then $\p
 \end{lemma}
 
 \begin{proof}
-\uses{def:entropic_value, lem:hard_opt_value, lem:hard_exp_value, lem:hard_success, lem:hard_params_valid}
+\leanok
+\uses{def:entropic_value, lem:opt_exp_value_eq, lem:lb_realizing_exists, lem:hard_exp_value, lem:hard_success, lem:hard_params_valid}
 By Lemma~\ref{lem:hard_success}, $p^{\mathcal M_u}(\pi) = p_-$. If $\beta > 0$,
 Lemmas~\ref{lem:hard_opt_value} and~\ref{lem:hard_exp_value} give
 $V^*_1(s_w) - V^\pi_1(s_w) = \beta^{-1}\log\frac{1 + c\,p_+}{1 + c\,p_-} = \beta^{-1}\log\frac{(2q-1)m}{m} = \beta^{-1}\log(2q-1)$.
@@ -516,20 +566,32 @@ If $\beta < 0$, $V^*_1(s_w) - V^\pi_1(s_w) = \beta^{-1}\log\frac{Z^*_1(s_w)}{Z^\
 $|\beta|^{-1}\log(2q-1) > |\beta|^{-1}\log q = \eps$.
 \end{proof}
 
+\textbf{Lean remark.} The Lean statement is the inequality $V^*_1(s_w) - V^\pi_1(s_w) > \eps$, for the encoded
+triples of \texttt{hardTriples}. Lemma~\ref{lem:hard_opt_value} is not formalized: the proof bounds
+$V^*_1(s_w)$ from below by the value of a policy realizing $u$ (Lemma~\ref{lem:lb_realizing_exists} and
+Lemma~\ref{lem:opt_exp_value_eq}), which gives
+$V^*_1(s_w) - V^\pi_1(s_w) \ge \beta^{-1}\log\frac{Z(p_+)}{Z(p_-)} = |\beta|^{-1}\log(2q - 1) > \eps$
+(\texttt{inv\_mul\_log\_hardZ\_div}, \texttt{lt\_inv\_mul\_log\_hardZ\_div}, with \texttt{hardZ} of
+Lemma~\ref{lem:hard_exp_value}).
+
 \begin{lemma}[Maximal return of the hard instances]\label{lem:hard_gmax}
 \uses{def:gmax, lem:hard_trajectory, lem:hard_success, lem:hard_params_valid}
-Under Condition~A, $\Gmax(\mathcal M_0) = H'$ (and $\Gmax(\mathcal M_u) = H'$ for every $u$);
-hence $c = e^{|\beta|\Gmax(\mathcal M_0)} - 1$ and
-$c^2/(c+1) = (e^{|\beta|\Gmax(\mathcal M_0)} - 1)^2/e^{|\beta|\Gmax(\mathcal M_0)}$.
+\lean{Essakine2026Tight.maxReturn_hardMDP_le, Essakine2026Tight.varianceFactor_eq, Essakine2026Tight.varianceFactor_mono, Essakine2026Tight.varianceFactor_eq_hardC, Learning.MDP.Episodic.ae_episodeReturn_mem_Icc_sum}\leanok
+$\Gmax(\mathcal M) \le H'$ for every instance $\mathcal M$; hence, as $x \mapsto (e^x - 1)^2/e^x$ is
+nondecreasing on $[0, \infty)$,
+$(e^{|\beta|\Gmax(\mathcal M_0)} - 1)^2/e^{|\beta|\Gmax(\mathcal M_0)} \le c^2/(c+1)$ with $c = e^{|\beta|H'} - 1$.
+(Under Condition~A the equality $\Gmax(\mathcal M) = H'$ holds; it is not needed.)
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:gmax, lem:hard_trajectory, lem:hard_success, lem:hard_params_valid}
-For every policy $\pi$, $R^\pi_1 = H' B$ a.s.\ with $B \sim \mathrm{Ber}(p)$ and
-$p = p^{\mathcal M}(\pi) \in \{p_-, p_+\} \subset (0, 1)$ (Lemmas~\ref{lem:hard_trajectory},
-\ref{lem:hard_success}, \ref{lem:hard_params_valid}). Both values $0$ and $H'$ of $R^\pi_1$ have
-positive probability, so the essential supremum of $R^\pi_1$ under $\Prob^\pi_{(s_w,1)}$ is
-$H'$; the supremum over $\pi$ (Definition~\ref{def:gmax}) is $H'$.
+For every policy $\pi$, the reward is $0$ before the step $\tilde H$, so the return is at most the
+number $H - \tilde H + 1 = H'$ of the remaining steps, almost surely; hence the essential supremum of the
+return is at most $H'$ for every $\pi$, and so is $\Gmax$. The monotonicity is that of
+$x \mapsto e^x - 2 + e^{-x}$ on $[0, \infty)$. (For the equality: both values $0$ and $H'$ of
+$R^\pi_1$ have positive probability by Lemmas~\ref{lem:hard_trajectory}, \ref{lem:hard_success}
+and~\ref{lem:hard_params_valid}.)
 \end{proof}
 
 \section{Change of measure}
@@ -544,6 +606,7 @@ functions of $\mathcal H_\tau$, so $\E_0[\tau]$ and $\E_0[N_u(\tau)]$ (in $[0, \
 
 \begin{lemma}[PAC algorithms find the triple]\label{lem:hard_pac_event}
 \uses{def:entropic_pac, def:bpi_alg, def:hard_mdp, def:hard_triple, lem:hard_eps_suboptimal, def:reward_fn}
+\lean{Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime}\leanok
 Assume Condition~A and let $\mathcal A$ be $(\eps,\delta)$-PAC for entropic BPI with reward
 function $r_0$, parameter $\beta$ and initial state $s_w$ (Definition~\ref{def:entropic_pac}).
 Then for every $u \in \mathcal U$,
@@ -555,6 +618,7 @@ particular $\sum_{u \in \mathcal U}\Prob_0(E_u) \le 1$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:entropic_pac, lem:hard_eps_suboptimal, def:hard_triple, def:hard_mdp}
 $\mathcal M_u \in \mathcal M_{r_0}$ (Definition~\ref{def:hard_mdp}), so the PAC property gives
 $\Prob_u(V^*_1(s_w) - V^{\mathrm{out}}_1(s_w) > \eps) \le \delta$ (the values being those of
@@ -565,13 +629,15 @@ $\Prob_u(E_u^c) \le \delta$. Disjointness: $u(\mathrm{out})$ is a single element
 pairwise disjoint events is at most $1$.
 \end{proof}
 
-\textbf{Lean remark.} The first claim is \texttt{IdentAlg.IsPAC.measureReal\_bad\_of\_isRun}
-applied to the member $\mathcal M_u$ of the class \texttt{\{M // M.HasRewardFn r₀\}}, in any run
-(or to \texttt{outputMeasure} directly); the second is \texttt{measure\_biUnion\_finset} for the
-pairwise disjoint preimages of the singletons $\{u\}$ by \texttt{hardTriple ∘ out}.
+\textbf{Lean remark.} Proved inline in \texttt{exists\_hardMDP\_lowerBound\_le\_lintegral\_stoppingTime}
+(steps \texttt{hy} and \texttt{hxsum}), for the laws \texttt{IdentAlg.outputMeasure} of the output: the
+first claim is the PAC hypothesis applied to the member $\mathcal M_u$ of the class
+\texttt{\{M // M.HasRewardFn r₀\}} and Lemma~\ref{lem:hard_eps_suboptimal}; the second is
+\texttt{measureReal\_biUnion\_finset} for the pairwise disjoint sets $\{\pi : \texttt{hardTriple π} = u\}$.
 
 \begin{lemma}[Divergence of one episode]\label{lem:hard_kl_episode}
 \uses{def:episode_env, lem:hard_trajectory, lem:hard_success, def:klbin, lem:klbin_bernoulli, def:hard_triple}
+\lean{Essakine2026Tight.klDiv_statesLaw_hardMDP_le, InformationTheory.klDiv_bernoulliMeasure}\leanok
 Assume Condition~A. For an instance $\mathcal M$ and a policy $\pi$ let
 $\nu_{\mathcal M}(\pi)$ be the law of the state sequence of an episode of $\pi$ in $\mathcal M$
 from $s_w$, i.e.\ the feedback kernel of the episode environment
@@ -584,6 +650,7 @@ $\mathrm{statesEnv}(\mathcal M, s_w)$ evaluated at the action $\pi$
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{lem:hard_trajectory, lem:hard_success, lem:klbin_bernoulli, def:hard_triple}
 By Lemma~\ref{lem:hard_trajectory}, $\nu_{\mathcal M}(\pi) = \Phi_\pi \# \mathrm{Ber}(p^{\mathcal M}(\pi))$
 with the \emph{same} map $\Phi_\pi$ for all instances (it depends only on $\pi$ and the tree).
@@ -595,13 +662,15 @@ $\KL(\Phi_\pi\#\mathrm{Ber}(p_-) \| \Phi_\pi\#\mathrm{Ber}(p_+)) \le \KL(\mathrm
 (Lemma~\ref{lem:klbin_bernoulli}; $p_+ \in (0,1)$ by Lemma~\ref{lem:hard_params_valid}).
 \end{proof}
 
-\textbf{Lean remark.} Data processing is Mathlib's \texttt{klDiv\_map\_le}
-(\texttt{ProbabilityTheory.klDiv} of the images by a measurable map). Equality holds since
-$\Phi_\pi$ is injective (apply data processing to a left inverse), but only the inequality is
-used.
+\textbf{Lean remark.} \texttt{klDiv\_statesLaw\_hardMDP\_le} is stated for any two instances $u, u'$:
+$\KL(\nu_{\mathcal M_u}(\pi) \| \nu_{\mathcal M_{u'}}(\pi)) \le \klbin(p^{u}(\pi), p^{u'}(\pi))$, by data
+processing (\texttt{klDiv\_map\_le}) and Lemma~\ref{lem:klbin_bernoulli}; the case distinction is done in
+the proof of Theorem~\ref{thm:lower_bound} with \texttt{coe\_succProb}. Equality holds since $\Phi_\pi$
+is injective, but only the inequality is used.
 
 \begin{lemma}[Change of measure on the hard instances]\label{lem:hard_change_of_measure}
 \uses{thm:change_of_measure, lem:hard_kl_episode, def:episode_env, def:bpi_alg, def:hard_triple, lem:kl_output_pair, def:klbin}
+\lean{Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime, Learning.IdentAlg.IsRun.klBer_measureReal_outputMeasure_le_sum_pullCount}\leanok
 Assume Condition~A. Let $\mathcal A$ be a BPI algorithm, $u \in \mathcal U$, and assume
 $\E_0[\tau] < \infty$. Then
 \[
@@ -610,6 +679,7 @@ $\E_0[\tau] < \infty$. Then
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{thm:change_of_measure, lem:hard_kl_episode, def:episode_env, lem:kl_output_pair, def:hard_triple}
 In LML terms (deviation~8), the episode environments $\mathrm{statesEnv}(\mathcal M_0, s_w)$ and
 $\mathrm{statesEnv}(\mathcal M_u, s_w)$ (Definition~\ref{def:episode_env}) are the stationary
@@ -635,7 +705,11 @@ since $N_u(\tau) = \sum_{\pi : u(\pi) = u} N_\pi(\tau)$ (Definition~\ref{def:har
 all terms are finite ($N_\pi(\tau) \le \tau$).
 \end{proof}
 
-\textbf{Lean remark.} \texttt{statesEnv M s₁ := stationaryEnv (statesKernel M s₁)} by
+\textbf{Lean remark.} Proved inline in \texttt{exists\_hardMDP\_lowerBound\_le\_lintegral\_stoppingTime}
+(step \texttt{hcm}), in the form with the pull counts of the policies,
+$\klbin(\Prob_0(E_u), \Prob_u(E_u)) \le \sum_\pi \E_0[N_\pi(\tau)]\,\indic\{u(\pi) = u\}\,\klbin(p_-, p_+)$,
+under the hypothesis that $\tau$ is $\Prob_0$-a.s.\ finite (which follows from $\E_0[\tau] < \infty$).
+\texttt{statesEnv M s₁ := stationaryEnv (statesKernel M s₁)} by
 definition, so Theorem~\ref{thm:change_of_measure}
 (\texttt{Essakine2026Tight/LeanMachineLearning/SequentialLearning/ChangeOfMeasure.lean})
 applies verbatim with the action type \texttt{Policy S A H} (a \texttt{Fintype}) and the
@@ -648,18 +722,18 @@ Theorem~\ref{thm:change_of_measure} is stated for it.
 
 \begin{lemma}[Divergence of the leaf parameters]\label{lem:hard_kl_params}
 \uses{def:hard_params, def:condition_a, lem:hard_params_valid, lem:klbin_upper, def:klbin}
+\lean{Essakine2026Tight.klBerReal_hardPMinus_hardPPlus_le, Essakine2026Tight.hardDelta_le, Essakine2026Tight.hardParams_valid}\leanok
 Under Condition~A, for both signs of $\beta$,
 \[
-  0 < \klbin(p_-, p_+) \le 72\,\frac{c+1}{c^2}\,\big(e^{|\beta|\eps} - 1\big)^2 < \infty .
+  \klbin(p_-, p_+) \le 72\,\frac{c+1}{c^2}\,\big(e^{|\beta|\eps} - 1\big)^2 < \infty .
 \]
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{lem:hard_params_valid, lem:klbin_upper, lem:klbin_bernoulli}
-By Lemma~\ref{lem:hard_params_valid}, $p_+ \in (0,1)$, $p_- \in (0,1)$, $p_- \ne p_+$ and
-$p_+(1-p_+) \ge 1/(8(c+1))$. Positivity and finiteness follow ($\klbin(x,y) > 0$ for
-$x \ne y$, $y \in (0,1)$: Gibbs' inequality for the Bernoulli laws through
-Lemma~\ref{lem:klbin_bernoulli}, Mathlib \texttt{klDiv\_eq\_zero\_iff}; and it is finite since $y \in (0,1)$). By Lemma~\ref{lem:klbin_upper}
+By Lemma~\ref{lem:hard_params_valid}, $p_+ \in (0,1)$, $p_- \in (0,1)$ and
+$p_+(1-p_+) \ge 1/(8(c+1))$; the divergence is finite since $p_+ \in (0,1)$. By Lemma~\ref{lem:klbin_upper}
 (the bound $\klbin(x,y) \le (x-y)^2/(y(1-y))$, with $y = p_+$ the \emph{second} argument),
 \[
   \klbin(p_-, p_+) \le \frac{\Delta^2}{p_+(1-p_+)} \le 8(c+1)\,\Delta^2 .
@@ -668,6 +742,11 @@ Next, $(3c+2)/(c+1) \le 3$, so for $\beta > 0$, $\Delta = (q-1)(3c+2)/(c(c+1)) \
 $\beta < 0$, $\Delta = (q-1)(3c+2)/(c(c+1)(2q-1)) \le 3(q-1)/c$ as well since $2q - 1 \ge 1$. Hence
 $\klbin(p_-,p_+) \le 8(c+1)\cdot 9(q-1)^2/c^2 = 72\,(c+1)(q-1)^2/c^2$.
 \end{proof}
+
+\textbf{Lean remark.} Stated for the real-valued divergence \texttt{klBerReal}, which is
+\texttt{klBer} since $p_+ \in (0, 1)$ (\texttt{klBer\_eq\_ofReal}). The positivity
+$\klbin(p_-, p_+) > 0$ of the paper is not needed: the proof of Theorem~\ref{thm:lower_bound} divides
+by the positive right-hand side.
 
 \begin{remark}[The paper's bound on the divergence]\label{rem:lb_kl_paper}
 The paper bounds $\klbin(p_-,p_+)$ by $(p_+ - p_-)^2/(p_-(1-p_-))$. The elementary bound
@@ -692,20 +771,28 @@ the bound $\klbin(p_-,p_+) \le \Delta^2/(p_+(1-p_+)) \le 8(c+1)\Delta^2$ valid.
 
 \begin{lemma}[The counts sum to the stopping time]\label{lem:hard_count_sum}
 \uses{def:hard_triple, def:bpi_alg}
+\lean{Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime, Essakine2026Tight.sum_lintegral_le_lintegral_sum, Learning.pullCount}\leanok
 In every run of a BPI algorithm in the episode environment of an instance, on $\{\tau < \infty\}$,
 $\sum_{u \in \mathcal U} N_u(\tau) = \tau$. Consequently, if $\tau < \infty$ $\Prob_0$-a.s.,
 $\E_0[\tau] = \sum_{u \in \mathcal U}\E_0[N_u(\tau)]$ (in $[0,\infty]$).
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{def:hard_triple}
 Each of the $\tau$ episodes $t < \tau$ has exactly one triple $u(\pi^{t+1})$
 (Definition~\ref{def:hard_triple}), so $\sum_u N_u(\tau) = \sum_{t<\tau}\sum_u\indic\{u(\pi^{t+1}) = u\} = \tau$.
 Take expectations (a finite sum of nonnegative terms).
 \end{proof}
 
+\textbf{Lean remark.} Proved inline in \texttt{exists\_hardMDP\_lowerBound\_le\_lintegral\_stoppingTime}
+(step \texttt{hchain}) with the pull counts of the policies: $\sum_\pi N_\pi(\tau) = \tau$ on
+$\{\tau < \infty\}$ is LML's \texttt{sum\_pullCount}, and only the inequality
+$\sum_\pi \E_0[N_\pi(\tau)] \le \E_0[\tau]$ is used (\texttt{sum\_lintegral\_le\_lintegral\_sum}).
+
 \begin{lemma}[Lower bound on the sum of divergences]\label{lem:hard_count_lower}
 \uses{def:klbin, lem:klbin_lower}
+\lean{Essakine2026Tight.ofReal_le_sum_klBer, Essakine2026Tight.ofReal_sum_le_sum_ofReal}\leanok
 Let $\mathcal U$ be a finite set with $\abs{\mathcal U} \ge 4$, $\delta \in (0, 1/16]$,
 $(x_u)_{u \in \mathcal U}$ in $[0,1]$ with $\sum_u x_u \le 1$ and $(y_u)_{u \in \mathcal U}$ in
 $[1 - \delta, 1]$. Then, in $[0, \infty]$,
@@ -715,6 +802,7 @@ $[1 - \delta, 1]$. Then, in $[0, \infty]$,
 \end{lemma}
 
 \begin{proof}
+\leanok
 \uses{lem:klbin_lower}
 \emph{Termwise.} If $y_u < 1$, Lemma~\ref{lem:klbin_lower} gives
 $\klbin(x_u,y_u) \ge (1-x_u)\log\frac{1}{1-y_u} - \log 2 \ge (1-x_u)\log\frac1\delta - \log 2$
@@ -728,10 +816,11 @@ which holds because $\frac{\abs{\mathcal U}}{2} - 1 \ge \frac{\abs{\mathcal U}}{
 $\abs{\mathcal U} \ge 4$) and $\frac14\log\frac1\delta \ge \frac14\log 16 = \log 2$ (as $\delta \le 1/16$).
 \end{proof}
 
-\textbf{Lean remark.} $\klbin$ is the $\texttt{ℝ≥0∞}$-valued \texttt{klBin} of
-Definition~\ref{def:klbin} (as \texttt{klBer} in the sister project, infinite when the second
-argument is $1$ and the first is not); the sum is a \texttt{Finset.sum} in \texttt{ℝ≥0∞} and the
-right-hand side is \texttt{ENNReal.ofReal} of a real number. The outline's version
+\textbf{Lean remark.} $\klbin$ is the $\texttt{ℝ≥0∞}$-valued \texttt{InformationTheory.klBer} of
+Definition~\ref{def:klbin} (infinite when the second argument is $0$ or $1$ and differs from the
+first); the sum is a \texttt{Finset.sum} in \texttt{ℝ≥0∞} and the
+right-hand side is \texttt{ENNReal.ofReal} of a real number; \texttt{ofReal\_le\_sum\_klBer} proves
+the outer inequality. The outline's version
 ($\abs{\mathcal U} \ge 2$, constant $1/4$) is weaker; the paper's constant $1/2$ is correct
 since $\abs{\mathcal U} \ge 4$ in the application.
 
@@ -769,6 +858,7 @@ More precisely the proof gives $\E_0[\tau] \ge \frac{1}{3456}\frac{(e^{|\beta|\G
 \end{theorem}
 
 \begin{proof}
+\leanok
 \uses{lem:hard_params_valid, lem:hard_gmax, lem:hard_pac_event, lem:hard_change_of_measure, lem:hard_kl_params, lem:hard_count_sum, lem:hard_count_lower, lem:tree_leaves, lem:tree_depth_props, def:hard_triple}
 Take $r_0$, $\mathcal M_0$, the family $(\mathcal M_u)_{u \in \mathcal U}$ and $s_1 = s_w$ of
 Definition~\ref{def:hard_mdp}, which is admissible by Lemma~\ref{lem:hard_params_valid}. Let
@@ -801,7 +891,7 @@ $H \ge 4$, $\lfloor H/3\rfloor \ge (H-2)/3 \ge H/6$; for $H = 3$, $1 \ge 1/2$), 
 (Lemma~\ref{lem:tree_leaves}~(ii)), so $\abs{\mathcal U} = \bar H L A \ge SAH/24$.
 
 \emph{Step 4: the constant.} By Lemma~\ref{lem:hard_gmax},
-$c^2/(c+1) = (e^{|\beta|\Gmax(\mathcal M_0)}-1)^2/e^{|\beta|\Gmax(\mathcal M_0)}$. Hence
+$c^2/(c+1) \ge (e^{|\beta|\Gmax(\mathcal M_0)}-1)^2/e^{|\beta|\Gmax(\mathcal M_0)}$. Hence
 \[
   \E_0[\tau] \ge \frac{1}{24\cdot 144}\,\frac{(e^{|\beta|\Gmax(\mathcal M_0)}-1)^2}{e^{|\beta|\Gmax(\mathcal M_0)}}\,\frac{SAH}{(e^{|\beta|\eps}-1)^2}\log\frac1\delta ,
 \]
@@ -815,8 +905,9 @@ $\exists\, r_0\ M_0\ s_1,\ M_0.\texttt{HasRewardFn}\ r_0 \wedge (\forall a\, h\,
 \forall\, \mathcal A,\ \texttt{IsEntropicPAC}\ \mathcal A\ r_0\ \beta\ \eps\ \delta\ s_1 \to \forall \text{ run},\
 \texttt{ENNReal.ofReal}\ (\mathrm{lowerBound}\ \dots\ (\Gmax\ M_0\ s_1)) \le \int \tau\, d\Prob$,
 with $\tau : \Omega \to \texttt{ℕ∞}$ cast to \texttt{ℝ≥0∞} (so $\E_0[\tau] = \infty$ is allowed and
-Step~0 is the case \texttt{lintegral = ⊤}). The hard MDP $M_0$ is \texttt{hardMDP S A H β ε none}
-and the family $\mathcal M_u$ only appears in the proof. Condition~A is a hypothesis on
+Step~0 is the case \texttt{lintegral = ⊤}). The hard MDP $M_0$ is \texttt{hardMDP H β ε none} on the
+given finite types \texttt{S}, \texttt{A}, and the family $\mathcal M_u$ only appears in the proof; the final
+numerical inequality is \texttt{lowerBound\_le\_of\_card}. Condition~A is a hypothesis on
 $(\beta, \texttt{effHorizon S A H}, \eps)$.
 
 \begin{remark}[On the constant and the hypotheses]\label{rem:lb_constant}

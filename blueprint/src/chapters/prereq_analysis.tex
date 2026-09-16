@@ -13,8 +13,8 @@ episodes into an explicit one. Everything is stated over $\R$ with no reference 
 
 \textbf{Constants.} Every constant is verified below. Two of the paper's statements are
 adjusted: the logarithmic sum bound (Lemma~\ref{lem:log_sum_bound}) holds with the constant
-$3$ in place of $4$ (we keep $4$ in the statement, since it is the form used by the counting
-argument, and record the sharper constant); and the self-bounding inequality
+$3$ in place of $4$ (both forms are stated, since the form with $4$ is the one used by the
+counting argument); and the self-bounding inequality
 (Lemma~\ref{lem:self_bounding}) is \emph{false} with the constant $C_1$ printed in the paper
 (a counterexample is given in Remark~\ref{rem:pana_self_bounding_paper}), so it is stated and
 proved with a corrected $C_1$.
@@ -25,25 +25,30 @@ proved with a corrected $C_1$.
 \texttt{Real.add\_one\_le\_exp}, \texttt{Real.log\_le\_sub\_one\_of\_pos},
 \texttt{Real.one\_sub\_inv\_le\_log\_of\_pos}, \texttt{Real.log\_le\_log\_iff},
 \texttt{Real.log\_rpow}, \texttt{Real.rpow\_natCast}; the variance
-\texttt{ProbabilityTheory.variance} with \texttt{variance\_def'} (variance as
-$\E X^2 - (\E X)^2$ for $X \in L^2$) and \texttt{MemLp.of\_bound}; the Cauchy--Schwarz
-inequality for finite sums \texttt{Finset.sum\_mul\_sq\_le\_sq\_mul\_sq} and
-\texttt{Finset.inner\_mul\_le\_norm\_mul\_norm}; the AM--GM inequality in the form
-\texttt{two\_mul\_le\_add\_sq} and \texttt{Real.add\_pow\_le\_pow\_mul\_pow\_of\_sq\_le\_sq}.
+\texttt{ProbabilityTheory.variance} with \texttt{variance\_eq\_sub} (variance as
+$\E X^2 - (\E X)^2$ for $X \in L^2$), \texttt{memLp\_of\_bounded} and the Bhatia--Davis
+inequality itself (\texttt{ProbabilityTheory.variance\_le\_sub\_mul\_sub},
+Lemma~\ref{lem:bhatia_davis}); the AM--GM inequality in the form \texttt{two\_mul\_le\_add\_sq};
+the weak logarithm-versus-power bound \texttt{Real.log\_le\_rpow\_div}.
 
-\textbf{What is missing.} The Bhatia--Davis inequality, the normalized variance bound, the
-logarithmic sum bound and the self-bounding inequality. They go to
-\texttt{Essakine2026Tight/Mathlib/} (\texttt{Analysis/BhatiaDavis.lean},
-\texttt{Analysis/LogSumBound.lean}, \texttt{Analysis/SelfBounding.lean}).
+\textbf{What is missing.} The normalized variance bound, the logarithmic sum bound and the
+self-bounding inequality, and the small lemmas around them. They are in
+\texttt{Essakine2026Tight/Mathlib/} (\texttt{Algebra/Order/Field/Basic.lean},
+\texttt{Analysis/Real/Sqrt.lean}, \texttt{Analysis/SpecialFunctions/Exp.lean},
+\texttt{Analysis/SpecialFunctions/Log/Basic.lean}, \texttt{Analysis/SpecialFunctions/Pow/Real.lean},
+\texttt{Analysis/SpecialFunctions/Log/SelfBounding.lean},
+\texttt{Probability/Moments/Variance.lean}).
 
 \section{Square roots, exponentials and logarithms}
 \label{sec:pre_analysis_basic}
 
 \begin{lemma}[Subadditivity of the square root]\label{lem:sqrt_add_le}
+\lean{Real.sqrt_add_le}\leanok
 For $a, b \ge 0$, $\sqrt{a + b} \le \sqrt a + \sqrt b$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Both sides are nonnegative, so it suffices to compare squares (Mathlib
 \texttt{Real.sqrt\_le\_left} with $y = \sqrt a + \sqrt b \ge 0$):
 $(\sqrt a + \sqrt b)^2 = a + b + 2\sqrt a\sqrt b \ge a + b$ because $\sqrt a\sqrt b \ge 0$
@@ -51,6 +56,7 @@ $(\sqrt a + \sqrt b)^2 = a + b + 2\sqrt a\sqrt b \ge a + b$ because $\sqrt a\sqr
 \end{proof}
 
 \begin{lemma}[Weighted AM--GM for a square root]\label{lem:sqrt_mul_le}
+\lean{Real.two_mul_sqrt_mul_le, Real.sqrt_mul_le_half_add_half, Real.sqrt_mul_le_add}\leanok
 For $a, b \ge 0$ and $\eta > 0$,
 \[
   \sqrt{ab} \le \frac{\eta a}{2} + \frac{b}{2\eta} \le \eta a + \frac{b}{\eta} .
@@ -58,50 +64,57 @@ For $a, b \ge 0$ and $\eta > 0$,
 \end{lemma}
 
 \begin{proof}
+\leanok
 Let $x := \sqrt{\eta a}$ and $y := \sqrt{b/\eta}$, so that $x, y \ge 0$, $x^2 = \eta a$,
 $y^2 = b/\eta$ and $xy = \sqrt{ab}$ (\texttt{Real.sqrt\_mul}, \texttt{Real.sq\_sqrt}; $\eta a \ge 0$
 and $b/\eta \ge 0$). From $(x - y)^2 \ge 0$ we get $2xy \le x^2 + y^2$
-(\texttt{two\_mul\_le\_add\_sq}), i.e.\ $2\sqrt{ab} \le \eta a + b/\eta$, which is the first
+(\texttt{two\_mul\_le\_add\_sq}), i.e.\ $2\sqrt{ab} \le \eta a + b/\eta$
+(\texttt{Real.two\_mul\_sqrt\_mul\_le}), which is the first
 inequality. The second holds because $\eta a \ge 0$ and $b/\eta \ge 0$.
 \end{proof}
 
 \begin{lemma}[A power bound for $(1 + a/H)^h$]\label{lem:one_add_div_pow_le_exp}
+\lean{Real.one_add_div_pow_le_exp}\leanok
 For $a \ge 0$, integers $H \ge 1$ and $0 \le h \le H$: $(1 + a/H)^h \le e^{a}$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 By \texttt{Real.add\_one\_le\_exp}, $1 + a/H \le e^{a/H}$, and $1 + a/H \ge 0$. Since
-$x \mapsto x^h$ is monotone on $[0, \infty)$ (\texttt{pow\_le\_pow\_left}),
-$(1 + a/H)^h \le (e^{a/H})^h = e^{ah/H}$ (\texttt{Real.exp\_nat\_mul} or
-\texttt{Real.rpow\_natCast}), and $ah/H \le a$ because $0 \le h \le H$ and $a \ge 0$, so
-$e^{ah/H} \le e^{a}$ (\texttt{Real.exp\_le\_exp}).
+$x \mapsto x^h$ is monotone on $[0, \infty)$ (\texttt{pow\_le\_pow\_left₀}),
+$(1 + a/H)^h \le (e^{a/H})^h = e^{ah/H}$ (\texttt{Real.exp\_nat\_mul}), and $ah/H \le a$
+because $0 \le h \le H$ and $a \ge 0$, so $e^{ah/H} \le e^{a}$ (\texttt{Real.exp\_le\_exp}).
 \end{proof}
 
-\begin{lemma}[{$2 - x \le 1/x$ on $(0, 1]$}]\label{lem:two_sub_le_inv}
-For $x \in (0, 1]$, $2 - x \le 1/x$. (The inequality holds for every $x > 0$.)
+\begin{lemma}[{$2 - x \le 1/x$ on $(0, \infty)$}]\label{lem:two_sub_le_inv}
+\lean{two_sub_le_inv}\leanok
+For $x > 0$ (in any linearly ordered field), $2 - x \le 1/x$. (It is used for
+$x = e^{\beta\eps} \in (0, 1]$.)
 \end{lemma}
 
 \begin{proof}
-Multiplying by $x > 0$, the claim is $2x - x^2 \le 1$, i.e.\ $0 \le 1 - 2x + x^2 = (1 - x)^2$
-(\texttt{le\_div\_iff₀}, \texttt{sq\_nonneg}).
+\leanok
+$1/x - (2 - x) = (1 - x)^2/x \ge 0$ (\texttt{field\_simp}, \texttt{positivity}).
 \end{proof}
 
 \section{The Bhatia--Davis inequality and the normalized variance bound}
 \label{sec:pre_analysis_variance}
 
 \begin{lemma}[Bhatia--Davis inequality]\label{lem:bhatia_davis}
-Let $(\Omega, \Prob)$ be a probability space, $Y : \Omega \to \R$ a random variable and
-$m \le M$ real numbers with $Y \in [m, M]$ almost surely. Then $Y$ is square-integrable, its
-mean $\mu := \E Y$ lies in $[m, M]$, and
+\lean{ProbabilityTheory.variance_le_sub_mul_sub}\leanok
+Let $(\Omega, \Prob)$ be a probability space, $Y : \Omega \to \R$ an a.e.-measurable random
+variable and $m, M$ real numbers with $Y \in [m, M]$ almost surely. Then, with $\mu := \E Y$,
 \[
   \Var(Y) \le (M - \mu)(\mu - m) .
 \]
 \end{lemma}
 
 \begin{proof}
-$Y$ is bounded a.s.\ on a probability space, hence in $L^2$ (Mathlib
-\texttt{MemLp.of\_bound}), and $\Var(Y) = \E Y^2 - \mu^2$ (\texttt{variance\_def'}). By
-monotonicity of the integral, $m \le \mu \le M$. Almost surely $(M - Y)(Y - m) \ge 0$, so
+\leanok
+This is Mathlib's \texttt{ProbabilityTheory.variance\_le\_sub\_mul\_sub}. The argument:
+$Y$ is bounded a.s.\ on a probability space, hence in $L^2$
+(\texttt{memLp\_of\_bounded}), and $\Var(Y) = \E Y^2 - \mu^2$ (\texttt{variance\_eq\_sub}).
+Almost surely $(M - Y)(Y - m) \ge 0$, so
 \[
   0 \le \E[(M - Y)(Y - m)] = \E[-Y^2 + (M + m)Y - Mm] = -\E Y^2 + (M + m)\mu - Mm ,
 \]
@@ -110,15 +123,26 @@ $\Var(Y) = \E Y^2 - \mu^2 \le (M + m)\mu - Mm - \mu^2 = (M - \mu)(\mu - m)$.
 This is the inequality of \cite{bhatia2000better}.
 \end{proof}
 
-\textbf{Lean remark.} State it as
-\texttt{variance X μ ≤ (M - μ[X]) * (μ[X] - m)} for \texttt{μ} a probability measure,
-\texttt{X} measurable (or \texttt{AEMeasurable}) with \texttt{∀ᵐ ω ∂μ, X ω ∈ Set.Icc m M}. The
-finite-vector version $\Var_p(f) \le (M - pf)(pf - m)$ for a probability vector $p$ on a finite
-set and $f \in [m, M]$ is the same statement for the measure $\sum_s p(s)\delta_s$
-(\texttt{weightedMeasure}), or is proved directly by the same computation with finite sums.
+\begin{lemma}[The mean of a bounded random variable]\label{lem:pana_integral_mem_Icc}
+\lean{ProbabilityTheory.integral_mem_Icc_of_ae_mem_Icc}\leanok
+Let $(\Omega, \Prob)$ be a probability space and $Y : \Omega \to \R$ a.e.-strongly measurable
+with $Y \in [m, M]$ almost surely. Then $\E Y \in [m, M]$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+$Y$ is integrable (\texttt{memLp\_of\_bounded} with $p = 1$), and the integral is monotone
+(\texttt{integral\_mono\_ae}) with $\E[m] = m$, $\E[M] = M$ on a probability space.
+\end{proof}
+
+\textbf{Lean remark.} The finite-vector version $\Var_p(f) \le (M - pf)(pf - m)$ for a
+probability vector $p$ on a finite set and $f \in [m, M]$ is the same statement for the measure
+$\sum_s p(s)\delta_s$ (\texttt{weightedMeasure}), or is proved directly by the same computation
+with finite sums.
 
 \begin{lemma}[Maximization of the normalized Bhatia--Davis bound]\label{lem:pana_var_ratio_max}
-For $0 < m \le M$ and every $\mu \in [m, M]$,
+\lean{sub_mul_sub_div_sq_le}\leanok
+For $m, M, \mu > 0$ (in any linearly ordered field),
 \[
   \frac{(M - \mu)(\mu - m)}{\mu^2} \le \frac{(M - m)^2}{4Mm}
   = \frac{(M/m - 1)^2}{4\,M/m},
@@ -127,58 +151,66 @@ with equality if and only if $\mu = 2Mm/(M + m)$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Since $\mu > 0$ and $4Mm > 0$, the inequality is equivalent to
-$4Mm(M - \mu)(\mu - m) \le (M - m)^2\mu^2$. Expanding both sides,
+$4Mm(M - \mu)(\mu - m) \le (M - m)^2\mu^2$ (\texttt{div\_le\_div\_iff₀}). Expanding both sides,
 \[
   (M - m)^2\mu^2 - 4Mm(M - \mu)(\mu - m)
   = (M + m)^2\mu^2 - 4Mm(M + m)\mu + 4M^2m^2
   = \big((M + m)\mu - 2Mm\big)^2 \ge 0 ,
 \]
-where we used $(M - m)^2 + 4Mm = (M + m)^2$. Equality holds iff $(M + m)\mu = 2Mm$. The last
+where we used $(M - m)^2 + 4Mm = (M + m)^2$ (\texttt{nlinarith} with this square as hint).
+Equality holds iff $(M + m)\mu = 2Mm$. The last
 expression of the statement is obtained by dividing numerator and denominator by $m^2$.
 (This is the calculus maximization of the paper's proof of Lemma~24 made algebraic: the
 function $\mu \mapsto (M - \mu)(\mu - m)/\mu^2$ increases on $[m, 2Mm/(M + m)]$ and decreases
-on $[2Mm/(M + m), M]$, with maximum $(M - m)^2/(4Mm)$.)
+on $[2Mm/(M + m), M]$, with maximum $(M - m)^2/(4Mm)$. The restriction $\mu \in [m, M]$ is not
+needed.)
 \end{proof}
 
 \begin{lemma}[Normalized variance bound for an exponential transform]\label{lem:normalized_variance_bound}
-\uses{lem:bhatia_davis, lem:pana_var_ratio_max}
+\uses{lem:bhatia_davis, lem:pana_var_ratio_max, lem:pana_integral_mem_Icc}
+\lean{ProbabilityTheory.variance_exp_div_sq_integral_le}\leanok
 Let $(\Omega, \Prob)$ be a probability space, $R \ge 0$, $\beta \in \R$ and $f : \Omega \to \R$
-a random variable with $f \in [0, R]$ almost surely. Let $Y := e^{\beta f}$, $\mu := \E Y$,
-$m := \min\{1, e^{\beta R}\}$ and $M := \max\{1, e^{\beta R}\}$. Then $Y \in [m, M]$ a.s.,
-$\mu \in [m, M]$, $\mu > 0$, and
+an a.e.-measurable random variable with $f \in [0, R]$ almost surely. Let $Y := e^{\beta f}$
+and $\mu := \E Y$. Then
 \[
   \frac{\Var(Y)}{\mu^2} \le \frac{(e^{\abs\beta R} - 1)^2}{4\,e^{\abs\beta R}} .
 \]
 \end{lemma}
 
 \begin{proof}
-\uses{lem:bhatia_davis, lem:pana_var_ratio_max}
+\uses{lem:bhatia_davis, lem:pana_var_ratio_max, lem:pana_integral_mem_Icc}
+\leanok
+Let $m := \min\{1, e^{\beta R}\}$ and $M := \max\{1, e^{\beta R}\}$.
 Almost surely $\beta f$ lies between $0$ and $\beta R$ (if $\beta \ge 0$ then
 $0 \le \beta f \le \beta R$; if $\beta < 0$ then $\beta R \le \beta f \le 0$), so by
-monotonicity of $\exp$, $m \le Y \le M$ a.s. Lemma~\ref{lem:bhatia_davis} gives
-$\mu \in [m, M]$ and $\Var(Y) \le (M - \mu)(\mu - m)$; moreover $m > 0$, hence $\mu > 0$.
+monotonicity of $\exp$, $m \le Y \le M$ a.s.\ (\texttt{ProbabilityTheory.exp\_mul\_mem\_Icc\_min\_max}).
+Lemma~\ref{lem:pana_integral_mem_Icc} gives
+$\mu \in [m, M]$, and $m > 0$, hence $\mu > 0$; Lemma~\ref{lem:bhatia_davis} gives
+$\Var(Y) \le (M - \mu)(\mu - m)$.
 Dividing by $\mu^2$ and applying Lemma~\ref{lem:pana_var_ratio_max},
 \[
-  \frac{\Var(Y)}{\mu^2} \le \frac{(M - \mu)(\mu - m)}{\mu^2} \le \frac{(M/m - 1)^2}{4\,M/m} .
+  \frac{\Var(Y)}{\mu^2} \le \frac{(M - \mu)(\mu - m)}{\mu^2} \le \frac{(M - m)^2}{4Mm} .
 \]
-Finally $M/m = e^{\abs\beta R}$: if $\beta \ge 0$ then $m = 1$, $M = e^{\beta R}$; if $\beta < 0$
-then $m = e^{\beta R}$, $M = 1$ and $M/m = e^{-\beta R}$. (For $\beta = 0$, $Y \equiv 1$, both
-sides vanish, and the formula still holds.)
+Finally $(M - m)^2/(4Mm) = (e^{\abs\beta R} - 1)^2/(4e^{\abs\beta R})$
+(\texttt{ProbabilityTheory.max\_sub\_min\_sq\_div\_eq}): if $\beta \ge 0$ then $m = 1$,
+$M = e^{\beta R}$; if $\beta < 0$ then $m = e^{\beta R}$, $M = 1$ and
+$(1 - e^{\beta R})^2/(4e^{\beta R}) = (e^{-\beta R} - 1)^2/(4e^{-\beta R})$.
 \end{proof}
 
 \textbf{Lean remark.} This is the paper's Lemma~24 (Appendix~F). The bound is used in
 Lemma~\ref{lem:variance_ratio_le} with $f$ the return of an episode and $R = \Gmax$; the
 paper's constant $V_G = (e^{\abs\beta G} - 1)^2/e^{\abs\beta G}$ (Definition~\ref{def:upper_bound_const})
 is four times the bound above, so the factor $4$ is slack that the formal proof may drop.
-The case split on the sign of $\beta$ is only needed to identify $M/m$; state the lemma with
-$m = \min\{1, e^{\beta R}\}$, $M = \max\{1, e^{\beta R}\}$ and prove $M/m = e^{\abs\beta R}$ by
-\texttt{abs\_of\_nonneg}/\texttt{abs\_of\_neg}.
+The case split on the sign of $\beta$ only appears in the two auxiliary lemmas (the a.s.\ bounds
+on $Y$ and the identification of $(M - m)^2/(4Mm)$).
 
 \section{The logarithmic sum bound}
 \label{sec:pre_analysis_log_sum}
 
 \begin{lemma}[One step of the logarithmic sum bound]\label{lem:pana_log_sum_step}
+\lean{Real.div_max_one_le_three_mul_log}\leanok
 For $U \ge 0$ and $u \in [0, 1]$,
 \[
   \frac{u}{\max\{U, 1\}} \le 3\log\frac{U + u + 1}{U + 1} .
@@ -186,45 +218,49 @@ For $U \ge 0$ and $u \in [0, 1]$,
 \end{lemma}
 
 \begin{proof}
+\leanok
 Let $x := u/(U + 1) \ge 0$. Since $1 + x > 0$, Mathlib \texttt{Real.one\_sub\_inv\_le\_log\_of\_pos}
 gives $\log(1 + x) \ge 1 - \frac{1}{1 + x} = \frac{x}{1 + x} = \frac{u}{U + 1 + u}$, so the
-right-hand side is at least $3u/(U + 1 + u)$. If $u = 0$ both sides vanish. Otherwise it
-suffices to show $U + 1 + u \le 3\max\{U, 1\}$: if $U \ge 1$ then
+right-hand side is at least $3u/(U + 1 + u)$. It
+suffices to show $u(U + 1 + u) \le 3u\max\{U, 1\}$, which follows from $u \ge 0$ and
+$U + 1 + u \le 3\max\{U, 1\}$: if $U \ge 1$ then
 $U + 1 + u \le U + 2 \le 3U$; if $U < 1$ then $U + 1 + u < 3 = 3\max\{U, 1\}$. Hence
 $\frac{u}{\max\{U,1\}} \le \frac{3u}{U + 1 + u} \le 3\log\frac{U + u + 1}{U + 1}$.
 \end{proof}
 
 \begin{lemma}[Logarithmic sum bound]\label{lem:log_sum_bound}
 \uses{lem:pana_log_sum_step}
+\lean{Real.sum_div_max_one_le_three_mul_log, Real.sum_div_max_one_le_four_mul_log}\leanok
 Let $(u_t)_{t \ge 1}$ be a sequence with $u_t \in [0, 1]$ and $U_t := \sum_{i = 1}^t u_i$
 ($U_0 = 0$). For every integer $T \ge 0$,
 \[
-  \sum_{t = 0}^{T}\frac{u_{t + 1}}{\max\{U_t, 1\}} \le 3\log(U_{T + 1} + 1) \le 4\log(U_{T + 1} + 1) .
+  \sum_{t = 0}^{T - 1}\frac{u_{t + 1}}{\max\{U_t, 1\}} \le 3\log(U_{T} + 1) \le 4\log(U_{T} + 1) .
 \]
 \end{lemma}
 
 \begin{proof}
 \uses{lem:pana_log_sum_step}
+\leanok
 For each $t$, $U_t \ge 0$, $u_{t+1} \in [0,1]$ and $U_{t+1} = U_t + u_{t+1}$, so
 Lemma~\ref{lem:pana_log_sum_step} gives
 \[
   \frac{u_{t + 1}}{\max\{U_t, 1\}} \le 3\log\frac{U_{t+1} + 1}{U_t + 1}
   = 3\big(\log(U_{t+1} + 1) - \log(U_t + 1)\big)
 \]
-(\texttt{Real.log\_div}, both arguments being positive). Summing over $t = 0, \dots, T$, the
+(\texttt{Real.log\_div}, both arguments being positive). Summing over $t = 0, \dots, T - 1$, the
 right-hand side telescopes (\texttt{Finset.sum\_range\_sub}) to
-$3(\log(U_{T+1} + 1) - \log(U_0 + 1)) = 3\log(U_{T+1} + 1)$. Finally $U_{T+1} + 1 \ge 1$, so
-$\log(U_{T+1} + 1) \ge 0$ (\texttt{Real.log\_nonneg}) and $3\log(\cdot) \le 4\log(\cdot)$.
+$3(\log(U_{T} + 1) - \log(U_0 + 1)) = 3\log(U_{T} + 1)$. Finally $U_{T} + 1 \ge 1$, so
+$\log(U_{T} + 1) \ge 0$ (\texttt{Real.log\_nonneg}) and $3\log(\cdot) \le 4\log(\cdot)$.
 \end{proof}
 
 \begin{remark}[On the constant]\label{rem:pana_log_sum_const}
 This is the paper's Lemma~28 (Appendix~F), stated there with the constant $4$ and without
 proof (it is Lemma~8 of \cite{menard2021fast}). The one-step bound holds with the constant
 $3$, hence so does the sum bound; the constant $2$ fails at $U = u = 1$ ($1 > 2\log(3/2)$).
-We keep the constant $4$ in the statement because it is the form consumed by
-Lemma~\ref{lem:sum_counts_bound}. \textbf{Lean remark.} Index the sequence by $\N$ with
+The form with the constant $4$ is the one consumed by
+Lemma~\ref{lem:sum_counts_bound}. \textbf{Lean remark.} The sequence is indexed by $\N$ with
 $u_{t+1} = $ \texttt{u t}, so that $U_t = $ \texttt{∑ i ∈ Finset.range t, u i} and the sum is
-\texttt{∑ t ∈ Finset.range (T + 1), u t / max (∑ i ∈ Finset.range t, u i) 1}.
+\texttt{∑ t ∈ Finset.range T, u t / max (∑ i ∈ Finset.range t, u i) 1}.
 \end{remark}
 
 \section{The self-bounding inequality}
@@ -236,10 +272,12 @@ $\tau$, and one must solve it for $\tau$. We first solve the quadratic part, the
 logarithm of a quantity that is bounded by a multiple of the square of its own logarithm.
 
 \begin{lemma}[Root of a quadratic inequality]\label{lem:pana_quadratic_root}
-Let $x, b, c \ge 0$ with $x^2 \le bx + c$. Then $x \le b + \sqrt c$.
+\lean{Real.le_add_sqrt_of_sq_le}\leanok
+Let $b, c \ge 0$ and $x$ real with $x^2 \le bx + c$. Then $x \le b + \sqrt c$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Suppose $x > b + \sqrt c$. Then $x > 0$ (as $b + \sqrt c \ge 0$), $x > b$ and $x > \sqrt c \ge 0$,
 so
 \[
@@ -247,21 +285,26 @@ so
 \]
 using $x\sqrt c \ge \sqrt c\sqrt c$ (from $x \ge \sqrt c$ and $\sqrt c \ge 0$) and
 $\sqrt c\sqrt c = c$ (\texttt{Real.mul\_self\_sqrt}). This contradicts $x^2 \le bx + c$.
+(No sign assumption on $x$ is needed.)
 \end{proof}
 
 \begin{lemma}[Logarithm versus powers]\label{lem:pana_log_le_rpow}
+\lean{Real.log_le_rpow_div_exp_one_mul}\leanok
 For $y > 0$ and $\gamma > 0$, $\log y \le \dfrac{y^{\gamma}}{e\gamma}$.
 \end{lemma}
 
 \begin{proof}
+\leanok
 Let $z := y^\gamma > 0$. Mathlib \texttt{Real.log\_le\_sub\_one\_of\_pos} applied to $z/e > 0$
 gives $\log(z/e) \le z/e - 1$, and $\log(z/e) = \log z - 1$ (\texttt{Real.log\_div},
 \texttt{Real.log\_exp}), so $\log z \le z/e$. Since $\log z = \gamma\log y$
 (\texttt{Real.log\_rpow}), $\gamma\log y \le y^\gamma/e$; divide by $\gamma > 0$.
+(Mathlib's \texttt{Real.log\_le\_rpow\_div} is the same bound without the factor $1/e$.)
 \end{proof}
 
 \begin{lemma}[A quantity bounded by the square of its logarithm]\label{lem:pana_log_self_bound}
 \uses{lem:pana_log_le_rpow}
+\lean{Real.log_le_of_le_mul_sq_log}\leanok
 Let $y \ge 1$ and $M > 0$ with $y \le M(\log y)^2$. Then
 \[
   \log y \le \tfrac85\log(4M) .
@@ -270,66 +313,111 @@ Let $y \ge 1$ and $M > 0$ with $y \le M(\log y)^2$. Then
 
 \begin{proof}
 \uses{lem:pana_log_le_rpow}
+\leanok
 Since $y \ge 1$, $\log y \ge 0$, and Lemma~\ref{lem:pana_log_le_rpow} with $\gamma = 3/16$ gives
 $0 \le \log y \le \frac{16}{3e}\,y^{3/16}$. Squaring (both sides are nonnegative,
-\texttt{pow\_le\_pow\_left}) and using $y^{3/16}\cdot y^{3/16} = y^{3/8}$ (\texttt{Real.rpow\_add}),
+\texttt{pow\_le\_pow\_left₀}) and using $y^{3/16}\cdot y^{3/16} = y^{3/8}$ (\texttt{Real.rpow\_add}),
 \[
   (\log y)^2 \le \frac{256}{9e^2}\,y^{3/8} \le 4\,y^{3/8},
 \]
 because $9e^2 \ge 64$ (indeed $e \ge 2.7$, \texttt{Real.exp\_one\_gt\_d9}, so $e^2 \ge 7.29 > 64/9$).
-Hence $y \le 4M\,y^{3/8}$, and dividing by $y^{3/8} > 0$ (\texttt{Real.rpow\_sub},
-$y\cdot y^{-3/8} = y^{5/8}$) gives $y^{5/8} \le 4M$. Both sides are positive, so taking
-logarithms (\texttt{Real.log\_le\_log\_iff}, \texttt{Real.log\_rpow}) yields
+Hence $y \le 4M\,y^{3/8}$, and since $y = y^{5/8}\,y^{3/8}$ with $y^{3/8} > 0$
+(\texttt{Real.rpow\_add}, \texttt{le\_of\_mul\_le\_mul\_right}), $y^{5/8} \le 4M$. Both sides are
+positive, so taking logarithms (\texttt{Real.log\_le\_log}, \texttt{Real.log\_rpow}) yields
 $\frac58\log y \le \log(4M)$, i.e.\ $\log y \le \frac85\log(4M)$.
 \end{proof}
 
-\begin{lemma}[Self-bounding inequality, sharp form]\label{lem:pana_self_bounding_core}
-\uses{lem:pana_quadratic_root, lem:pana_log_self_bound}
-Let $A, B, C, D \ge 0$, $E \ge B$, $\alpha \ge e$ and $\tau \ge 0$ satisfy
+\begin{lemma}[Reduction of the self-bounding inequality to a quadratic one]\label{lem:pana_self_bounding_quadratic}
+\uses{lem:pana_quadratic_root}
+\lean{Real.le_mul_sq_log_of_le_sqrt_mul_add}\leanok
+Let $A, B, C, D \ge 0$, $E \ge B$, $\alpha \in \R$ and $\tau \ge 0$ with $L := \log(\alpha\tau) \ge 1$
+satisfy
 \begin{equation}\label{eq:pana_self_bounding_hyp}
   \tau \le C\sqrt{\tau\big(A\log(\alpha\tau) + B\log(\alpha\tau)^2\big)}
   + D\big(A\log(\alpha\tau) + E\log(\alpha\tau)^2\big) .
 \end{equation}
-Let $K := C^2(A + B) + (D + 2\sqrt D\,C)(A + E)$. Then either $\tau \le 1$, or
-$\tau > 1$, $K > 0$, $L := \log(\alpha\tau) \ge 1$, $\tau \le K L^2$ and
-$L \le \frac85\log(4\alpha K)$. In both cases
-\[
-  \tau \le K\Big(\tfrac85\log(4\alpha K)\Big)^2 + 1 .
-\]
+Let $K := C^2(A + B) + (D + 2\sqrt D\,C)(A + E)$. Then $\tau \le K L^2$.
 \end{lemma}
 
 \begin{proof}
-\uses{lem:pana_quadratic_root, lem:pana_log_self_bound}
-If $\tau \le 1$ the last claim holds because $K \ge 0$. Assume $\tau > 1$. Then
-$\alpha\tau \ge \alpha \ge e$, so $L = \log(\alpha\tau) \ge 1$ (\texttt{Real.le\_log\_iff\_exp\_le}).
+\uses{lem:pana_quadratic_root}
+\leanok
 \begin{enumerate}
   \item[(i)] \emph{Reduction to a quadratic inequality.} Since $L \ge 1$ and $A \ge 0$,
         $AL \le AL^2$, hence $AL + BL^2 \le (A + B)L^2$ and $AL + EL^2 \le (A + E)L^2$. Both
         terms of~\eqref{eq:pana_self_bounding_hyp} are monotone in these quantities ($C, D \ge 0$,
-        $\sqrt{\cdot}$ monotone), and $\sqrt{\tau(A + B)L^2} = L\sqrt{\tau(A+B)}$ as $L \ge 0$
+        $\sqrt{\cdot}$ monotone), and $\sqrt{\tau(A + B)L^2} = L\sqrt{A+B}\sqrt\tau$ as $L \ge 0$
         (\texttt{Real.sqrt\_mul}, \texttt{Real.sqrt\_sq}); so
         $\tau \le CL\sqrt{A + B}\,\sqrt\tau + D(A + E)L^2$.
-  \item[(ii)] \emph{Solving it.} Put $x := \sqrt\tau \ge 0$, $b := CL\sqrt{A+B} \ge 0$ and
+  \item[(ii)] \emph{Solving it.} Put $x := \sqrt\tau$, $b := CL\sqrt{A+B} \ge 0$ and
         $c := D(A+E)L^2 \ge 0$; then $x^2 = \tau \le bx + c$ and Lemma~\ref{lem:pana_quadratic_root}
-        gives $x \le b + \sqrt c = L\big(C\sqrt{A+B} + \sqrt{D(A+E)}\big)$. Squaring (both sides
+        gives $x \le b + \sqrt c = CL\sqrt{A+B} + \sqrt D\sqrt{A+E}\,L$. Squaring (both sides
         nonnegative),
         \[
-          \tau \le L^2\Big(C^2(A+B) + 2C\sqrt{A+B}\sqrt{D(A+E)} + D(A+E)\Big) .
+          \tau \le L^2\Big(C^2(A+B) + D(A+E)\Big) + 2C\sqrt D\,L^2\,\sqrt{A+B}\sqrt{A+E} .
         \]
-        As $B \le E$, $\sqrt{A+B} \le \sqrt{A+E}$, and $\sqrt{D(A+E)} = \sqrt D\sqrt{A+E}$, so
-        the middle term is at most $2C\sqrt D\,(A+E)$. Hence $\tau \le KL^2$. Since $\tau > 0$,
-        this forces $K > 0$.
-  \item[(iii)] \emph{Bounding the logarithm.} Let $y := \alpha\tau \ge e \ge 1$ and
-        $M := \alpha K > 0$. Multiplying $\tau \le KL^2$ by $\alpha$ gives
-        $y \le M(\log y)^2$, and Lemma~\ref{lem:pana_log_self_bound} yields
-        $L = \log y \le \frac85\log(4M) = \frac85\log(4\alpha K)$.
+        As $B \le E$, $\sqrt{A+B} \le \sqrt{A+E}$, so $\sqrt{A+B}\sqrt{A+E} \le A + E$ and
+        the last term is at most $2C\sqrt D\,(A+E)L^2$. Hence $\tau \le KL^2$.
 \end{enumerate}
-Finally $0 \le 1 \le L \le \frac85\log(4\alpha K)$ gives $L^2 \le (\frac85\log(4\alpha K))^2$, and
-$\tau \le KL^2 \le K(\frac85\log(4\alpha K))^2 \le K(\frac85\log(4\alpha K))^2 + 1$.
+\end{proof}
+
+\begin{lemma}[The logarithm of the self-bounding inequality]\label{lem:pana_self_bounding_log}
+\uses{lem:pana_self_bounding_quadratic, lem:pana_log_self_bound}
+\lean{Real.one_le_log_mul_of_exp_one_le, Real.log_le_of_le_sqrt_mul_add}\leanok
+Let $A, B, C, D \ge 0$, $E \ge B$, $\alpha \ge e$ and $\tau > 1$
+satisfy~\eqref{eq:pana_self_bounding_hyp}, and let $K$ be as in
+Lemma~\ref{lem:pana_self_bounding_quadratic}. Then $L := \log(\alpha\tau) \ge 1$, $K > 0$ and
+$L \le \frac85\log(4\alpha K)$.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pana_self_bounding_quadratic, lem:pana_log_self_bound}
+\leanok
+$\alpha\tau \ge \alpha \ge e$, so $L \ge 1$ (\texttt{Real.le\_log\_iff\_exp\_le};
+\texttt{Real.one\_le\_log\_mul\_of\_exp\_one\_le}). Lemma~\ref{lem:pana_self_bounding_quadratic}
+gives $\tau \le KL^2$; since $\tau > 0$, this forces $K > 0$. Let $y := \alpha\tau \ge 1$ and
+$M := \alpha K > 0$. Multiplying $\tau \le KL^2$ by $\alpha$ gives $y \le M(\log y)^2$, and
+Lemma~\ref{lem:pana_log_self_bound} yields $L = \log y \le \frac85\log(4M) = \frac85\log(4\alpha K)$.
+\end{proof}
+
+\begin{lemma}[Self-bounding inequality, sharp form]\label{lem:pana_self_bounding_core}
+\uses{lem:pana_self_bounding_quadratic, lem:pana_self_bounding_log}
+\lean{Real.le_mul_sq_log_add_one_of_le_sqrt_mul_add}\leanok
+Let $A, B, C, D \ge 0$, $E \ge B$, $\alpha \ge e$ and $\tau \ge 0$
+satisfy~\eqref{eq:pana_self_bounding_hyp}, let $K := C^2(A + B) + (D + 2\sqrt D\,C)(A + E)$ and
+let $M \ge 4\alpha K$. Then
+\[
+  \tau \le K\Big(\tfrac85\log M\Big)^2 + 1 .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pana_self_bounding_quadratic, lem:pana_self_bounding_log}
+\leanok
+If $\tau \le 1$ the claim holds because $K \ge 0$. Assume $\tau > 1$. By
+Lemma~\ref{lem:pana_self_bounding_log}, $K > 0$, $L := \log(\alpha\tau) \ge 1$ and
+$L \le \frac85\log(4\alpha K) \le \frac85\log M$ ($0 < 4\alpha K \le M$ and $\log$ is monotone);
+by Lemma~\ref{lem:pana_self_bounding_quadratic}, $\tau \le KL^2$.
+Then $0 \le L \le \frac85\log M$ gives $L^2 \le (\frac85\log M)^2$, and
+$\tau \le KL^2 \le K(\frac85\log M)^2 \le K(\frac85\log M)^2 + 1$.
+\end{proof}
+
+\begin{lemma}[The constant of the self-bounding inequality]\label{lem:pana_four_alpha_K_le}
+\lean{Real.four_mul_mul_le}\leanok
+Let $A, B, C, D \ge 0$, $E \ge B$ and $\alpha \ge e$, and $K := C^2(A + B) + (D + 2\sqrt D\,C)(A + E)$.
+Then $4\alpha K \le 11\alpha^2(A + E)(C + \sqrt D)^2$.
+\end{lemma}
+
+\begin{proof}
+\leanok
+$K \le C^2(A+E) + (D + 2\sqrt D C)(A+E) = (A+E)\big(C^2 + 2C\sqrt D + D\big) = (A+E)(C + \sqrt D)^2$
+(using $B \le E$ and $\sqrt D^2 = D$), and $4\alpha \le 11\alpha^2$ because $\alpha \ge e \ge 4/11$.
+Both factors are nonnegative, so the products compare.
 \end{proof}
 
 \begin{lemma}[Self-bounding inequality]\label{lem:self_bounding}
-\uses{lem:pana_self_bounding_core}
+\uses{lem:pana_self_bounding_core, lem:pana_four_alpha_K_le}
+\lean{Real.le_of_le_sqrt_mul_add, Real.le_of_le_sqrt_mul_add'}\leanok
 Let $A, B, C, D \ge 0$, $E \ge B$, $\alpha \ge e$ and $\tau \ge 0$ satisfy
 \[
   \tau \le C\sqrt{\tau\big(A\log(\alpha\tau) + B\log(\alpha\tau)^2\big)}
@@ -345,20 +433,14 @@ If moreover $D \ge 1$, the same holds with $C_1 := \frac85\log\big(11\alpha^2(A+
 \end{lemma}
 
 \begin{proof}
-\uses{lem:pana_self_bounding_core}
+\uses{lem:pana_self_bounding_core, lem:pana_four_alpha_K_le}
+\leanok
 Let $K := C^2(A+B) + (D + 2\sqrt D C)(A+E)$, so that the claimed bound reads
-$\tau \le KC_1^2 + 1$. If $\tau \le 1$ it holds since $KC_1^2 \ge 0$. Otherwise
-Lemma~\ref{lem:pana_self_bounding_core} gives $K > 0$, $1 \le L := \log(\alpha\tau)$,
-$\tau \le KL^2$ and $L \le \frac85\log(4\alpha K)$. Now
-\[
-  K \le C^2(A+E) + (D + 2\sqrt D C)(A+E) = (A+E)\big(C^2 + 2C\sqrt D + D\big)
-  = (A+E)(C + \sqrt D)^2
-\]
-(using $B \le E$ and $\sqrt D^2 = D$), and $4\alpha \le 11\alpha^2$ because $\alpha \ge e \ge 4/11$.
-Hence $0 < 4\alpha K \le 11\alpha^2(A+E)(C+\sqrt D)^2$, and by monotonicity of $\log$ on $(0,\infty)$
-(\texttt{Real.log\_le\_log\_iff}), $L \le \frac85\log(4\alpha K) \le C_1$. As $L \ge 1 > 0$,
-$L^2 \le C_1^2$ and $\tau \le KL^2 \le KC_1^2 \le KC_1^2 + 1$. If $D \ge 1$ then $\sqrt D \le D$,
-so $(C + \sqrt D)^2 \le (C + D)^2$ and the second form of $C_1$ is larger.
+$\tau \le KC_1^2 + 1$, which is Lemma~\ref{lem:pana_self_bounding_core} with
+$M := 11\alpha^2(A+E)(C+\sqrt D)^2 \ge 4\alpha K$ (Lemma~\ref{lem:pana_four_alpha_K_le}).
+If $D \ge 1$ then $\sqrt D \le D$ (\texttt{Real.sqrt\_le\_left}), so
+$(C + \sqrt D)^2 \le (C + D)^2$ and $M' := 11\alpha^2(A+E)(C+D)^2 \ge M \ge 4\alpha K$ also
+qualifies.
 \end{proof}
 
 \begin{remark}[The paper's constant is wrong]\label{rem:pana_self_bounding_paper}
