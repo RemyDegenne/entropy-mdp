@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/mathlib-initiative/formalization.yaml/main/schema/formalization.schema.json
+# formalization.yaml (v0.4): repo-root metadata for formalization projects.
+# See https://github.com/mathlib-initiative/formalization.yaml for the fields.
+
+version: "v0.4"
+
+project:
+  name: "entropy-mdp"
+  description: >-
+    A Lean 4 / Mathlib formalization of "Tight Sample Complexity Bounds for Entropic Best
+    Policy Identification" (Amer Essakine, Claire Vernade, COLT 2026, arXiv:2605.13717):
+    best-policy identification in finite-horizon tabular MDPs under the entropic risk measure,
+    in the online (forward) model. The paper's two results are the lower bound
+    Ω((e^{|β| G_max} - 1)² e^{-|β| G_max} S A H log(1/δ) / (e^{|β| ε} - 1)²) on the expected
+    number of episodes of every (ε, δ)-PAC algorithm (Theorem 3) and the matching upper bound
+    for the algorithm Entropic-BPI (KL-based bonuses in the exponential space and an entropic
+    stopping rule; Theorem 4). The MDP model is built on the LML (Lean Machine Learning)
+    algorithm–environment framework and its MDPs (finite-horizon MDPs embedded in a layered
+    stationary MDP, episodes as rounds, identification algorithms with stopping and output
+    rules); the objects (entropic values, empirical models, exploration bonuses, concentration
+    events, the change of measure at a stopping time) are introduced in library generality, to
+    be contributed to LML and Mathlib. The development is blueprint-driven and proceeds in two
+    phases: phase 1 states the headline results (this file lists them; their statements are
+    `sorry`-ed challenge statements for leanprover/comparator), phase 2 proves them.
+  authors:
+    - "Rémy Degenne"
+  responsible_maintainers:
+    - "Rémy Degenne"
+  license: "Apache-2.0"
+  # extra keys (tolerated by the schema), kept for convenience:
+  repository: "https://github.com/RemyDegenne/entropy-mdp"
+  blueprint: "https://remydegenne.github.io/entropy-mdp/blueprint/"
+
+# This repository is the substantive formalization, not a packaging or comparison layer.
+repository:
+  role: "substantive-development"
+
+sources:
+  - title: "Tight Sample Complexity Bounds for Entropic Best Policy Identification"
+    authors:
+      - "Amer Essakine"
+      - "Claire Vernade"
+    id: "COLT 2026, arXiv:2605.13717"
+    type: "conference-paper"
+    location: "Theorems 3 and 4 (the appendix's detailed version); see status.scope"
+    relationship: "formalizes"
+    license: ""
+    author_endorsement: "not-contacted"
+    note: >-
+      The LaTeX source of the paper (arXiv v1, identical to the COLT submission) is vendored in
+      this repository under `source/`. The formalization is driven by a blueprint
+      (`blueprint/src/`, written by Claude with the formalizer's review) that decomposes the
+      paper's proofs into small lemmas, corrects its errors and imprecisions (see
+      `notes/paper-errata.md`: a false bound on the binary divergence and Condition A stated
+      with the wrong horizon in Theorem 3, a bonus with the wrong rate, off-by-one clips, a
+      false Lemma 29, the "in particular" simplification of Theorem 4, the non-full tree) and
+      fills the steps the paper leaves to references; the blueprint is a derived artifact of
+      this project, not an independent source. The formalizer is not an author of the paper.
+
+related_formalizations: []   # no earlier or parallel formalization of this paper is known
+
+# Best-policy identification in finite-horizon MDPs, risk-sensitive reinforcement learning
+# (entropic risk measure), sample complexity lower and upper bounds.
+classification:
+  arxiv: ["cs.LG", "stat.ML"]
+  msc2020:
+    - "68T05"   # learning and adaptive systems
+    - "90C40"   # Markov and semi-Markov decision processes
+    - "62L05"   # sequential statistical design
+    - "62L10"   # sequential statistical analysis
+
+status:
+  scope: >-
+    Phase 1 (statements, 2026-09-16). The headline results of the paper are stated in Lean, each
+    as a `sorry`-ed theorem, over definitions written in library generality
+    (`Essakine2026Tight/LeanMachineLearning/ReinforcementLearning/MDP/`: finite-horizon MDPs on
+    top of LML's `MDP`, entropic values, empirical models; `Essakine2026Tight/EV2026/`: the
+    exploration rates, the Entropic-BPI algorithm, the run quantities and events, the
+    constants):
+
+    Theorem 3 (`Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime`,
+    blueprint `thm:lower_bound`): for `S ≥ 6`, `A ≥ 2`, `H ≥ 3 d`, `β ≠ 0`, `δ ∈ (0, 1/16]` and
+    `ε` satisfying Condition A, there are a reward function `r₀` with values in `[0, 1]`, an MDP
+    `M₀` with reward function `r₀` and an initial state `s₁` such that every algorithm which is
+    `(ε, δ)`-PAC for the class of MDPs with reward function `r₀` uses, in every run on `M₀`, at
+    least `(1/5000) (e^{|β| G_max} - 1)² e^{-|β| G_max} e^{2 min(β, 0) ε} S A H log(1/δ) /
+    (e^{|β| ε} - 1)²` episodes in expectation. Condition A is stated for the effective horizon
+    `H - ⌊H/3⌋ - d` of the hard instance and with a margin (the paper's condition does not make
+    its construction admissible, and its bound on the binary divergence is false), and the
+    paper's constant `1/1650` is replaced by `1/5000` (the corrected proof gives `1/3456`).
+    Theorem 4, PAC (`Essakine2026Tight.isEntropicPAC_entropicBPI`, `thm:upper_bound_pac`): for
+    every reward function `r` with values in `[0, 1]`, `β ≠ 0`, `δ ∈ (0, 1)` and
+    `ε ∈ (0, 2/(|β| H S)]`, Entropic-BPI is `(ε, δ)`-PAC on the class of MDPs with reward
+    function `r`.
+    Theorem 4, sample complexity (`Essakine2026Tight.probReal_stoppingTime_entropicBPI_le_ge`,
+    `thm:upper_bound_complexity`): under the same hypotheses, in every run on an MDP with
+    reward function `r`, with probability at least `1 - δ` the number of episodes is at most
+    `upperBound S A H β ε δ G_max`, the two-term bound obtained by solving the recursive
+    inequality of the analysis with the corrected Lemma 29 (the paper's "in particular"
+    single-term form assumes that the first term dominates, and its Lemma 29 is false as
+    stated), with generous absolute constants; its asymptotic form is the paper's
+    `Õ((e^{|β|ε} - 1)⁻² (e^{|β| G_max} - 1)² e^{-|β| G_max} S A H)`. The bonus of Entropic-BPI
+    carries the KL rate in its third term (the paper's `α*` there does not suffice).
+
+    The PAC property is LML's `IdentAlg.IsPAC` (a property of the law of the output) for the
+    class of MDPs with a known deterministic reward function and arbitrary transition kernels.
+    Deviations from the paper (corrected clips and ranges, random predictable pseudo-counts,
+    step-dependent Bernstein ranges, the constants) are listed in `blueprint/src/content.tex`
+    and `notes/blueprint-outline.md`.
+
+    The blueprint (11 chapters, `blueprint/src/chapters/`) is complete for phase 2: every
+    headline theorem and every definition of the statements carries its `\lean` tag
+    (`lake exe checkdecls blueprint/lean_decls` passes), the paper's proofs are decomposed into
+    labelled lemmas with complete proof sketches, and the errors found in the paper are listed
+    in `notes/paper-errata.md`.
+
+    Phase 2 (proofs) has not started.
+  sorry_count: 3
+  sorry_in_definitions: 0

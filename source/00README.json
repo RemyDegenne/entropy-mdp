@@ -1,0 +1,25 @@
+{
+   "sources" : [
+      {
+         "usage" : "toplevel",
+         "filename" : "colt_main_draft.tex"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "jmlr.cls"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "jmlrutils.sty"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "refs2.bib"
+      }
+   ],
+   "spec_version" : 1,
+   "texlive_version" : "2025",
+   "process" : {
+      "compiler" : "pdflatex"
+   }
+}

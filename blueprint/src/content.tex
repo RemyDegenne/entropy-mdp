@@ -1,0 +1,163 @@
+% In this file you should put the actual content of the blueprint.
+% It will be used both by the web and the print version.
+% It should *not* include the \begin{document}
+%
+% If you want to split the blueprint content into several files then
+% the current file can be a simple sequence of \input. Otherwise It
+% can start with a \section or \chapter for instance.
+
+\part{Tight sample complexity bounds for entropic best policy identification}
+\label{part:main}
+
+\textbf{Overview}
+
+This blueprint guides the Lean formalization of the paper
+\emph{Tight Sample Complexity Bounds for Entropic Best Policy Identification} by Amer Essakine
+and Claire Vernade (COLT 2026, \cite{essakine2026tight}). The paper studies best-policy
+identification in finite-horizon tabular MDPs under the entropic risk measure
+$V^\pi_h(s) = \beta^{-1}\log \E[\exp(\beta \sum_{i \ge h} r_i(S_i, A_i)) \mid S_h = s]$, in the
+online (forward) interaction model: the learner plays one deterministic policy per episode from
+a fixed initial state $s_1$, observes the states of the episode (the rewards are known and
+deterministic), and stops after a random number $\tau$ of episodes to output a policy
+$\hat\pi$ which must be $\eps$-optimal with probability at least $1 - \delta$. Its results are:
+\begin{enumerate}
+  \item[(i)] a lower bound (Theorem~\ref{thm:lower_bound}, the paper's Theorem~3): on a hard
+        instance $\mathcal M_0$, every $(\eps,\delta)$-PAC algorithm uses in expectation
+        $\Omega\big(\frac{(e^{|\beta| \Gmax(\mathcal M_0)} - 1)^2}{e^{|\beta| \Gmax(\mathcal M_0)}}
+        \frac{S A H}{(e^{|\beta|\eps} - 1)^2} \log\frac1\delta\big)$ episodes, where
+        $\Gmax(\mathcal M)$ is the maximal achievable return;
+  \item[(ii)] the algorithm Entropic-BPI (KL-based exploration bonuses in the exponential
+        space and an entropic stopping rule) and its matching upper bound
+        (Theorems~\ref{thm:upper_bound_pac} and~\ref{thm:upper_bound_complexity}, the paper's
+        Theorem~4): it is $(\eps,\delta)$-PAC and stops after
+        $\tilde O\big(\frac{e^{2|\beta|\eps}}{(e^{|\beta|\eps} - 1)^2}
+        \frac{(e^{|\beta| \Gmax(\mathcal M)} - 1)^2}{e^{|\beta| \Gmax(\mathcal M)}} S A H\big)$
+        episodes with probability at least $1 - \delta$, closing the $e^{|\beta| H}$ gap of the
+        previous bounds.
+\end{enumerate}
+
+\textbf{Goals of the formalization.} Two goals drive the organization of this document.
+First, formalize the two main results of the paper. Second, build a reusable library, to be
+contributed to \emph{Lean Machine Learning} (LML) and Mathlib: finite-horizon MDPs and their
+values (on top of LML's MDPs and its algorithm--environment framework), entropic values,
+empirical models, identification algorithms for episodic environments, the change of measure at
+a stopping time, and the concentration inequalities (Sanov, a Bernoulli maximal inequality, the
+self-normalized Bernstein inequality, the KL-Bernstein inequality) are introduced in the
+generality in which they are useful, even when the paper only needs a special case.
+
+\textbf{Deviations from the paper.} The blueprint departs from the paper whenever the paper's
+statement is imprecise or a different route is simpler to formalize while giving the same (or
+a stronger) statement; every such point is recorded in a remark next to the statement it
+concerns. The main ones:
+\begin{itemize}
+  \item Never-visited state-action pairs get the trivial bounds (the paper's $\alpha(0)/0 = \infty$),
+        the greedy policy for $\beta < 0$ is $\argmin_a \Ul$ (as in the appendix), and the
+        clips of the optimistic backups and of the certificate at step $h$ are $e^{\beta(H+1-h)}$
+        (the ranges of $U^*_h$; the paper's exponents are off by one).
+  \item The third term of the exploration bonus carries the KL rate $\alpha$ (as in the
+        statement of the paper's Lemma~7), not $\alpha^*$: with $\alpha^*$ the certificate
+        lemmas fail (Chapter~\ref{chap:algorithm}, Definition~\ref{def:bonus}).
+  \item The Bernstein concentration event uses step-dependent ranges and a non-strict
+        inequality (with the paper's strict one, the event is empty for $\beta < 0$), the
+        pseudo-counts are the random predictable sums of conditional visit probabilities, and
+        the rate terms are $\min\{\alpha(n)/n, 1\}$ with value $1$ for unvisited pairs; the
+        additive term of the certificate recursion uses $e^{\beta(H+1-h)}$ (resp. $1$ for
+        $\beta < 0$) so that it dominates the clip of unvisited pairs. The KL event is obtained
+        from a time-uniform mixture-martingale bound rather than from Sanov's bound and a union
+        bound over $n$ (which diverges with the paper's rate).
+  \item The paper's Lemma~27 needs $\alpha \ge \alpha^{\mathrm{cnt}} \ge 1$, the counting
+        argument has constant $16$ (not $3$), and the paper's Lemma~29 is false as stated: the
+        factor $(C + D)$ in its logarithm must be squared (Chapter~\ref{chap:pre_analysis}).
+  \item Theorem~4 is stated in its detailed appendix form, with its two conclusions as two
+        separate statements, and with the two-term bound that the proof actually gives (the
+        paper's ``in particular'' simplification assumes that the first term dominates); its
+        absolute constants are generous so that the formal proof has slack, and its
+        hypothesis $\eps \le 2/(|\beta| H S)$ is kept although the proof does not use it.
+  \item The PAC property is a property of the algorithm (LML's \texttt{IdentAlg.IsPAC}) for the
+        class of MDPs with the known reward function of the algorithm; Theorem~3 assumes PAC
+        for the class with the reward function of the hard instances (a stronger theorem).
+  \item The hard instance of Theorem~3 uses a possibly non-full tree (the first $S-3$ nodes of
+        the $A$-ary tree in breadth-first order), which the paper leaves to
+        \cite{domingues2021episodic}; the leaves are the childless nodes. Condition~A is
+        stated for the effective horizon $H' = H - \lfloor H/3 \rfloor - d$ of the construction
+        (the paper's condition with $H$ does not imply admissibility) and with a margin
+        $p_+ \le (1 + p_-)/2$: the paper's bound on the binary divergence $\klbin(p_-, p_+)$
+        is false near the boundary of its condition. The gap $\Delta = p_+ - p_-$ is chosen so
+        that non-realizing policies are strictly more than $\eps$-suboptimal. The constant
+        $1/1650$ becomes $1/5000$ (the proof gives $1/3456$).
+  \item The change of measure (Lemma~17 of the paper) is proved in LML generality for two
+        stationary environments and any stopping time of the history filtration, and applied
+        to the episode environment, whose actions are policies.
+  \item Lemma~7 (and~12) is stated without a sign assumption on $\Zt - Z^*$, the optimism lemma
+        being proved jointly by backward induction; the $\eps$-optimality at stopping for
+        $\beta < 0$ is proved through $Z^\pi_1 \ge Z^*_1 \ge \Zl_1$ (the paper's argument uses
+        an unproved lower bound on $Z^\pi_1$ and has a sign typo).
+\end{itemize}
+
+\textbf{Reading guide.}
+Part~\ref{part:main} follows the paper: Chapter~\ref{chap:mdp} sets up the model (finite-horizon
+MDPs, entropic values, the episode environment and PAC identification),
+Chapter~\ref{chap:empirical} the empirical transitions and the concentration events,
+Chapter~\ref{chap:algorithm} the Entropic-BPI algorithm, Chapters~\ref{chap:analysis_pos}
+and~\ref{chap:analysis_neg} its analysis for $\beta > 0$ and $\beta < 0$,
+Chapter~\ref{chap:sample_complexity} the sample complexity theorem and
+Chapter~\ref{chap:lower_bound} the lower bound.
+Part~\ref{part:prereq} collects the prerequisites that are not in Mathlib or LML, decomposed
+into small lemmas: finite-horizon MDP theory (occupancy measures, unrolling of recursions,
+entropic variances), concentration inequalities, the change of measure, and elementary
+inequalities.
+
+\textbf{Conventions.} The paper's steps are $h = 1, \dots, H$ with the terminal step $H + 1$;
+the blueprint keeps this indexing, and the Lean remarks give the $0$-indexed translation
+(a step-$h$ quantity of the paper is at Lean index $h - 1$, and the paper's
+$e^{\beta(H - h)}$ is $e^{\beta k}$ with $k = H - 1 - h$ the number of steps after the Lean
+step $h$). Episodes are indexed by $t = 0, 1, \dots$ (LML rounds): $t$ is the number of
+episodes already played and $\pi^{t+1}$ the policy computed from them. All random objects live
+on a probability space $(\Omega, \mathcal F, \Prob)$; $\Prob^\pi_{(s,h)}$, $\E^\pi_{(s,h)}$ denote the
+law of the trajectory of the policy $\pi$ started at the state $s$ at step $h$, and
+$\E^\pi := \E^\pi_{(s_1, 1)}$.
+
+\textbf{Status.} The formalization proceeds in two phases. Phase~1 states the headline results
+of the paper in Lean, over definitions written in library generality: each such statement
+carries a \verb+\lean+ tag naming its Lean declaration and is marked as formalized, with its
+proof left to phase~2. Each headline statement is also a standalone challenge file for
+\texttt{leanprover/comparator} (directory \texttt{comparator/}). Phase~2 will formalize the
+proofs, following this document.
+
+\textbf{Blueprint author.} Rémy Degenne. Anyone is welcome to contribute!
+
+\input{chapters/mdp.tex}
+\input{chapters/empirical.tex}
+\input{chapters/algorithm.tex}
+\input{chapters/analysis_pos.tex}
+\input{chapters/analysis_neg.tex}
+\input{chapters/sample_complexity.tex}
+\input{chapters/lower_bound.tex}
+
+\part{Prerequisites to be added to Mathlib and LML}
+\label{part:prereq}
+
+\textbf{Overview}
+
+The proofs of Part~\ref{part:main} rely on results of probability theory and information theory
+that are standard but not yet available in Mathlib or in LML. This part develops them, at the
+level of generality of a library: each chapter is a self-contained area that can be formalized
+(and contributed upstream) independently of the rest.
+\begin{itemize}
+  \item Chapter~\ref{chap:pre_mdp}: finite-horizon MDPs: occupancy measures, unrolling of
+        recursive inequalities along trajectories, entropic variances and their Bellman
+        recursion, sampling at the visits of a state-action pair.
+  \item Chapter~\ref{chap:pre_concentration}: Sanov's high-probability bound, a maximal
+        inequality for Bernoulli sequences, the self-normalized Bernstein inequality, the
+        KL-Bernstein inequality and the transportation of variances.
+  \item Chapter~\ref{chap:pre_info}: the binary relative entropy and the change of measure at
+        a stopping time for algorithm-environment sequences.
+  \item Chapter~\ref{chap:pre_analysis}: elementary inequalities (Bhatia--Davis, a normalized
+        variance bound for exponential transforms, a logarithmic sum bound, a self-bounding
+        inequality).
+\end{itemize}
+
+\input{chapters/prereq_mdp.tex}
+\input{chapters/prereq_concentration.tex}
+\input{chapters/prereq_info.tex}
+\input{chapters/prereq_analysis.tex}

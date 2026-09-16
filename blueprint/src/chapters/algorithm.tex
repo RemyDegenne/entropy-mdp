@@ -1,0 +1,455 @@
+\chapter{The Entropic-BPI algorithm}
+\label{chap:algorithm}
+
+This chapter defines the algorithm of the paper (Section~4, Algorithm~1, and the equations of
+Appendix~B: (bonus positive), (optimism\_equation\_positive), (width\_certificate\_positive)
+and their negative versions) as an identification algorithm in the episode environment, and
+the auxiliary ``ring'' quantities of its analysis. The algorithm knows the reward function
+$r$ and the parameters $\beta \ne 0$, $\delta \in (0, 1)$, $\eps > 0$, $s_1$; the transition
+kernels are unknown to it.
+
+\textbf{Standing setting and abbreviations.} $r$ is a reward function with values in $[0, 1]$
+(Definition~\ref{def:reward_fn}), $\beta \ne 0$, $\delta \in (0, 1)$, $\eps > 0$ and $s_1 \in \Ss$.
+All the quantities of Sections~\ref{sec:algorithm_backups}--\ref{sec:algorithm_alg} are
+computed after $t$ episodes from the history $\hist_t$ of the first $t$ episodes: they only
+depend on the counts $n_h^t(s, a)$ (Definition~\ref{def:counts}), the empirical transitions
+$\phat_h^t(\cdot \mid s, a)$ (Definition~\ref{def:emp_trans}), the rates $\alpha, \alpha^*$ of
+Definition~\ref{def:rates} and $r$; when $t$, $h$ and $(s, a)$ are clear we abbreviate
+$n := n_h^t(s, a)$, $\phat := \phat_h^t(\cdot \mid s, a)$ and write $\phat g$ for
+$(\phat_h^t g)(s, a)$. The ring quantities of Section~\ref{sec:algorithm_ring} also use the true
+kernels $p_h$ and exist only for the analysis.
+
+\textbf{Lean remark.} Every quantity of the chapter is defined as a function of a history
+\texttt{hist : Hist Unit (Policy S A H) (Traj S H) t} (file \texttt{Essakine2026Tight/EV2026/Algorithm.lean},
+namespace \texttt{Essakine2026Tight}) and evaluated on a run $(X, Y)$ through
+\texttt{histAt X Y t ω} (\texttt{Run.lean}: \texttt{UtildeAt}, \texttt{UlowerAt},
+\texttt{ZtildeAt}, \texttt{ZlowerAt}, \texttt{bonusAt}, \texttt{greedyAt}, \texttt{certAt},
+\texttt{ringZAt}, \texttt{ringUAt}). The backward recursions are indexed by the number
+\texttt{j : ℕ} of steps to the end: \texttt{j = 0} is the terminal step $H + 1$ and the paper's
+step $h$ has \texttt{j = H + 1 - h}; the Lean step of a pair is \texttt{stepOf H k : Fin H}, the
+step with \texttt{k = j - 1 = H - h} steps after it, and the values at the step \texttt{j} are
+computed from the values at \texttt{j - 1} by one application of the one-step functions
+\texttt{bonus}, \texttt{stepU}, \texttt{ringUAux} (which take the step data
+\texttt{k n r phat Zt Zl} as arguments and are independent of histories).
+
+\section{Bonus and backups}
+\label{sec:algorithm_backups}
+
+\begin{definition}[Exploration bonus]\label{def:bonus}
+\lean{Essakine2026Tight.bonus, Essakine2026Tight.bonusAt}\leanok
+\uses{def:counts, def:emp_trans, def:rates, lem:emp_trans_simplex}
+Let $t \ge 0$, $h \le H$ and $(s, a)$ with $n = n_h^t(s, a) \ge 1$, and let $\Zt^t_{h+1}, \Zl^t_{h+1} : \Ss \to \R$
+be the optimistic and pessimistic values of the next step (Definition~\ref{def:backups}). The
+\emph{bonus} is, for $\beta > 0$ (eq.~(bonus positive) of the paper),
+\[
+  b_h^t(s, a) := 2\sqrt2\, \sqrt{\Var_{\phat}\big(\Zt^t_{h+1}\big)\, \frac{\alpha^*(n)}{n}}
+  + 5\, e^{\beta(H - h)}\, \frac{\alpha(n)}{n}
+  + 4 H\, e^{\beta(H - h)}\, \frac{\alpha(n)}{n} ,
+\]
+and for $\beta < 0$ (eq.~(bonus\_negative)),
+\[
+  b_h^t(s, a) := 2\sqrt2\, \sqrt{\Var_{\phat}\big(\Zl^t_{h+1}\big)\, \frac{\alpha^*(n)}{n}}
+  + 5\, \big(1 - e^{\beta(H - h)}\big)\, \frac{\alpha(n)}{n}
+  + 4 H\, \big(1 - e^{\beta(H - h)}\big)\, \frac{\alpha(n)}{n} ,
+\]
+where $\Var_{\phat}(g) = \Var_{\phat_h^t}(g)(s, a)$ is the variance under the empirical
+transitions (Definition~\ref{def:emp_trans}). The bonus is not defined (and never used) for a
+pair with $n_h^t(s, a) = 0$. The third term carries the KL rate $\alpha$ (as in the statement of
+the paper's Lemma~7), not the Bernstein rate $\alpha^*$ of the paper's equations
+(bonus positive) and (bonus\_negative): with $\alpha^*$, which can be as small as $\alpha/S$,
+the certificate lemmas (Lemmas~\ref{lem:certificate_pos} and~\ref{lem:certificate_neg}) fail
+(Remark~\ref{rem:pos_constants_bonus}).
+\end{definition}
+
+\textbf{Lean remark.} \texttt{bonus nA H β δ k n phat Zt Zl : ℝ} with \texttt{k = H - h} the
+number of steps after the step (so $e^{\beta(H - h)}$ is \texttt{Real.exp (β * k)}),
+\texttt{nA = Fintype.card A}, the rates applied with \texttt{Fintype.card S}, and
+\texttt{if 0 < β then … else …} selecting the sign; \texttt{vecVar phat Zt} is $\Var_{\phat}(\Zt)$.
+The function is total in Lean and takes the value $0$ at \texttt{n = 0} (Lean's $\alpha(0)/0 = 0$);
+this value never appears in a statement, since every statement about the bonus assumes
+\texttt{0 < n} (deviation~1). The constants $2\sqrt2$, $5$, $4H$ are those of Lemma~7 of the
+paper (Lemma~\ref{lem:concentration_pos}), of which the bonus is by definition the right-hand
+side minus the last term; they are verified there.
+
+\begin{definition}[Optimistic and pessimistic backups]\label{def:backups}
+\lean{Essakine2026Tight.stepU, Essakine2026Tight.optZStep, Essakine2026Tight.optZ, Essakine2026Tight.stepUAt, Essakine2026Tight.ZtildeAt, Essakine2026Tight.ZlowerAt, Essakine2026Tight.UtildeAt, Essakine2026Tight.UlowerAt}\leanok
+\uses{def:bonus, def:counts, def:emp_trans, def:reward_fn}
+Let $t \ge 0$. The \emph{optimistic and pessimistic exponential values} $\Zt^t_h, \Zl^t_h : \Ss \to \R$
+($h \le H + 1$) and \emph{backups} $\Ut^t_h, \Ul^t_h : \Ss \times \As \to \R$ ($h \le H$) are defined by the
+backward recursion $\Zt^t_{H+1} := 1$, $\Zl^t_{H+1} := 1$ and, for $h = H, \dots, 1$, with the
+\emph{clip} $c_h := e^{\beta(H + 1 - h)}$:
+
+\emph{Case $\beta > 0$} (eq.~(optimism\_equation\_positive)). For a pair with $n = n_h^t(s, a) \ge 1$
+and $b = b_h^t(s, a)$,
+\begin{align*}
+  \Ut^t_h(s, a) &:= \min\Big\{ c_h,\ e^{\beta r_h(s, a)} \Big[ \phat \Zt^t_{h+1} + b + \frac1H\, \phat\big(\Zt^t_{h+1} - \Zl^t_{h+1}\big) \Big] \Big\}, \\
+  \Ul^t_h(s, a) &:= \max\Big\{ 1,\ e^{\beta r_h(s, a)} \Big[ \phat \Zl^t_{h+1} - b - \frac1H\, \phat\big(\Zt^t_{h+1} - \Zl^t_{h+1}\big) \Big] \Big\},
+\end{align*}
+and for a never-visited pair ($n_h^t(s, a) = 0$) $\Ut^t_h(s, a) := c_h$, $\Ul^t_h(s, a) := 1$; then
+$\Zt^t_h(s) := \max_{a} \Ut^t_h(s, a)$ and $\Zl^t_h(s) := \max_a \Ul^t_h(s, a)$.
+
+\emph{Case $\beta < 0$} (eq.~(optimism\_equation\_negative)). The clips are exchanged: for $n \ge 1$,
+\begin{align*}
+  \Ut^t_h(s, a) &:= \min\Big\{ 1,\ e^{\beta r_h(s, a)} \Big[ \phat \Zt^t_{h+1} + b + \frac1H\, \phat\big(\Zt^t_{h+1} - \Zl^t_{h+1}\big) \Big] \Big\}, \\
+  \Ul^t_h(s, a) &:= \max\Big\{ c_h,\ e^{\beta r_h(s, a)} \Big[ \phat \Zl^t_{h+1} - b - \frac1H\, \phat\big(\Zt^t_{h+1} - \Zl^t_{h+1}\big) \Big] \Big\},
+\end{align*}
+for a never-visited pair $\Ut^t_h(s, a) := 1$, $\Ul^t_h(s, a) := c_h$; and
+$\Zt^t_h(s) := \min_a \Ut^t_h(s, a)$, $\Zl^t_h(s) := \min_a \Ul^t_h(s, a)$.
+\end{definition}
+
+\begin{remark}[Deviations 1 and 3: unvisited pairs and the clips]\label{rem:algorithm_clips}
+(a) The paper handles never-visited pairs through the convention $\alpha(0)/0 = \infty$, which
+makes the bonus infinite and the minimum/maximum equal to the clips; the blueprint defines the
+backups of such pairs directly as the clips, so that Lean's $\alpha(0)/0 = 0$ never enters.
+(b) The paper writes the optimistic clip as $e^{\beta(H - h - 1)}$ (both in Section~4 and in
+eq.~(optimism\_equation\_positive)) and, for $\beta < 0$, the pessimistic clip as
+$e^{\beta(H - h - 1)}$. With the paper's $1$-indexed steps this is off by two: the target of the
+optimistic backup is $U^*_h$, which ranges in $[1, e^{\beta(H + 1 - h)}]$ for $\beta > 0$
+(Lemma~\ref{lem:opt_exp_value_range}), and optimism ($U^*_h \le \Ut^t_h$, Lemma~\ref{lem:optimism_pos})
+forces the clip to dominate $e^{\beta(H + 1 - h)}$: at the last step $h = H$ the paper's clip
+$e^{-\beta} < 1 \le U^*_H(s, a) = e^{\beta r_H(s, a)}$ would break optimism for every pair. The
+recursion is consistent with the clip $c_h = e^{\beta(H + 1 - h)}$: the bracket of $\Ut^t_h$ is
+at most $e^{\beta}\cdot e^{\beta(H - h)}$ plus the bonus terms, and $e^{\beta(H + 1 - h)}$ is the
+exact range of the values it approximates (Lemma~\ref{lem:backups_range}). In Lean the clip is
+\texttt{Real.exp (β * (k + 1))} for \texttt{k = H - h} steps after the step (the paper's
+exponent $H - h - 1$ is $k - 1$).
+\end{remark}
+
+\textbf{Lean remark.} \texttt{stepU nA H β δ k n r phat Zt Zl : ℝ × ℝ} computes the pair
+$(\Ut, \Ul)(s, a)$ of one pair from its step data, with the clips
+\texttt{up := if 0 < β then Real.exp (β * (k + 1)) else 1},
+\texttt{low := if 0 < β then 1 else Real.exp (β * (k + 1))} and \texttt{if n = 0 then (up, low) else (min up …, max low …)};
+\texttt{optZ r β δ hist : ℕ → (S → ℝ) × (S → ℝ)} is the backward recursion
+($\Zt, \Zl$ at the step with \texttt{j} steps to the end; \texttt{optZ 0 = (1, 1)}, and
+\texttt{optZ (k + 1)} takes the \texttt{max} (\texttt{0 < β}) or \texttt{min} over
+\texttt{A} of the \texttt{stepU} of the step \texttt{stepOf H k}); \texttt{stepUAt r β δ hist h s a}
+is the pair of backups at the step \texttt{h : Fin H}. The finite maxima and minima are
+\texttt{Finset.univ.sup'}/\texttt{inf'} or LML's \texttt{Function.max}/\texttt{min} on a
+finite nonempty type.
+
+\begin{lemma}[Ranges and order of the backups]\label{lem:backups_range}
+\uses{def:backups, def:bonus, lem:rates_props, lem:emp_trans_simplex}
+For every $t$, $h \le H$, $(s, a)$ with $n_h^t(s, a) \ge 1$: $b_h^t(s, a) \ge 0$. For every $t$,
+$h \le H$ and $(s, a)$:
+\begin{enumerate}
+  \item[(i)] if $\beta > 0$: $1 \le \Ul^t_h(s, a) \le \Ut^t_h(s, a) \le e^{\beta(H + 1 - h)}$;
+  \item[(ii)] if $\beta < 0$: $e^{\beta(H + 1 - h)} \le \Ul^t_h(s, a) \le \Ut^t_h(s, a) \le 1$;
+\end{enumerate}
+and for every $h \le H + 1$ and $s$, the same bounds hold for $\Zl^t_h(s) \le \Zt^t_h(s)$:
+$1 \le \Zl^t_h(s) \le \Zt^t_h(s) \le e^{\beta(H + 1 - h)}$ if $\beta > 0$, and
+$e^{\beta(H + 1 - h)} \le \Zl^t_h(s) \le \Zt^t_h(s) \le 1$ if $\beta < 0$ (at $h = H + 1$ all
+values are $1$). In particular $\Zt^t_{h+1}$ and $\Zl^t_{h+1}$ take values in $[1, e^{\beta(H - h)}]$
+($\beta > 0$), resp.\ $[e^{\beta(H - h)}, 1]$ ($\beta < 0$), and $\Zt^t_h, \Zl^t_h > 0$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:backups, def:bonus, lem:rates_props, lem:emp_trans_simplex}
+Fix $t$. We prove by backward induction on $h = H + 1, H, \dots, 1$ the statement $P(h)$:
+\emph{for all $s$, $\Zl^t_h(s) \le \Zt^t_h(s)$ and both lie in $I_h := [\min(1, e^{\beta(H + 1 - h)}), \max(1, e^{\beta(H + 1 - h)})]$},
+proving along the way the claims about $b$, $\Ul$ and $\Ut$ at the step $h$. $P(H + 1)$: both
+values are $1 \in I_{H+1} = \{1\}$. Assume $P(h + 1)$ for some $h \le H$ and fix $(s, a)$.
+
+\emph{The bonus is nonnegative.} For $n \ge 1$: $\Var_{\phat}(\cdot) \ge 0$ (Lemma~\ref{lem:emp_trans_simplex}),
+$\alpha(n), \alpha^*(n) \ge 0$ (Lemma~\ref{lem:rates_props}), $e^{\beta(H - h)} > 0$, and for $\beta < 0$
+also $1 - e^{\beta(H - h)} \ge 0$; so $b_h^t(s, a)$ is a sum of nonnegative terms.
+
+\emph{The correction term is nonnegative.} $w := \frac1H \phat(\Zt^t_{h+1} - \Zl^t_{h+1}) \ge 0$ by
+$P(h + 1)$ and the positivity of $\phat$ (Lemma~\ref{lem:emp_trans_simplex}).
+
+\emph{Case $\beta > 0$.} Put $c := e^{\beta(H + 1 - h)} \ge 1$ (as $H + 1 - h \ge 1$). If $n = 0$,
+$\Ul = 1 \le c = \Ut$. If $n \ge 1$, let $X := e^{\beta r_h(s, a)}[\phat\Zt^t_{h+1} + b + w]$ and
+$Y := e^{\beta r_h(s, a)}[\phat\Zl^t_{h+1} - b - w]$, so that $\Ut = \min\{c, X\}$, $\Ul = \max\{1, Y\}$.
+Then: $X \ge 1$, since $e^{\beta r} \ge 1$, $\phat \Zt^t_{h+1} \ge 1$ (by $P(h + 1)$, $\Zt^t_{h+1} \ge 1$,
+and $\phat$ preserves lower bounds) and $b, w \ge 0$; $Y \le c$, since
+$Y \le e^{\beta r_h(s, a)} \phat \Zl^t_{h+1} \le e^{\beta} e^{\beta(H - h)} = c$ (as $r \le 1$ and
+$\Zl^t_{h+1} \le \Zt^t_{h+1} \le e^{\beta(H - h)}$); and $Y \le X$ (as $\Zl^t_{h+1} \le \Zt^t_{h+1}$ and
+$b, w \ge 0$). Hence $\max\{1, Y\} \le \min\{c, X\}$: indeed $1 \le c$, $1 \le X$, $Y \le c$ and
+$Y \le X$. So $1 \le \Ul \le \Ut \le c$. Taking the maximum over $a$ of both sides preserves
+the order and the bounds: $1 \le \Zl^t_h(s) = \max_a \Ul \le \max_a \Ut = \Zt^t_h(s) \le c$, which is $P(h)$.
+
+\emph{Case $\beta < 0$.} Put $c := e^{\beta(H + 1 - h)} \le 1$. If $n = 0$, $\Ul = c \le 1 = \Ut$. If
+$n \ge 1$, with $X, Y$ as above, $\Ut = \min\{1, X\}$ and $\Ul = \max\{c, Y\}$. Then $X \ge c$: since
+$\beta < 0$ and $r \le 1$, $e^{\beta r} \ge e^{\beta}$, and $\phat\Zt^t_{h+1} \ge e^{\beta(H - h)}$ by
+$P(h + 1)$, so $X \ge e^{\beta} e^{\beta(H - h)} + 0 = c$; $Y \le 1$: $e^{\beta r} \le 1$ and
+$\phat\Zl^t_{h+1} \le 1$; $Y \le X$ as before; and $c \le 1$. Hence $c \le \Ul \le \Ut \le 1$, and the
+minimum over $a$ gives $P(h)$.
+
+The final claims restate $P(h + 1)$ and positivity of the lower bounds.
+\end{proof}
+
+\textbf{Lean remark.} The induction is on \texttt{j} for \texttt{optZ r β δ hist j}
+(\texttt{optZ\_le}, \texttt{optZ\_mem\_Icc}), and the one-step statement is a lemma about
+\texttt{stepU} with hypotheses on \texttt{Zt}, \texttt{Zl} (\texttt{stepU\_fst\_le},
+\texttt{stepU\_mem\_Icc}); the bonus nonnegativity is \texttt{bonus\_nonneg} (for
+\texttt{0 < n}, or unconditionally, the value at \texttt{n = 0} being $0$).
+
+\section{Greedy policy and certificate}
+\label{sec:algorithm_certificate}
+
+\begin{definition}[Greedy policy]\label{def:greedy}
+\lean{Essakine2026Tight.greedy, Essakine2026Tight.greedyAt}\leanok
+\uses{def:backups}
+The policy played at the episode $t + 1$ is the \emph{greedy policy} of the history $\hist_t$:
+\[
+  \pi^{t+1}_h(s) := \argmax_{a \in \As} \Ut^t_h(s, a) \quad (\beta > 0),
+  \qquad
+  \pi^{t+1}_h(s) := \argmin_{a \in \As} \Ul^t_h(s, a) \quad (\beta < 0),
+\]
+for $h \le H$ and $s \in \Ss$, with a fixed tie-breaking rule. Consequently
+$\Zt^t_h(s) = \Ut^t_h(s, \pi^{t+1}_h(s))$ for $\beta > 0$ and $\Zl^t_h(s) = \Ul^t_h(s, \pi^{t+1}_h(s))$ for
+$\beta < 0$ (Definition~\ref{def:backups}).
+\end{definition}
+
+\begin{remark}[Deviation 2: the greedy policy for $\beta < 0$]\label{rem:algorithm_greedy_neg}
+The algorithm box of the paper (Section~4) writes $\argmin_a \Ut^t_h(s, a)$ for $\beta < 0$, while
+its Appendix~B.2 (after eq.~(optimism\_equation\_negative)) defines $\pi^{t+1}_h(s) = \argmin_a \Ul^t_h(s, a)$
+and its analysis uses the latter: the stopping rule compares the certificate to $\Zl^t_1(s_1)$
+and Lemma~16 (Lemma~\ref{lem:certificate_neg}) bounds $\Ur - \Ul$ at the greedy action, both
+of which need $\Zl^t_h(s) = \Ul^t_h(s, \pi^{t+1}_h(s))$. For $\beta < 0$ the pessimistic $\Ul$ is
+the \emph{optimistic} bound on the entropic value $Q^*$ (the exponential is decreasing), so
+$\argmin_a \Ul$ is the optimistic greedy choice; this is the definition adopted.
+\end{remark}
+
+\textbf{Lean remark.} \texttt{greedy r β δ hist : Policy S A H := fun h s ↦ if 0 < β then argmax (fun a ↦ (stepUAt r β δ hist h s a).1) else argmin (fun a ↦ (stepUAt r β δ hist h s a).2)}
+with LML's \texttt{argmax}/\texttt{argmin} on a finite nonempty type (a definite choice of a
+maximizer, \texttt{le\_argmax}); \texttt{greedyAt r β δ X Y t ω := greedy r β δ (histAt X Y t ω)}.
+The map \texttt{hist ↦ greedy r β δ hist} is measurable because the history type is countable
+(\texttt{measurable\_of\_countable}).
+
+\begin{definition}[Certificate]\label{def:certificate}
+\lean{Essakine2026Tight.certStep, Essakine2026Tight.cert, Essakine2026Tight.certAt}\leanok
+\uses{def:backups, def:bonus, def:greedy}
+Let $t \ge 0$ and $\pi := \pi^{t+1}$. The \emph{certificate} of $\pi$ is the family of functions
+$(\pi_h \cert^t_h) : \Ss \to \R$, $h \le H + 1$, defined by the backward recursion
+$\cert^t_{H+1} := 0$ and, for $h = H, \dots, 1$ and $s \in \Ss$, with $a := \pi_h(s)$,
+$n := n_h^t(s, a)$, $\phat := \phat_h^t(\cdot \mid s, a)$ and the clip
+\[
+  c_h := e^{\beta(H + 1 - h)} \ (\beta > 0), \qquad c_h := 1 \ (\beta < 0):
+\]
+\[
+  (\pi_h \cert^t_h)(s) := \cert^t_h(s, a),
+  \qquad
+  \cert^t_h(s, a) :=
+  \begin{cases}
+    \min\Big\{ c_h,\ e^{\beta r_h(s, a)} \Big[ 3\, b_h^t(s, a) + \Big(1 + \frac3H\Big)\, \phat\,\big(\pi_{h+1}\cert^t_{h+1}\big) \Big] \Big\} & \text{if } n \ge 1, \\[4pt]
+    c_h & \text{if } n = 0
+  \end{cases}
+\]
+(eq.~(width\_certificate\_positive) and (width\_certificate\_negative) of the paper, with
+$\pi_{H+1}\cert^t_{H+1} := 0$). Only the composed functions $\pi_h \cert^t_h$ enter the
+recursion and the algorithm; $\cert^t_h(s, a)$ for $a \ne \pi_h(s)$ is never used.
+\end{definition}
+
+\begin{remark}[The clip of the certificate]\label{rem:algorithm_cert_clip}
+For $\beta > 0$ the paper clips the certificate at $e^{\beta(H - h)}$ in Appendix~B (and at
+$e^{\beta(H - h - 1)}$ in Section~4). The certificate must dominate $\Zt^t_h - \Zr^t_h$
+(Lemma~\ref{lem:cert_dominates_gap_pos}), which is at most $e^{\beta(H + 1 - h)} - 1$ for a visited
+pair and equal to $c_h - \min\{e^{\beta r}(p_h \Zr^t_{h+1}), 1\}$-type quantities for an unvisited
+one; with the paper's clip the domination fails at $h = H$ as soon as $e^{\beta} - 1 > 1$. The
+clip $c_h = e^{\beta(H + 1 - h)}$ (the same as for $\Ut$, deviation~3) dominates every gap of
+Lemma~\ref{lem:backups_range}. For $\beta < 0$ the clip $1$ dominates $1 - e^{\beta(H + 1 - h)}$.
+\end{remark}
+
+\textbf{Lean remark.} \texttt{cert r β δ hist : ℕ → S → ℝ}, the backward recursion of the
+composed certificate ($\pi_h \cert^t_h$ at the step with \texttt{j} steps to the end;
+\texttt{cert 0 = 0}), whose step \texttt{k + 1} computes the greedy action
+\texttt{a := greedy r β δ hist h s} at \texttt{h := stepOf H k}, the bonus from
+\texttt{optZ r β δ hist k}, the clip \texttt{if 0 < β then Real.exp (β * (k + 1)) else 1}, and
+\texttt{if n = 0 then clip else min clip (…)}; \texttt{certAt r β δ X Y t ω h}.
+
+\begin{lemma}[Range of the certificate]\label{lem:certificate_range}
+\uses{def:certificate, lem:backups_range, lem:emp_trans_simplex}
+For every $t$, $h \le H + 1$ and $s$: $0 \le (\pi^{t+1}_h \cert^t_h)(s) \le c_h$, with
+$c_{H+1} := 0$; in particular $\pi^{t+1}_{h+1}\cert^t_{h+1}$ takes values in $[0, e^{\beta(H - h)}]$
+($\beta > 0$) or $[0, 1]$ ($\beta < 0$) for $h \le H$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:certificate, lem:backups_range, lem:emp_trans_simplex}
+Backward induction on $h$. At $h = H + 1$ the certificate is $0$. Let $h \le H$ and assume
+$0 \le \pi_{h+1}\cert^t_{h+1} \le c_{h+1}$; fix $s$, $a = \pi_h(s)$. If $n = 0$ the value is $c_h \in [0, c_h]$
+($c_h > 0$). If $n \ge 1$: $b_h^t(s, a) \ge 0$ (Lemma~\ref{lem:backups_range}),
+$\phat(\pi_{h+1}\cert^t_{h+1}) \ge 0$ by the induction hypothesis and positivity of $\phat$
+(Lemma~\ref{lem:emp_trans_simplex}), and $e^{\beta r} > 0$, so the bracket is nonnegative and
+$\min\{c_h, \cdot\} \in [0, c_h]$. For $\beta > 0$, $c_{h+1} = e^{\beta(H - h)}$; for $\beta < 0$, $c_{h+1} = 1$
+(and $0$ at $h = H$, contained in $[0, 1]$).
+\end{proof}
+
+\section{Stopping rule and the algorithm}
+\label{sec:algorithm_alg}
+
+\begin{definition}[Stopping rule]\label{def:stopping_rule}
+\lean{Essakine2026Tight.stopCond}\leanok
+\uses{def:certificate, def:backups}
+The \emph{stopping condition} after $t$ episodes is
+\[
+  (\pi^{t+1}_1 \cert^t_1)(s_1) \le \frac{e^{\beta\eps} - 1}{e^{\beta\eps}}\, \Zt^t_1(s_1)
+  \quad (\beta > 0, \text{ eq.~(computable\_stopping\_condition)}),
+\]
+\[
+  (\pi^{t+1}_1 \cert^t_1)(s_1) \le \big(1 - e^{\beta\eps}\big)\, \Zl^t_1(s_1)
+  \quad (\beta < 0, \text{ Algorithm~1 and Appendix~B.2}).
+\]
+Entropic-BPI stops after $t$ episodes if the condition holds for the history $\hist_t$ (and not
+before). Both sides are computable from $\hist_t$ and $r$ by the backward recursions of
+Definitions~\ref{def:backups} and~\ref{def:certificate}.
+\end{definition}
+
+\textbf{Lean remark.} \texttt{stopCond r β δ ε s₁ hist : Prop := if 0 < β then cert r β δ hist H s₁ ≤ (Real.exp (β * ε) - 1) / Real.exp (β * ε) * (optZ r β δ hist H).1 s₁ else cert r β δ hist H s₁ ≤ (1 - Real.exp (β * ε)) * (optZ r β δ hist H).2 s₁}
+(the step $1$ has \texttt{j = H} steps to the end). For $\beta > 0$ the condition is
+equivalent to $\pi\cert \le (e^{\beta\eps} - 1)(\Zt^t_1(s_1) - \pi\cert)$, the form in which it is
+used (Lemma~\ref{lem:pac_at_stopping_pos}). Appendix~B.2 of the paper writes the $\beta < 0$
+condition as $\pi \cert \le (e^{\beta\eps} - 1)\Zl^t_1(s_1)$, whose right-hand side is negative for
+$\beta < 0$ (the algorithm would never stop); the algorithm box and the proof of the sample
+complexity use $(1 - e^{\beta\eps})\Zl^t_1(s_1)$, which is the intended condition. Note that the
+condition fails after $0$ episodes: all pairs are unvisited, so $\pi^1\cert^0_1(s_1) = c_1$ while
+$\Zt^0_1(s_1) = e^{\beta H}$ (resp.\ $\Zl^0_1(s_1) = e^{\beta H}$) and the factors
+$(e^{\beta\eps} - 1)/e^{\beta\eps}$, $1 - e^{\beta\eps}$ are less than $1$; hence $\tau \ge 1$.
+
+\begin{definition}[Algorithm 1: Entropic-BPI]\label{def:entropic_bpi}
+\lean{Essakine2026Tight.entropicBPI}\leanok
+\uses{def:bpi_alg, def:greedy, def:stopping_rule, def:backups, def:certificate}
+\emph{Entropic-BPI} with parameters $(r, \beta, \delta, \eps, s_1)$ is the BPI algorithm
+(Definition~\ref{def:bpi_alg}) whose
+\begin{enumerate}
+  \item[(i)] \emph{sampling rule} is deterministic: after $t$ episodes, with history $\hist_t$, it
+        plays the greedy policy $\pi^{t+1}$ of $\hist_t$ (Definition~\ref{def:greedy}) at the
+        episode $t + 1$;
+  \item[(ii)] \emph{stopping rule} is the set of histories $\hist_t$ (of any length $t$) satisfying
+        the stopping condition of Definition~\ref{def:stopping_rule};
+  \item[(iii)] \emph{output rule} is deterministic: it outputs the greedy policy of the history at
+        which it stops, i.e.\ $\hat\pi := \pi^{\tau + 1}$ when it stops after $\tau$ episodes.
+\end{enumerate}
+
+\medskip\noindent\textbf{Algorithm 1 (Entropic-BPI).}
+\begin{enumerate}
+  \item[] \textbf{Input:} the reward function $r$, $\beta \ne 0$, $\delta \in (0, 1)$, $\eps > 0$, the
+        initial state $s_1$.
+  \item[] \textbf{Initialization:} $t := 0$, empty history ($n_h^0 \equiv 0$, $\phat_h^0 \equiv 1/S$).
+  \item[] \textbf{Repeat} (after $t$ episodes, from the history $\hist_t$):
+  \item[(1)] \emph{Terminal initialization:} $\Zt^t_{H+1} := 1$, $\Zl^t_{H+1} := 1$, $\cert^t_{H+1} := 0$.
+  \item[(2)] \emph{Backward pass, for $h = H, H - 1, \dots, 1$:} for all $(s, a)$ with $n_h^t(s, a) \ge 1$
+        compute the bonus $b_h^t(s, a)$ (Definition~\ref{def:bonus}); for all $(s, a)$ compute the
+        backups $\Ut^t_h(s, a)$, $\Ul^t_h(s, a)$ and then $\Zt^t_h$, $\Zl^t_h$
+        (Definition~\ref{def:backups}); for all $s$ set the greedy action $\pi^{t+1}_h(s)$
+        (Definition~\ref{def:greedy}); for all $s$ compute the certificate $(\pi^{t+1}_h\cert^t_h)(s)$
+        (Definition~\ref{def:certificate}).
+  \item[(3)] \emph{Stopping test:} if the stopping condition of Definition~\ref{def:stopping_rule}
+        holds, \textbf{stop}: $\tau := t$, \textbf{output} $\hat\pi := \pi^{t+1}$.
+  \item[(4)] \emph{Otherwise} play the episode $t + 1$ with the policy $\pi^{t+1}$ from $s_1$,
+        observe its state sequence $(s^{t+1}_1, \dots, s^{t+1}_{H+1})$, append it to the history,
+        set $t := t + 1$ and go to (1).
+\end{enumerate}
+\end{definition}
+
+\textbf{Lean remark.} \texttt{entropicBPI r β δ ε s₁ : BPIAlg S A H} with
+\texttt{alg := detAlgorithm (fun \_ p ↦ greedy r β δ p.1) (fun \_ ↦ measurable\_of\_countable \_)}
+(LML \texttt{detAlgorithm}: the next action is a measurable function of the pair (history,
+observation); the observation is \texttt{()}), \texttt{stopSet := \{h : Σ n, Hist Unit (Policy S A H) (Traj S H) n | stopCond r β δ ε s₁ h.2\}}
+(measurable since the history type is countable: \texttt{(Set.to\_countable \_).measurableSet}),
+and \texttt{output := Kernel.deterministic (fun h ↦ greedy r β δ h.2) (measurable\_of\_countable \_)}.
+This is the LML main branch's \texttt{IdentAlg} with a \texttt{stopSet} of histories of
+variable length and one \texttt{output} kernel on them (the previous statement-only
+formalization used a stopping predicate \texttt{stop n hist} and a family \texttt{output n}).
+
+\begin{lemma}[Runs of Entropic-BPI]\label{lem:entropic_bpi_run}
+\uses{def:entropic_bpi, def:bpi_alg, def:greedy, def:stopping_rule, def:episode_env}
+Let $(X, Y, \hat\pi)$ be a run of Entropic-BPI in the episode environment of an MDP
+$\mathcal M \in \mathcal M_r$ from $s_1$, on $(\Omega, \Prob)$, and let $\tau$ be its stopping time.
+Almost surely:
+\begin{enumerate}
+  \item[(i)] for every $t \ge 0$, $X_t = \pi^{t+1}$, the greedy policy of the history $\hist_t = (X_i, Y_i)_{i < t}$
+        of the first $t$ episodes (Definition~\ref{def:greedy});
+  \item[(ii)] $\tau = \min\{t \ge 0 : \hist_t \text{ satisfies the stopping condition}\}$: on
+        $\{\tau < \infty\}$ the stopping condition holds for $\hist_\tau$ and fails for $\hist_t$
+        for every $t < \tau$; on $\{\tau = \infty\}$ it fails for every $t$;
+  \item[(iii)] on $\{\tau < \infty\}$, $\hat\pi = \pi^{\tau + 1}$, the greedy policy of $\hist_\tau$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{def:entropic_bpi, def:bpi_alg, def:greedy, def:stopping_rule}
+(i) $(X, Y)$ is an algorithm-environment sequence for the sampling rule of Entropic-BPI, a
+deterministic algorithm whose next action after the history $\hist_t$ is $\pi^{t+1} = \mathrm{greedy}(\hist_t)$.
+The defining property of an algorithm-environment sequence is that the conditional law of
+$X_t$ given $\hist_t$ (and the trivial observation) is the policy kernel, here the Dirac mass
+at $\mathrm{greedy}(\hist_t)$; a random variable whose conditional law given $Z$ is the Dirac mass
+at $g(Z)$ equals $g(Z)$ almost surely. A countable intersection over $t$ gives (i) almost
+surely for all $t$ simultaneously.
+
+(ii) The stopping time of an identification algorithm is the hitting time of its stopping rule
+by the process $t \mapsto \hist_t$ (Definition~\ref{def:bpi_alg}): $\tau$ is the least $t$ with
+$\hist_t$ in the stopping rule, i.e.\ satisfying the stopping condition, and $+\infty$ if there is
+none. Minimality gives the failure of the condition for all $t < \tau$, and $\tau < \infty$ gives
+$\hist_\tau$ in the stopping rule.
+
+(iii) The output has conditional law $\rho(\hist_\tau)$ given the stopped history $\hist_\tau$,
+where $\rho$ is the deterministic kernel $\mathrm{hist} \mapsto \delta_{\mathrm{greedy}(\mathrm{hist})}$; as in (i),
+$\hat\pi = \mathrm{greedy}(\hist_\tau)$ almost surely. On $\{\tau < \infty\}$ the stopped history is the
+history of the first $\tau$ episodes, so $\hat\pi = \mathrm{greedy}(\hist_\tau) = \pi^{\tau + 1}$
+(which is also $X_\tau$ by (i)).
+\end{proof}
+
+\textbf{Lean remark.} (i) is LML's \texttt{IsDeterministicAlg.action\_ae\_all\_eq} (or
+\texttt{action\_detAlgorithm\_ae\_all\_eq}) for \texttt{detAlgorithm}: \texttt{∀ᵐ ω ∂P, ∀ t, X t ω = greedy r β δ (histAt X Y t ω)};
+its proof is \texttt{hasCondDistrib\_action} with the deterministic policy kernel and
+\texttt{ae\_eq\_of\_hasCondDistrib\_deterministic}. (ii) is the characterization of
+\texttt{hittingAfter} (Mathlib: \texttt{hittingAfter\_mem\_set\_of\_ne\_top},
+\texttt{hittingAfter\_le\_iff}, and LML's \texttt{IdentAlg.stoppedHist\_mem\_stopSet\_of\_ne\_top});
+the value \texttt{τ ω : ℕ∞} is compared with \texttt{t} through \texttt{ENat} coercions. (iii)
+is \texttt{IsRun.hasCondDistrib\_output} with \texttt{Kernel.deterministic}, giving
+\texttt{out =ᵐ[P] fun ω ↦ greedy r β δ (A.stoppedHist O X Y ω).2}, and
+\texttt{stoppedHist ω = ⟨τ ω, histAt X Y (τ ω) ω⟩} on \texttt{τ ω ≠ ⊤} (LML
+\texttt{stoppedValue} of \texttt{sigmaHistory}). Statements about the output are only made on
+$\{\tau < \infty\}$, which has full probability under the good event
+(Lemma~\ref{lem:stopping_time_bound_pos}).
+
+\section{The ring quantities of the analysis}
+\label{sec:algorithm_ring}
+
+The analysis compares the computable values to the values of the played policy through an
+auxiliary backward recursion, which follows the true exponential Bellman recursion of the
+greedy policy but is clipped by the empirical pessimistic (resp.\ optimistic) backup. It uses
+the unknown kernels $p_h$ and is never computed by the algorithm.
+
+\begin{definition}[Ring values and backups]\label{def:ring}
+\lean{Essakine2026Tight.ringUAux, Essakine2026Tight.ringZStep, Essakine2026Tight.ringZ, Essakine2026Tight.ringU, Essakine2026Tight.ringZAt, Essakine2026Tight.ringUAt}\leanok
+\uses{def:backups, def:bonus, def:greedy, def:episodic_mdp, def:reward_fn}
+Let $\mathcal M \in \mathcal M_r$ with transition kernels $(p_h)$, $t \ge 0$ and $\pi := \pi^{t+1}$. The
+\emph{ring values} $\Zr^t_h : \Ss \to \R$, $h \le H + 1$, and \emph{ring backups}
+$\Ur^t_h : \Ss \times \As \to \R$, $h \le H$, are defined by $\Zr^t_{H+1} := 1$ and, for $h = H, \dots, 1$
+and every $(s, a)$, with $n := n_h^t(s, a)$, $\phat := \phat_h^t(\cdot \mid s, a)$, $b := b_h^t(s, a)$
+and $e^{\beta r} := e^{\beta r_h(s, a)}$:
+
+\emph{Case $\beta > 0$} (Appendix~B.1, ``Stopping rule''). For $n \ge 1$,
+\begin{align*}
+  \Ur^t_{h, \mathrm{pes}}(s, a) &:= \max\Big\{ 1,\ e^{\beta r} \Big[ \phat \Zr^t_{h+1} - b - \frac1H\, \phat\big(\Zt^t_{h+1} - \Zr^t_{h+1}\big) \Big] \Big\}, \\
+  \Ur^t_h(s, a) &:= \min\Big\{ e^{\beta r}\, (p_h \Zr^t_{h+1})(s, a),\ \Ur^t_{h, \mathrm{pes}}(s, a) \Big\},
+\end{align*}
+and for a never-visited pair $\Ur^t_h(s, a) := \min\{ e^{\beta r}\, (p_h \Zr^t_{h+1})(s, a),\ 1\}$
+(the pessimistic backup being $\Ul^t_h(s, a) = 1$ there).
+
+\emph{Case $\beta < 0$} (Appendix~B.2). For $n \ge 1$,
+\begin{align*}
+  \Ur^t_{h, \mathrm{opt}}(s, a) &:= \min\Big\{ 1,\ e^{\beta r} \Big[ \phat \Zr^t_{h+1} + b + \frac1H\, \phat\big(\Zr^t_{h+1} - \Zl^t_{h+1}\big) \Big] \Big\}, \\
+  \Ur^t_h(s, a) &:= \max\Big\{ e^{\beta r}\, (p_h \Zr^t_{h+1})(s, a),\ \Ur^t_{h, \mathrm{opt}}(s, a) \Big\},
+\end{align*}
+and for a never-visited pair $\Ur^t_h(s, a) := \max\{ e^{\beta r}\, (p_h \Zr^t_{h+1})(s, a),\ 1\}$
+(the optimistic backup being $\Ut^t_h(s, a) = 1$ there).
+
+In both cases $\Zr^t_h(s) := \Ur^t_h(s, \pi_h(s))$. Here $\Zt^t_{h+1}$, $\Zl^t_{h+1}$ and $b$ are those
+of Definitions~\ref{def:backups} and~\ref{def:bonus} for the same history, and
+$(p_h \Zr^t_{h+1})(s, a) = \sum_{s'} p_h(s' \mid s, a)\Zr^t_{h+1}(s')$ uses the true kernel.
+\end{definition}
+
+\textbf{Lean remark.} \texttt{ringUAux nA H β δ k n r p phat Zr Zt Zl : ℝ} is the one-step
+function (arguments: the true transition vector \texttt{p = M.transVec h s a}, the empirical
+one, the next-step ring value and the next-step optimistic and pessimistic values), with the
+sign selected by \texttt{if 0 < β} and the unvisited case by \texttt{if n = 0};
+\texttt{ringZ M β δ hist : ℕ → S → ℝ} is the backward recursion ($\Zr$ at the step with
+\texttt{j} steps to the end, \texttt{ringZ 0 = 1}, evaluated at the greedy action
+\texttt{greedy r β δ hist h s} of the same history, where \texttt{r} is the reward function of
+\texttt{M}), \texttt{ringU M β δ hist h s a} the ring backup at the step \texttt{h}, and
+\texttt{ringZAt}, \texttt{ringUAt} their values on a run. The lemmas about these quantities
+(Lemmas~\ref{lem:ring_pos}, \ref{lem:certificate_pos}, \ref{lem:cert_dominates_gap_pos} and
+their negative counterparts) are in Chapters~\ref{chap:analysis_pos} and~\ref{chap:analysis_neg}.

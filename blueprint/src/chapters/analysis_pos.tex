@@ -1,0 +1,755 @@
+\chapter{Analysis of Entropic-BPI for \texorpdfstring{$\beta > 0$}{beta > 0}}
+\label{chap:analysis_pos}
+
+This chapter reproduces Appendix~B.1 of \cite{essakine2026tight} (Lemmas~7--11 and the proof
+of the sample complexity for $\beta > 0$), decomposed into lemmas that are each a plausible
+single Lean declaration, with every constant recomputed. The structure is the one of
+\cite{menard2021fast} transported to the exponential space of \cite{fei2021exponential}: a
+concentration inequality for the optimal exponential value (Lemma~\ref{lem:concentration_pos})
+gives optimism (Lemma~\ref{lem:optimism_pos}); an auxiliary ``ring'' value
+$\Zr^t$ bridges the pessimistic value $\Zl^t$ and the value $Z^{\pi^{t+1}}$ of the greedy
+policy (Lemmas~\ref{lem:ring_pos}, \ref{lem:certificate_pos}), so that the computable
+certificate $\pi^{t+1}\cert^t$ dominates the gap $Z^* - Z^{\pi^{t+1}}$
+(Lemmas~\ref{lem:cert_dominates_gap_pos}, \ref{lem:stopping_pos}) and the stopping rule is
+sound (Lemma~\ref{lem:pac_at_stopping_pos}); finally the certificate is bounded under the true
+kernel (Lemma~\ref{lem:cert_true_recursion_pos}), unrolled along the trajectory of $\pi^{t+1}$
+(Lemmas~\ref{lem:cert_unrolled_pos}, \ref{lem:ratio_bound_pos}) and summed over the episodes
+(Lemmas~\ref{lem:progress_pos}, \ref{lem:stopping_time_bound_pos}, \ref{lem:pac_pos}).
+
+\section{Standing setting and notation}
+\label{sec:pos_setting}
+
+Throughout this chapter: $\beta > 0$; $\mathcal M$ is a finite-horizon MDP
+(Definition~\ref{def:episodic_mdp}) with reward function $r$ with values in $[0, 1]$
+(Definition~\ref{def:reward_fn}); $\delta \in (0, 1)$ and $\eps > 0$; $(X, Y, \mathrm{out})$ is a run
+of Entropic-BPI (Definition~\ref{def:entropic_bpi}) with parameters $(r, \beta, \delta, \eps, s_1)$
+in the episode environment of $\mathcal M$ from $s_1$ (Definition~\ref{def:episode_env}), on a
+probability space $(\Omega, \mathcal F, \Prob)$, with stopping time $\tau$. For every $t \ge 0$ the
+quantities $n_h^t$, $\phat_h^t$, $b_h^t$, $\Ut_h^t$, $\Ul_h^t$, $\Zt_h^t$, $\Zl_h^t$, $\pi^{t+1}$,
+$\cert_h^t$, $\Ur_h^t$, $\Zr_h^t$ are those of Definitions~\ref{def:counts}, \ref{def:emp_trans},
+\ref{def:bonus}, \ref{def:backups}, \ref{def:greedy}, \ref{def:certificate}, \ref{def:ring}
+computed from the history of the first $t$ episodes of the run, and $\rho_h^t$, $\rho^{*t}_h$
+are the rate terms of Definition~\ref{def:rate_min}. Inside a statement about a fixed $t$ we
+write $\pi := \pi^{t+1}$ and, for a fixed $(h, s, a)$,
+\[
+  n := n_h^t(s,a), \quad \phat := \phat_h^t(\cdot \mid s, a), \quad b := b_h^t(s,a), \quad
+  \alpha := \alpha(n, \delta), \quad \alpha^* := \alpha^*(n, \delta), \quad
+  \rho := \rho_h^t(s,a), \quad \rho^* := \rho^{*t}_h(s,a),
+\]
+and for a function $f : \Ss \to \R$, $\phat f := \sum_{s'} \phat(s' \mid s,a) f(s')$,
+$(p_h f)(s,a) := \sum_{s'} p_h(s' \mid s,a) f(s')$, $\Var_{\phat}(f)$ and $\Var_{p_h}(f)(s,a)$
+the variances of $f$ under these probability vectors (Lemma~\ref{lem:emp_trans_simplex}).
+We also write
+\[
+  B_h := e^{\beta (H - h)} \quad \text{(the range parameter of step $h$)}, \qquad
+  c_h := e^{\beta (H + 1 - h)} \quad \text{(the clip of step $h$)},
+\]
+so that $B_h = c_{h+1}$, $1 \le B_h \le c_h$ and $B_H = 1$. The ranges used all the time are:
+$Z^*_{h+1}, U^*_h \in [1, c_h]$ and $Z^*_{h+1} \in [1, B_h]$ (Lemma~\ref{lem:opt_exp_value_range});
+$Z^\pi_{h+1} \in [1, B_h]$ for every policy $\pi$ (Lemma~\ref{lem:exp_value_range});
+$1 \le \Zl_{h+1}^t \le \Zt_{h+1}^t \le B_h$ and $1 \le \Ul_h^t \le \Ut_h^t \le c_h$
+(Lemma~\ref{lem:backups_range}); $0 \le \pi_{h+1}\cert_{h+1}^t \le c_{h+1} = B_h$
+(Lemma~\ref{lem:certificate_range}). The good event is $\evGood^+ = \evKL \cap \evBern(Z^*, B) \cap \evCnt$
+with $B = (B_h)_{h \le H}$ (Definition~\ref{def:good_event}); ``on $\evGood^+$'' means ``for every
+$\omega \in \evGood^+$'', and the statements are pointwise in $\omega$ (no measure theory is
+involved before Lemma~\ref{lem:pac_pos}).
+
+\textbf{Lean remark.} All the objects of this chapter are functions of $\omega$ through the
+history $\mathrm{histAt}\ X\ Y\ t\ \omega$ (\texttt{Essakine2026Tight/EV2026/Run.lean}:
+\texttt{UtildeAt}, \texttt{ZtildeAt}, \texttt{certAt}, \texttt{ringZAt}, \ldots), and the
+events $\evGood^+$ etc.\ are subsets of $\Omega$; a lemma ``on $\evGood^+$, for all $t, h, s, a$,
+$\ldots$'' is a Lean statement \texttt{∀ ω ∈ goodEvent X Y M β δ P, ∀ t h s a, \ldots}. The
+step $h$ of the paper is the Lean index $h - 1$; the backward recursions are indexed by the
+number $j = H + 1 - h$ of steps to the end, so ``backward induction on $h$ from $H + 1$ down to
+$1$'' is an induction on $j$ from $0$ to $H$, and the ranges $B_h = e^{\beta(H-h)}$,
+$c_h = e^{\beta(H+1-h)}$ are \texttt{Real.exp (β * (j - 1))} and \texttt{Real.exp (β * j)}.
+The pair $(s, a)$ with $n_h^t(s,a) = 0$ (never visited) is a separate case of every
+backward induction below (deviation~1 of Chapter~\ref{chap:mdp}): its backups are the clips
+$\Ut = c_h$, $\Ul = 1$, its certificate is $c_h$ and its rate terms are $\rho = \rho^* = 1$.
+
+\section{Concentration and optimism}
+\label{sec:pos_optimism}
+
+\begin{lemma}[Concentration of the optimal exponential value; Lemma~7 of the paper]\label{lem:concentration_pos}
+\uses{def:good_event, def:backups, def:emp_trans, def:counts, def:rates, def:opt_value, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $(s,a)$ with $n = n_h^t(s,a) \ge 1$,
+\[
+  \abs{(p_h - \phat) Z^*_{h+1}(s,a)}
+  \le 2\sqrt2 \sqrt{\Var_{\phat}(\Zt^t_{h+1}) \frac{\alpha^*}{n}}
+  + 5 B_h \frac{\alpha}{n} + 4 H B_h \frac{\alpha}{n}
+  + \frac1H \phat \abs{\Zt^t_{h+1} - Z^*_{h+1}} .
+\]
+The sum of the first three terms of the right-hand side is the bonus $b = b_h^t(s,a)$
+(Definition~\ref{def:bonus}, with the third term $4 H B_h \alpha(n,\delta)/n$; see
+Remark~\ref{rem:pos_constants_bonus}), so the conclusion reads
+$\abs{(p_h - \phat) Z^*_{h+1}(s,a)} \le b + \frac1H \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}}$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:good_event, def:event_bern, def:event_kl, lem:opt_exp_value_range, lem:backups_range, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:emp_trans_simplex}
+Fix $\omega \in \evGood^+$, $t$, $h$, $(s,a)$ with $n \ge 1$. Write $f := Z^*_{h+1} - 1$ and
+$g := \Zt^t_{h+1} - 1$; both take values in $[0, B_h - 1] \subseteq [0, B_h]$
+(Lemmas~\ref{lem:opt_exp_value_range} and~\ref{lem:backups_range}) and variances are invariant
+under the shift by $1$.
+
+\emph{Bernstein event.} Since $\omega \in \evBern(Z^*, B)$ with $B_h \ge \max Z^*_{h+1} - \min Z^*_{h+1}$
+and $n \ge 1$ (Definitions~\ref{def:event_bern}, \ref{def:good_event}),
+\[
+  \abs{(p_h - \phat) Z^*_{h+1}(s,a)}
+  \le \sqrt{2 \Var_{p_h}(Z^*_{h+1})(s,a) \frac{\alpha^*}{n}} + 3 B_h \frac{\alpha^*}{n} .
+\]
+
+\emph{Transport of the variance.} Since $\omega \in \evKL$, $\KL(\phat \,\|\, p_h(\cdot \mid s,a)) \le \alpha/n$
+(Definition~\ref{def:event_kl}), so Lemma~\ref{lem:kl_transport_var} (first inequality, with
+$p = \phat$, $q = p_h(\cdot \mid s,a)$, $f$, $b = B_h$) gives
+$\Var_{p_h}(Z^*_{h+1}) \le 2 \Var_{\phat}(Z^*_{h+1}) + 4 B_h^2 \alpha/n$, and
+Lemma~\ref{lem:transport_var} (first part, with $f$, $g$, $b = B_h$) gives
+$\Var_{\phat}(Z^*_{h+1}) \le 2\Var_{\phat}(\Zt^t_{h+1}) + 2 B_h \phat\abs{Z^*_{h+1} - \Zt^t_{h+1}}$.
+Hence
+\[
+  2 \Var_{p_h}(Z^*_{h+1}) \frac{\alpha^*}{n}
+  \le 8 \Var_{\phat}(\Zt^t_{h+1}) \frac{\alpha^*}{n}
+  + 8 B_h \, \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}} \, \frac{\alpha^*}{n}
+  + 8 B_h^2 \frac{\alpha}{n}\frac{\alpha^*}{n} .
+\]
+
+\emph{Square roots.} By Lemma~\ref{lem:sqrt_add_le} (twice), the square root of the right-hand
+side is at most the sum of the three square roots. The first is
+$2\sqrt2\sqrt{\Var_{\phat}(\Zt^t_{h+1})\alpha^*/n}$. For the second, Lemma~\ref{lem:sqrt_mul_le}
+with $x = \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}}$, $y = 8 B_h \alpha^*/n$ and $\eta = 2/H$ gives
+\[
+  \sqrt{x y} \le \frac{\eta x}{2} + \frac{y}{2\eta}
+  = \frac1H \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}} + 2 H B_h \frac{\alpha^*}{n} .
+\]
+For the third, Lemma~\ref{lem:sqrt_mul_le} with $\eta = 1$ gives
+$\sqrt{\alpha \alpha^*} \le (\alpha + \alpha^*)/2$, so
+$\sqrt{8 B_h^2 \alpha\alpha^*/n^2} \le \sqrt2 B_h (\alpha + \alpha^*)/n$.
+
+\emph{Collecting.} Altogether, using $\alpha^* \le \alpha$ (Lemma~\ref{lem:rates_props}) and
+$H \ge 1$,
+\begin{align*}
+  \abs{(p_h - \phat) Z^*_{h+1}(s,a)}
+  &\le 2\sqrt2\sqrt{\Var_{\phat}(\Zt^t_{h+1})\frac{\alpha^*}{n}}
+     + \frac1H \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}}
+     + \big(\sqrt2 \alpha + 3 \alpha^*\big)\frac{B_h}{n}
+     + \big(2H + \sqrt2\big) B_h \frac{\alpha^*}{n} \\
+  &\le 2\sqrt2\sqrt{\Var_{\phat}(\Zt^t_{h+1})\frac{\alpha^*}{n}}
+     + \frac1H \phat\abs{\Zt^t_{h+1} - Z^*_{h+1}}
+     + 5 B_h \frac{\alpha}{n} + 4 H B_h \frac{\alpha}{n},
+\end{align*}
+since $\sqrt2 + 3 \le 5$ and $2H + \sqrt2 \le 4H$.
+\end{proof}
+
+\begin{remark}[The constants of the bonus]\label{rem:pos_constants_bonus}
+\uses{def:bonus, lem:concentration_pos}
+The proof of Lemma~7 in \cite{essakine2026tight} takes the square root of
+$\Var_{p_h}(Z^*_{h+1})\alpha^*/n$ instead of $2\Var_{p_h}(Z^*_{h+1})\alpha^*/n$ and thereby
+loses a factor $\sqrt2$ on the last two terms; the constants $2\sqrt2$, $5$ and $4H$ of its
+statement are nevertheless correct, by the splitting $\sqrt{\alpha\alpha^*} \le (\alpha + \alpha^*)/2$
+and the choice $\eta = 2/H$ above (the paper's $\eta = 1/H$ would give $\sqrt2 \cdot 4H$).
+Two points about the bonus:
+\begin{enumerate}
+  \item[(i)] The third term of the bonus is stated here with the KL rate $\alpha(n,\delta)$,
+        as in the statement of Lemma~7 of the paper (its equation (bonus positive) writes
+        $\alpha^*$ there instead). Lemma~\ref{lem:concentration_pos} with $\alpha^*$ in the
+        third term is true as well (the proof above gives the bound with $(2H + \sqrt2)\alpha^*$ in
+        that place), but the certificate bound of Lemma~\ref{lem:certificate_pos} needs
+        $b \ge (5 + 4H) B_h \alpha/n$, and this fails for the version with $\alpha^*$ (the
+        KL-Bernstein inequality that controls $(p_h - \phat)(Z^*_{h+1} - \Zr^t_{h+1})$ only has the
+        KL radius $\alpha/n$ at its disposal, and $\alpha^*(n,\delta)$ can be as small as
+        $\alpha(n,\delta)/S$). \textbf{Consequently Definition~\ref{def:bonus} must use
+        $4 H e^{\beta(H-h)}\alpha(n,\delta)/n$ as its third term} (for both signs of $\beta$);
+        the sample complexity is unaffected, since the analysis of
+        Lemma~\ref{lem:cert_true_recursion_pos} bounds this term by the additive rate term
+        $84 H c_h \rho$, which is already in $\alpha$.
+  \item[(ii)] The bonus is \emph{defined} as the right-hand side of
+        Lemma~\ref{lem:concentration_pos} minus its last term, so the lemma is the statement
+        ``$\abs{(p_h - \phat)Z^*_{h+1}} \le b + \frac1H\phat\abs{\Zt^t_{h+1} - Z^*_{h+1}}$'', which is
+        the only form used afterwards (Lemmas~\ref{lem:optimism_pos} and~\ref{lem:certificate_pos}).
+        The statement carries no sign assumption on $\Zt^t_{h+1} - Z^*_{h+1}$ (deviation~13);
+        the absolute value is removed in Lemma~\ref{lem:optimism_pos} by its induction hypothesis.
+\end{enumerate}
+\end{remark}
+
+\begin{lemma}[Optimism and pessimism; Lemma~8 of the paper]\label{lem:optimism_pos}
+\uses{def:good_event, def:backups, def:opt_value, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$, $s \in \Ss$ and $a \in \As$,
+\[
+  \Ul_h^t(s,a) \le U^*_h(s,a) \le \Ut_h^t(s,a) \quad (h \le H)
+  \qquad\text{and}\qquad
+  \Zl_h^t(s) \le Z^*_h(s) \le \Zt_h^t(s) .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:concentration_pos, lem:opt_exp_value_range, lem:opt_bellman, lem:emp_trans_simplex, def:backups, lem:backups_range}
+Fix $\omega \in \evGood^+$ and $t$. We prove by backward induction on $h$ (from $H + 1$ down to
+$1$) the statement $P(h)$: ``for all $s$, $\Zl_h^t(s) \le Z^*_h(s) \le \Zt_h^t(s)$'', proving the
+$U$-inequalities at step $h \le H$ along the way from $P(h+1)$.
+
+\emph{Base case} $h = H + 1$: $\Zl_{H+1}^t = Z^*_{H+1} = \Zt_{H+1}^t = 1$
+(Definitions~\ref{def:backups}, \ref{def:opt_value}).
+
+\emph{Induction step.} Let $h \le H$, assume $P(h+1)$ and fix $(s,a)$. By
+Lemma~\ref{lem:opt_bellman}, $U^*_h(s,a) = e^{\beta r_h(s,a)} (p_h Z^*_{h+1})(s,a)$ and
+$U^*_h(s,a) \in [1, c_h]$ (Lemma~\ref{lem:opt_exp_value_range}).
+
+\emph{Never-visited pair} ($n = 0$): $\Ut_h^t(s,a) = c_h \ge U^*_h(s,a) \ge 1 = \Ul_h^t(s,a)$.
+
+\emph{Visited pair} ($n \ge 1$). Upper bound: $\Ut_h^t(s,a) = \min\{c_h, X\}$ with
+$X := e^{\beta r_h(s,a)}[\phat\Zt^t_{h+1} + b + \frac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})]$, and
+$U^*_h(s,a) \le c_h$, so it suffices to show $U^*_h(s,a) \le X$. Now
+\[
+  X - U^*_h(s,a) = e^{\beta r_h(s,a)}\Big[ \phat(\Zt^t_{h+1} - Z^*_{h+1}) + (\phat - p_h)Z^*_{h+1}(s,a)
+  + b + \tfrac1H \phat(\Zt^t_{h+1} - \Zl^t_{h+1}) \Big].
+\]
+By $P(h+1)$, $\Zt^t_{h+1} - Z^*_{h+1} \ge 0$ pointwise, so
+$\phat\abs{\Zt^t_{h+1} - Z^*_{h+1}} = \phat(\Zt^t_{h+1} - Z^*_{h+1})$ and
+Lemma~\ref{lem:concentration_pos} gives
+$(\phat - p_h)Z^*_{h+1}(s,a) \ge -b - \frac1H\phat(\Zt^t_{h+1} - Z^*_{h+1})$. Hence
+\[
+  X - U^*_h(s,a) \ge e^{\beta r_h(s,a)}\Big[\big(1 - \tfrac1H\big)\phat(\Zt^t_{h+1} - Z^*_{h+1})
+  + \tfrac1H \phat(Z^*_{h+1} - \Zl^t_{h+1})\Big] \ge 0 ,
+\]
+because $H \ge 1$, both functions inside are nonnegative by $P(h+1)$, and $\phat$ is a
+positive linear functional (Lemma~\ref{lem:emp_trans_simplex}). Lower bound:
+$\Ul_h^t(s,a) = \max\{1, Y\}$ with
+$Y := e^{\beta r_h(s,a)}[\phat\Zl^t_{h+1} - b - \frac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})]$; since
+$U^*_h(s,a) \ge 1$ it suffices to show $Y \le U^*_h(s,a)$:
+\[
+  U^*_h(s,a) - Y = e^{\beta r_h(s,a)}\Big[\phat(Z^*_{h+1} - \Zl^t_{h+1}) + (p_h - \phat)Z^*_{h+1}(s,a)
+  + b + \tfrac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})\Big]
+  \ge e^{\beta r_h(s,a)}\big(1 + \tfrac1H\big)\phat(Z^*_{h+1} - \Zl^t_{h+1}) \ge 0,
+\]
+using again Lemma~\ref{lem:concentration_pos} in the form
+$(p_h - \phat)Z^*_{h+1}(s,a) \ge -b - \frac1H\phat(\Zt^t_{h+1} - Z^*_{h+1})$ and
+$-\frac1H\phat(\Zt^t_{h+1} - Z^*_{h+1}) + \frac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1}) = \frac1H\phat(Z^*_{h+1} - \Zl^t_{h+1})$.
+
+\emph{From $U$ to $Z$.} By Lemma~\ref{lem:opt_bellman} ($\beta > 0$), $Z^*_h(s) = \max_a U^*_h(s,a)$;
+by Definition~\ref{def:backups}, $\Zt_h^t(s) = \max_a\Ut_h^t(s,a)$ and $\Zl_h^t(s) = \max_a \Ul_h^t(s,a)$;
+the maximum over $a$ is monotone, which gives $P(h)$.
+\end{proof}
+
+\textbf{Lean remark.} The induction is on $j = H + 1 - h$ with the statement $P$ about $Z$ only;
+the $U$-inequalities are a separate lemma taking $P(h+1)$ as a hypothesis (one lemma for the
+upper bound, one for the lower bound), which keeps each declaration small. The maxima over
+$a$ are \texttt{Finset.sup'} over the finite type $\As$ (or LML's \texttt{argmax}), and
+``monotone'' is \texttt{Finset.sup'\_mono}-type reasoning. The positivity of $\phat$ is
+\texttt{vecExp} of a nonnegative function under a probability vector.
+
+\section{The ring value and the certificate}
+\label{sec:pos_certificate}
+
+The pessimistic value $\Zl^t$ is below $Z^*$ but need not be comparable to $Z^{\pi}$
+($\pi = \pi^{t+1}$ is greedy for $\Ut^t$, not for $\Ul^t$). The analysis-only value $\Zr^t$ of
+Definition~\ref{def:ring} follows the policy $\pi$ under the \emph{true} kernel, clipped by the
+pessimistic empirical backup; it lies below both $\Zl^t$ and $Z^\pi$, and the certificate
+$\pi\cert^t$ dominates $\Zt^t - \Zr^t$. We first record the trivial lower bound on $\Zr^t$,
+which the paper uses implicitly.
+
+\begin{lemma}[The ring value is at least one]\label{lem:pos_ring_range}
+\uses{def:ring, def:entropic_bpi}
+For all $t \ge 0$, $h \in \{1, \dots, H + 1\}$, $s$ and $a$: $\Zr_h^t(s) \ge 1$ and, for $h \le H$,
+$\Ur_h^t(s,a) \ge 1$.
+\end{lemma}
+
+\begin{proof}
+\uses{def:ring, lem:exp_value_monotone}
+Backward induction on $h$; $\Zr_{H+1}^t = 1$. If $\Zr_{h+1}^t \ge 1$ pointwise then
+$e^{\beta r_h(s,a)}(p_h\Zr^t_{h+1})(s,a) \ge (p_h \Zr^t_{h+1})(s,a) \ge (p_h 1)(s,a) = 1$ ($\beta r_h \ge 0$;
+Lemma~\ref{lem:exp_value_monotone}: $p_h$ is positive and $p_h 1 = 1$). For a visited pair,
+$\Ur^t_{h,\mathrm{pes}}(s,a) = \max\{1, \cdot\} \ge 1$, so $\Ur_h^t(s,a)$, the minimum of two numbers
+$\ge 1$, is $\ge 1$; for a never-visited pair $\Ur_h^t(s,a) = \min\{e^{\beta r_h}(p_h\Zr^t_{h+1})(s,a), 1\} \ge 1$.
+Finally $\Zr_h^t(s) = \Ur_h^t(s, \pi_h(s)) \ge 1$.
+\end{proof}
+
+\begin{lemma}[The ring value is a lower bound; Lemma~10 of the paper]\label{lem:ring_pos}
+\uses{def:ring, def:backups, def:greedy, def:exp_value, def:entropic_bpi}
+For all $t \ge 0$ (no event is needed), $h \in \{1, \dots, H + 1\}$, $s$ and $a$, with $\pi = \pi^{t+1}$,
+\[
+  \Ur_h^t(s,a) \le \min\{\Ul_h^t(s,a), U^\pi_h(s,a)\} \quad (h \le H)
+  \qquad\text{and}\qquad
+  \Zr_h^t(s) \le \min\{\Zl_h^t(s), Z^\pi_h(s)\} .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{def:ring, def:backups, def:greedy, lem:exp_value_monotone, lem:exp_bellman, def:exp_value, lem:emp_trans_simplex}
+Backward induction on $h$ with the statement $P(h)$: ``for all $s$,
+$\Zr_h^t(s) \le \min\{\Zl_h^t(s), Z^\pi_h(s)\}$''. Base case: all three values are $1$ at $h = H + 1$.
+Let $h \le H$, assume $P(h+1)$, fix $(s,a)$.
+
+\emph{Comparison with $U^\pi$.} In both the visited and the never-visited case
+$\Ur_h^t(s,a) \le e^{\beta r_h(s,a)}(p_h\Zr^t_{h+1})(s,a)$ (it is a minimum with this quantity), and
+$(p_h\Zr^t_{h+1})(s,a) \le (p_h Z^\pi_{h+1})(s,a)$ by $P(h+1)$ and the monotonicity of $p_h$
+(Lemma~\ref{lem:exp_value_monotone}); by Definition~\ref{def:exp_value},
+$e^{\beta r_h(s,a)}(p_h Z^\pi_{h+1})(s,a) = U^\pi_h(s,a)$.
+
+\emph{Comparison with $\Ul$.} If $n = 0$, $\Ur_h^t(s,a) \le 1 = \Ul_h^t(s,a)$. If $n \ge 1$,
+$\Ur_h^t(s,a) \le \Ur^t_{h,\mathrm{pes}}(s,a) = \max\{1, Y'\}$ and $\Ul_h^t(s,a) = \max\{1, Y\}$ with
+\[
+  Y = e^{\beta r_h}\big[\phat\Zl^t_{h+1} - b - \tfrac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})\big], \qquad
+  Y' = e^{\beta r_h}\big[\phat\Zr^t_{h+1} - b - \tfrac1H\phat(\Zt^t_{h+1} - \Zr^t_{h+1})\big],
+\]
+so $Y - Y' = e^{\beta r_h}\big[\phat(\Zl^t_{h+1} - \Zr^t_{h+1}) + \tfrac1H\phat(\Zl^t_{h+1} - \Zr^t_{h+1})\big]
+= e^{\beta r_h}\big(1 + \tfrac1H\big)\phat(\Zl^t_{h+1} - \Zr^t_{h+1}) \ge 0$ by $P(h+1)$ and the
+positivity of $\phat$ (Lemma~\ref{lem:emp_trans_simplex}); $y \mapsto \max\{1, y\}$ is monotone,
+hence $\Ur^t_{h,\mathrm{pes}}(s,a) \le \Ul_h^t(s,a)$. (The paper writes the factor as $1 - \frac1H$; the
+correct factor is $1 + \frac1H$, and only its sign matters.)
+
+\emph{From $U$ to $Z$.} With $a = \pi_h(s)$: $\Zr_h^t(s) = \Ur_h^t(s, a) \le \Ul_h^t(s, a) \le \max_{a'}\Ul_h^t(s,a') = \Zl_h^t(s)$
+(Definitions~\ref{def:ring}, \ref{def:backups}) and
+$\Zr_h^t(s) \le U^\pi_h(s, \pi_h(s)) = Z^\pi_h(s)$ (Lemma~\ref{lem:exp_bellman}). This is $P(h)$.
+\end{proof}
+
+\begin{lemma}[One-step certificate bound; Lemma~11 of the paper]\label{lem:certificate_pos}
+\uses{def:good_event, def:ring, def:backups, def:bonus, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $(s,a)$ with $n = n_h^t(s,a) \ge 1$,
+\[
+  \Ut_h^t(s,a) - \Ur_h^t(s,a)
+  \le e^{\beta r_h(s,a)}\Big[3 b + \Big(1 + \frac3H\Big)\phat\big(\Zt^t_{h+1} - \Zr^t_{h+1}\big)\Big] .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:concentration_pos, lem:optimism_pos, lem:ring_pos, lem:pos_ring_range, lem:kl_bernstein, lem:kl_transport_var, lem:var_le_range_mean, lem:sqrt_add_le, lem:sqrt_mul_le, lem:emp_trans_simplex, lem:backups_range, lem:opt_exp_value_range, def:event_kl, def:bonus}
+Fix $\omega \in \evGood^+$, $t$, $h$, $(s,a)$ with $n \ge 1$, and write $\Delta := \phat(\Zt^t_{h+1} - \Zr^t_{h+1}) \ge 0$
+(Lemmas~\ref{lem:ring_pos}, \ref{lem:optimism_pos}: $\Zr^t_{h+1} \le \Zl^t_{h+1} \le Z^*_{h+1} \le \Zt^t_{h+1}$
+pointwise). Throughout, $\Ut_h^t(s,a) \le X := e^{\beta r_h}[\phat\Zt^t_{h+1} + b + \frac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1})]$
+(drop the clip), and $\phat(\Zt^t_{h+1} - \Zl^t_{h+1}) \le \Delta$ (positivity of $\phat$,
+Lemma~\ref{lem:emp_trans_simplex}). Recall $\Ur_h^t(s,a) = \min\{e^{\beta r_h}(p_h\Zr^t_{h+1})(s,a), \Ur^t_{h,\mathrm{pes}}(s,a)\}$.
+
+\emph{Case 1: $\Ur_h^t(s,a) = e^{\beta r_h}(p_h\Zr^t_{h+1})(s,a)$.} Then
+$\Ut_h^t(s,a) - \Ur_h^t(s,a) \le e^{\beta r_h}\big[b + \frac1H\Delta + \phat\Zt^t_{h+1} - p_h\Zr^t_{h+1}\big]$ and
+\[
+  \phat\Zt^t_{h+1} - p_h\Zr^t_{h+1}
+  = \Delta + (\phat - p_h)Z^*_{h+1}(s,a) + (p_h - \phat)\big(Z^*_{h+1} - \Zr^t_{h+1}\big)(s,a) .
+\]
+\emph{Second term.} By Lemma~\ref{lem:concentration_pos} and $\abs{\Zt^t_{h+1} - Z^*_{h+1}} = \Zt^t_{h+1} - Z^*_{h+1} \le \Zt^t_{h+1} - \Zr^t_{h+1}$
+pointwise, $(\phat - p_h)Z^*_{h+1}(s,a) \le b + \frac1H\Delta$.
+\emph{Third term.} Let $f := Z^*_{h+1} - \Zr^t_{h+1}$; then $0 \le f \le B_h - 1 \le B_h$ pointwise
+(Lemma~\ref{lem:opt_exp_value_range} and Lemma~\ref{lem:pos_ring_range}). Since $\omega \in \evKL$,
+$\KL(\phat\,\|\,p_h(\cdot\mid s,a)) \le \alpha/n$, and Lemma~\ref{lem:kl_bernstein} (with $p = \phat$,
+$q = p_h(\cdot \mid s,a)$, range $B_h$) gives
+\[
+  (p_h - \phat) f(s,a) \le \sqrt{2\Var_{p_h}(f)(s,a)\frac{\alpha}{n}} + \frac23 B_h\frac{\alpha}{n} .
+\]
+The variance is under the \emph{true} kernel (the second argument of the divergence); the
+paper writes it under $\phat$, which is the wrong side. We transport it back:
+Lemma~\ref{lem:kl_transport_var} (first inequality) gives $\Var_{p_h}(f) \le 2\Var_{\phat}(f) + 4B_h^2\alpha/n$
+and Lemma~\ref{lem:var_le_range_mean} gives $\Var_{\phat}(f) \le B_h\,\phat f$. Hence, by
+Lemma~\ref{lem:sqrt_add_le} and Lemma~\ref{lem:sqrt_mul_le} (with $x = \phat f$, $y = 4B_h\alpha/n$,
+$\eta = 2/H$),
+\[
+  \sqrt{2\Var_{p_h}(f)\frac{\alpha}{n}}
+  \le \sqrt{\phat f \cdot 4 B_h \frac{\alpha}{n}} + \sqrt{8 B_h^2\frac{\alpha^2}{n^2}}
+  \le \frac1H \phat f + H B_h\frac{\alpha}{n} + 2\sqrt2 B_h \frac{\alpha}{n} ,
+\]
+and $\phat f \le \Delta$. Therefore
+\[
+  (p_h - \phat)f(s,a) \le \frac1H\Delta + \Big(H + 2\sqrt2 + \frac23\Big) B_h\frac{\alpha}{n}
+  \le \frac1H\Delta + (4H + 5) B_h \frac{\alpha}{n} \le \frac1H \Delta + b ,
+\]
+since $H + 2\sqrt2 + \frac23 \le H + 3.5 \le 4H + 5$ and $b \ge 5B_h\alpha/n + 4HB_h\alpha/n$
+(Definition~\ref{def:bonus} with the third term in $\alpha$, Remark~\ref{rem:pos_constants_bonus};
+the square-root term of $b$ is nonnegative).
+\emph{Sum.} $\phat\Zt^t_{h+1} - p_h\Zr^t_{h+1} \le 2b + (1 + \frac2H)\Delta$, hence
+$\Ut_h^t(s,a) - \Ur_h^t(s,a) \le e^{\beta r_h}[3b + (1 + \frac3H)\Delta]$.
+
+\emph{Case 2: $\Ur_h^t(s,a) = \Ur^t_{h,\mathrm{pes}}(s,a)$.} Then
+$\Ur_h^t(s,a) \ge e^{\beta r_h}[\phat\Zr^t_{h+1} - b - \frac1H\Delta]$ (the maximum dominates its
+second argument), so
+\[
+  \Ut_h^t(s,a) - \Ur_h^t(s,a) \le e^{\beta r_h}\Big[2b + \Delta + \tfrac1H\phat(\Zt^t_{h+1} - \Zl^t_{h+1}) + \tfrac1H\Delta\Big]
+  \le e^{\beta r_h}\Big[2b + \big(1 + \tfrac2H\big)\Delta\Big] ,
+\]
+which is at most the claimed bound as $b \ge 0$ (Lemma~\ref{lem:backups_range}) and $\Delta \ge 0$.
+No event is used in this case.
+\end{proof}
+
+\begin{remark}[The constants $3$ and $3/H$]\label{rem:pos_constants_certificate}
+\uses{lem:certificate_pos}
+The paper's proof of Lemma~11 bounds the third term by
+$\frac1H\Delta + (2H + \frac23)B_h\alpha/n$ and then claims that this is at most $\frac1H\Delta + b$.
+With the bonus of equation (bonus positive) of the paper this would require
+$(2H + \frac23) B_h\alpha/n \le 5B_h\alpha/n + 4HB_h\alpha^*/n$, which is false in general
+($\alpha^*/\alpha$ can be as small as $1/S$). With the third term of the bonus in $\alpha$
+(Remark~\ref{rem:pos_constants_bonus}) the inequality $(H + 2\sqrt2 + \frac23) B_h \alpha/n \le b$
+holds for every $H \ge 1$, and the constants $3$ and $3/H$ of the certificate
+(Definition~\ref{def:certificate}) are correct. The coefficient $\frac1H$ in front of $\Delta$ is
+what makes the certificate recursion $(1 + \frac3H)$-contracting up to the constant $e^3$
+(Lemma~\ref{lem:cert_unrolled_pos}); it is bought at the price of the $HB_h\alpha/n$ term, which is
+why the bonus needs an $H\alpha/n$ term.
+\end{remark}
+
+\begin{lemma}[The certificate dominates the optimistic--ring gap]\label{lem:cert_dominates_gap_pos}
+\uses{def:good_event, def:certificate, def:backups, def:ring, def:greedy, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$,
+\[
+  \Zt_h^t(s) - \Zr_h^t(s) \le (\pi_h\cert_h^t)(s) .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:certificate_pos, lem:backups_range, lem:pos_ring_range, lem:emp_trans_simplex, def:certificate, def:greedy, def:ring, lem:certificate_range}
+Fix $\omega \in \evGood^+$ and $t$; backward induction on $h$. Base case $h = H + 1$: both sides
+are $0$ ($\Zt_{H+1}^t = \Zr_{H+1}^t = 1$, $\cert_{H+1}^t = 0$). Induction step: let $h \le H$, $s \in \Ss$
+and $a := \pi_h(s)$; by Definitions~\ref{def:greedy} and~\ref{def:ring},
+$\Zt_h^t(s) = \Ut_h^t(s,a)$ and $\Zr_h^t(s) = \Ur_h^t(s,a)$. In all cases
+$\Zt_h^t(s) - \Zr_h^t(s) \le c_h - 1 \le c_h$ by Lemma~\ref{lem:backups_range} ($\Zt_h^t \le c_h$) and
+Lemma~\ref{lem:pos_ring_range} ($\Zr_h^t \ge 1$).
+
+\emph{Never-visited pair} ($n_h^t(s,a) = 0$): $(\pi_h\cert_h^t)(s) = c_h$ (Definition~\ref{def:certificate}),
+and we are done.
+
+\emph{Visited pair} ($n \ge 1$): $(\pi_h\cert_h^t)(s) = \min\{c_h, e^{\beta r_h(s,a)}[3b + (1 + \frac3H)\phat(\pi_{h+1}\cert_{h+1}^t)]\}$;
+the first argument was handled above, and for the second, Lemma~\ref{lem:certificate_pos} and the
+induction hypothesis $\Zt^t_{h+1} - \Zr^t_{h+1} \le \pi_{h+1}\cert^t_{h+1}$ pointwise, integrated
+against the probability vector $\phat$ (Lemma~\ref{lem:emp_trans_simplex}), give
+$\Zt_h^t(s) - \Zr_h^t(s) \le e^{\beta r_h(s,a)}[3b + (1 + \frac3H)\phat(\pi_{h+1}\cert^t_{h+1})]$.
+\end{proof}
+
+\begin{lemma}[The certificate dominates the suboptimality gap; Lemma~9 of the paper]\label{lem:stopping_pos}
+\uses{def:good_event, def:certificate, def:opt_value, def:exp_value, def:greedy, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H + 1\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$,
+\[
+  Z^*_h(s) - Z^\pi_h(s) \le (\pi_h\cert_h^t)(s) .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:optimism_pos, lem:ring_pos, lem:cert_dominates_gap_pos}
+$Z^*_h(s) \le \Zt_h^t(s)$ (Lemma~\ref{lem:optimism_pos}) and $\Zr_h^t(s) \le Z^\pi_h(s)$
+(Lemma~\ref{lem:ring_pos}), so $Z^*_h(s) - Z^\pi_h(s) \le \Zt_h^t(s) - \Zr_h^t(s) \le (\pi_h\cert_h^t)(s)$
+(Lemma~\ref{lem:cert_dominates_gap_pos}).
+\end{proof}
+
+\begin{lemma}[Soundness of the stopping rule]\label{lem:pac_at_stopping_pos}
+\uses{def:good_event, def:stopping_rule, def:entropic_value, def:opt_value, def:greedy, def:entropic_bpi}
+On $\evGood^+$, for every $t \ge 0$ such that the stopping condition of
+Definition~\ref{def:stopping_rule} holds after $t$ episodes, i.e.\
+$(\pi_1\cert_1^t)(s_1) \le \frac{e^{\beta\eps} - 1}{e^{\beta\eps}}\Zt_1^t(s_1)$ with $\pi = \pi^{t+1}$,
+one has $V^*_1(s_1) - V^\pi_1(s_1) \le \eps$.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:cert_dominates_gap_pos, lem:ring_pos, lem:stopping_pos, lem:value_gap_log, lem:exp_value_range}
+Write $g := (\pi_1\cert_1^t)(s_1) \ge 0$. Multiplying the stopping condition by $e^{\beta\eps} > 0$
+gives $e^{\beta\eps} g \le (e^{\beta\eps} - 1)\Zt_1^t(s_1)$, i.e.\ $g \le (e^{\beta\eps} - 1)(\Zt_1^t(s_1) - g)$.
+By Lemma~\ref{lem:cert_dominates_gap_pos} and Lemma~\ref{lem:ring_pos},
+$\Zt_1^t(s_1) - g \le \Zr_1^t(s_1) \le Z^\pi_1(s_1)$, and $e^{\beta\eps} - 1 > 0$, so
+$g \le (e^{\beta\eps} - 1) Z^\pi_1(s_1)$. By Lemma~\ref{lem:stopping_pos},
+$Z^*_1(s_1) - Z^\pi_1(s_1) \le g \le (e^{\beta\eps} - 1)Z^\pi_1(s_1)$, and $Z^\pi_1(s_1) > 0$
+(Lemma~\ref{lem:exp_value_range}); Lemma~\ref{lem:value_gap_log} ($\beta > 0$) concludes.
+\end{proof}
+
+\textbf{Lean remark.} The stopping condition is \texttt{stopCond r β δ ε s₁ (histAt X Y t ω)};
+this lemma is about the history of $t$ episodes for a fixed $t$ and does not mention $\tau$. The
+translation from the exponential gap to the entropic gap is entirely in
+Lemma~\ref{lem:value_gap_log}; here only real arithmetic is used.
+
+\section{The certificate under the true kernel}
+\label{sec:pos_true_kernel}
+
+\begin{lemma}[Certificate recursion under the true kernel]\label{lem:cert_true_recursion_pos}
+\uses{def:good_event, def:certificate, def:rate_min, def:exp_value, def:greedy, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, $h \in \{1, \dots, H\}$ and $s \in \Ss$, with $\pi = \pi^{t+1}$ and
+$a := \pi_h(s)$,
+\[
+  (\pi_h\cert_h^t)(s) \le e^{\beta r_h(s,a)}\Big[
+    36\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\,\rho^{*t}_h(s,a)}
+    + \Big(1 + \frac{13}{H}\Big)\big(p_h\,\pi_{h+1}\cert^t_{h+1}\big)(s,a)
+    + 84\,H\,c_h\,\rho^t_h(s,a)\Big] ,
+\]
+where $\rho^t_h(s,a) = \min\{\alpha(n,\delta)/n, 1\}$ and $\rho^{*t}_h(s,a) = \min\{\alpha^*(n,\delta)/n, 1\}$
+(both equal to $1$ if $n = n_h^t(s,a) = 0$; Definition~\ref{def:rate_min}).
+\end{lemma}
+
+\begin{proof}
+\uses{lem:certificate_range, def:certificate, def:bonus, def:event_kl, lem:kl_bernstein, lem:var_le_range_mean, lem:kl_transport_var, lem:transport_var, lem:sqrt_add_le, lem:sqrt_mul_le, lem:rates_props, lem:opt_exp_value_eq, lem:optimism_pos, lem:ring_pos, lem:cert_dominates_gap_pos, lem:backups_range, lem:exp_value_range, lem:exp_value_monotone, lem:emp_trans_simplex}
+Fix $\omega \in \evGood^+$, $t$, $h$, $s$, $a = \pi_h(s)$; write $g := \pi_{h+1}\cert^t_{h+1} : \Ss \to [0, B_h]$
+(Lemma~\ref{lem:certificate_range}, the clip at step $h + 1$ being $c_{h+1} = B_h$),
+$\Delta_p := (p_h g)(s,a) \ge 0$ and $\rho, \rho^*$ as in the statement. All three terms in the
+bracket are nonnegative and $e^{\beta r_h} \ge 1$.
+
+\emph{Trivial case: $n = 0$ or $\alpha/n \ge 1$.} Then $\rho = 1$, and $(\pi_h\cert_h^t)(s) \le c_h \le 84 H c_h \rho$
+(Lemma~\ref{lem:certificate_range}), which is at most the right-hand side.
+
+\emph{Main case: $n \ge 1$ and $\alpha/n < 1$.} Then $\rho = \alpha/n$ and, as $\alpha^* \le \alpha$
+(Lemma~\ref{lem:rates_props}), $\rho^* = \alpha^*/n \le \rho$. Dropping the clip in
+Definition~\ref{def:certificate}, $(\pi_h\cert_h^t)(s) \le e^{\beta r_h(s,a)}[3b + (1 + \frac3H)\phat g]$.
+
+\emph{Step (i): the empirical expectation of $g$.} Since $\omega \in \evKL$,
+Lemma~\ref{lem:kl_bernstein} (range $B_h$) gives
+$\abs{(\phat - p_h) g(s,a)} \le \sqrt{2\Var_{p_h}(g)(s,a)\rho} + \frac23 B_h\rho$, and
+$\Var_{p_h}(g)(s,a) \le B_h\Delta_p$ (Lemma~\ref{lem:var_le_range_mean}). By
+Lemma~\ref{lem:sqrt_mul_le} with $x = \Delta_p$, $y = 2B_h\rho$, $\eta = 2/H$:
+$\sqrt{2B_h\Delta_p\rho} \le \frac1H\Delta_p + \frac{H}{2}B_h\rho$. Hence, as $\frac H2 + \frac23 \le 2H$,
+\[
+  \phat g \le \Big(1 + \frac1H\Big)\Delta_p + 2 H B_h \rho .
+\]
+
+\emph{Step (ii): the bonus under the true kernel.} Recall
+$b = 2\sqrt2\sqrt{\Var_{\phat}(\Zt^t_{h+1})\rho^*} + 5B_h\rho + 4HB_h\rho$ (Definition~\ref{def:bonus},
+Remark~\ref{rem:pos_constants_bonus}). Lemma~\ref{lem:kl_transport_var} (second inequality, with
+$f = \Zt^t_{h+1} - 1 \in [0, B_h]$ by Lemma~\ref{lem:backups_range}) gives
+$\Var_{\phat}(\Zt^t_{h+1}) \le 2\Var_{p_h}(\Zt^t_{h+1})(s,a) + 4B_h^2\rho$.
+Lemma~\ref{lem:transport_var} (first part, with $f = \Zt^t_{h+1} - 1$ and $g' = Z^\pi_{h+1} - 1$, both in
+$[0, B_h]$ by Lemmas~\ref{lem:backups_range} and~\ref{lem:exp_value_range}) gives
+$\Var_{p_h}(\Zt^t_{h+1}) \le 2\Var_{p_h}(Z^\pi_{h+1}) + 2B_h\,p_h\abs{\Zt^t_{h+1} - Z^\pi_{h+1}}$. Now
+$Z^\pi_{h+1} \le Z^*_{h+1} \le \Zt^t_{h+1}$ pointwise (Lemma~\ref{lem:opt_exp_value_eq} for $\beta > 0$ and
+Lemma~\ref{lem:optimism_pos}), and
+$\Zt^t_{h+1} - Z^\pi_{h+1} \le \Zt^t_{h+1} - \Zr^t_{h+1} \le g$ pointwise
+(Lemmas~\ref{lem:ring_pos} and~\ref{lem:cert_dominates_gap_pos}); by the monotonicity of $p_h$
+(Lemma~\ref{lem:exp_value_monotone}), $p_h\abs{\Zt^t_{h+1} - Z^\pi_{h+1}}(s,a) \le \Delta_p$. Therefore
+\[
+  \Var_{\phat}(\Zt^t_{h+1})\rho^* \le 4\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^* + 4B_h\Delta_p\rho^* + 4B_h^2\rho\rho^* ,
+\]
+and by Lemma~\ref{lem:sqrt_add_le} (twice), Lemma~\ref{lem:sqrt_mul_le} with $x = \Delta_p$,
+$y = 4B_h\rho^*$ and $\eta = 1/(\sqrt2 H)$ (so that $\sqrt{xy} \le \frac{x}{2\sqrt2 H} + \sqrt2 H\cdot 2B_h\rho^*$),
+and $\sqrt{\rho\rho^*} \le \rho$,
+\[
+  2\sqrt2\sqrt{\Var_{\phat}(\Zt^t_{h+1})\rho^*}
+  \le 4\sqrt2\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^*} + \frac1H\Delta_p + 8HB_h\rho^* + 4\sqrt2 B_h\rho .
+\]
+With $\rho^* \le \rho$, $4\sqrt2 \le 6$ and $8H + 4\sqrt2 + 5 + 4H \le (12 + 4\sqrt2 + 5)H \le 23H$,
+\[
+  b \le 6\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^*} + \frac1H\Delta_p + 23 H B_h\rho .
+\]
+
+\emph{Step (iii): combination.} Using (i), (ii), $(1 + \frac3H)(1 + \frac1H) = 1 + \frac4H + \frac3{H^2} \le 1 + \frac7H$
+and $(1 + \frac3H)\cdot 2H = 2H + 6 \le 8H$ (all for $H \ge 1$),
+\begin{align*}
+  3b + \Big(1 + \frac3H\Big)\phat g
+  &\le 18\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^*} + \frac3H\Delta_p + 69HB_h\rho
+     + \Big(1 + \frac7H\Big)\Delta_p + 8HB_h\rho \\
+  &\le 36\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^*} + \Big(1 + \frac{10}{H}\Big)\Delta_p + 77 H B_h\rho ,
+\end{align*}
+which is at most the bracket of the statement since $B_h \le c_h$, $10 \le 13$ and $77 \le 84$.
+\end{proof}
+
+\begin{remark}[The constants $36$, $13$, $84$ and the additive term]\label{rem:pos_constants_recursion}
+\uses{lem:cert_true_recursion_pos}
+The paper's computation (Appendix~B.1, ``Sample complexity'') is looser than the one above: it
+keeps the coefficient $\frac{2\sqrt2}{H}$ in front of $\Delta_p$ in the bound on $b$, which gives the
+coefficient $1 + \frac{4 + 6\sqrt2}{H} + \frac{3}{H^2} \le 1 + \frac{15.5}{H}$ (not $1 + \frac{13}{H}$) after
+multiplication by $3$, and it drops a $+9$ when simplifying $81H + (1 + \frac3H)3H$ to $84H$.
+Choosing $\eta = 1/(\sqrt2 H)$ instead of $2/H$ in the AM--GM step of (ii), and the sharper
+form of Lemma~\ref{lem:sqrt_mul_le} in (i), gives $1 + \frac{10}{H}$ and $77H$, so the paper's
+constants $36$, $13$, $84$ are correct with room to spare. The additive term is written with
+$c_h = e^{\beta(H+1-h)}$ rather than the paper's $e^{\beta(H-h)}$ (deviation~11): it must dominate
+the certificate of a never-visited pair, which is its clip $c_h$, and this is the only place
+where the clip of Definition~\ref{def:certificate} enters the sample complexity. The rates are
+the truncated rates $\rho = \min\{\alpha/n, 1\}$ (the paper's $\alpha(n)/n \wedge 1$), with the value
+$1$ for never-visited pairs, so that the statement has no $\alpha(0)/0$.
+\end{remark}
+
+\begin{lemma}[Unrolled certificate]\label{lem:cert_unrolled_pos}
+\uses{def:good_event, def:certificate, def:rate_min, def:exp_value, def:step_law, def:greedy, def:entropic_bpi}
+On $\evGood^+$, for all $t \ge 0$, with $\pi = \pi^{t+1}$ and $\E^\pi = \E^\pi_{(s_1, 1)}$,
+\[
+  (\pi_1\cert_1^t)(s_1) \le e^{13}\,\E^\pi\Bigg[\sum_{h=1}^H e^{\beta\sum_{i \le h} r_i(S_i, A_i)}
+  \Big(36\sqrt{\Var_{p_h}(Z^\pi_{h+1})(S_h, A_h)\,\rho^{*t}_h(S_h, A_h)}
+  + 84\,H\,c_h\,\rho^t_h(S_h, A_h)\Big)\Bigg] .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:cert_true_recursion_pos, lem:unroll_recursion, lem:one_add_div_pow_le_exp, def:certificate}
+Fix $\omega \in \evGood^+$ and $t$. Apply Lemma~\ref{lem:unroll_recursion} to the policy $\pi$, the
+functions $g_h := \pi_h\cert_h^t$ ($h \le H + 1$; $g_{H+1} = 0$ by Definition~\ref{def:certificate}), the
+nonnegative functions
+$u_h(s,a) := 36\sqrt{\Var_{p_h}(Z^\pi_{h+1})(s,a)\rho^{*t}_h(s,a)} + 84Hc_h\rho^t_h(s,a)$ and
+$\kappa := 1 + \frac{13}{H} \ge 1$: the hypothesis
+$g_h(s) \le e^{\beta r_h(s, \pi_h(s))}[u_h(s, \pi_h(s)) + \kappa(p_hg_{h+1})(s, \pi_h(s))]$ for all
+$h \le H$ and $s$ is Lemma~\ref{lem:cert_true_recursion_pos}, and the rewards are nonnegative. The
+conclusion is $g_1(s_1) \le \sum_{h=1}^H\kappa^{h-1}\E^\pi[e^{\beta\sum_{i \le h} r_i(S_i,A_i)}u_h(S_h,A_h)]$, and
+$\kappa^{h-1} \le \kappa^H \le e^{13}$ by Lemma~\ref{lem:one_add_div_pow_le_exp} (with $a = 13$,
+$0 \le h - 1 \le H$); all the summands are nonnegative.
+\end{proof}
+
+\textbf{Lean remark.} The expectation is an integral against
+$\mathrm{stepLaw}\ M\ \pi\ (s_1, 0)$ of a bounded measurable function of the first $H$ rounds;
+the rate terms $\rho^t_h(S_h, A_h)$ are, for the fixed $\omega$, deterministic functions of $(h, s, a)$
+(the history is frozen), so no measurability issue in $\omega$ arises inside the expectation.
+
+\begin{lemma}[Normalized certificate bound]\label{lem:ratio_bound_pos}
+\uses{def:good_event, def:certificate, def:backups, def:rate_min, def:occupancy, def:gmax, def:upper_bound_const, def:greedy, def:entropic_bpi}
+Let $V_G := (e^{\beta\Gmax} - 1)^2/e^{\beta\Gmax}$ with $\Gmax = \Gmax(\mathcal M)$ (Definition~\ref{def:gmax};
+this is the $V_G$ of Definition~\ref{def:upper_bound_const}). On $\evGood^+$, for all $t \ge 0$, with
+$\pi = \pi^{t+1}$,
+\[
+  \frac{(\pi_1\cert_1^t)(s_1)}{\Zt_1^t(s_1)} \le e^{13}\Big[36\sqrt{V_G\,x_t} + 84\,H\,e^{\beta(H+1)}\,y_t\Big],
+  \quad
+  x_t := \sum_{h=1}^H\sum_{s,a} p^\pi_h(s,a)\rho^{*t}_h(s,a), \quad
+  y_t := \sum_{h=1}^H\sum_{s,a} p^\pi_h(s,a)\rho^t_h(s,a),
+\]
+where $p^\pi_h$ is the occupancy measure of $\pi$ from $s_1$ (Definition~\ref{def:occupancy}).
+\end{lemma}
+
+\begin{proof}
+\uses{lem:cert_unrolled_pos, lem:optimism_pos, lem:opt_exp_value_eq, lem:exp_value_range, lem:cauchy_schwarz_traj, lem:entropic_variance_sum, lem:variance_ratio_le, lem:gmax_le_horizon, lem:occupancy_expectation, def:entropic_variance}
+Fix $\omega \in \evGood^+$ and $t$. \emph{Denominator.} $\Zt_1^t(s_1) \ge Z^*_1(s_1) \ge Z^\pi_1(s_1) \ge 1 > 0$
+(Lemma~\ref{lem:optimism_pos}, Lemma~\ref{lem:opt_exp_value_eq} for $\beta > 0$,
+Lemma~\ref{lem:exp_value_range}), so the left-hand side is at most $(\pi_1\cert_1^t)(s_1)/Z^\pi_1(s_1)$,
+which we bound by dividing Lemma~\ref{lem:cert_unrolled_pos} by $Z^\pi_1(s_1)$.
+
+\emph{Variance term.} Put $w_h := e^{\beta\sum_{i \le h} r_i(S_i,A_i)}$ (a nonnegative function of the
+trajectory up to step $h$), $v_h := \Var_{p_h}(Z^\pi_{h+1})(S_h,A_h)/Z^\pi_1(s_1)^2$ and
+$u_h := \rho^{*t}_h(S_h,A_h)$. Lemma~\ref{lem:cauchy_schwarz_traj} (Cauchy--Schwarz for $\sum_h\E^\pi$) gives
+\[
+  \E^\pi\Big[\sum_h w_h\sqrt{v_hu_h}\Big] \le \sqrt{\E^\pi\Big[\sum_h w_h^2v_h\Big]}\sqrt{\E^\pi\Big[\sum_h u_h\Big]} .
+\]
+By Lemma~\ref{lem:entropic_variance_sum},
+$\E^\pi[\sum_h w_h^2 v_h] = \Var_{\Prob^\pi}(e^{\beta R_1^\pi})/Z^\pi_1(s_1)^2$, and by
+Lemma~\ref{lem:variance_ratio_le} with $G = \Gmax$ (admissible since $R_1^\pi \in [0, \Gmax]$ a.s.\ by
+Lemma~\ref{lem:gmax_le_horizon}), this ratio is at most $V_G$. By Lemma~\ref{lem:occupancy_expectation},
+$\E^\pi[\sum_h u_h] = x_t$.
+
+\emph{Rate term.} Since $0 \le r_i \le 1$ and $\beta > 0$, $w_h \le e^{\beta h}$, and $e^{\beta h}c_h = e^{\beta(H+1)}$;
+with $Z^\pi_1(s_1) \ge 1$ and Lemma~\ref{lem:occupancy_expectation},
+$\E^\pi[\sum_h w_h\,84Hc_h\rho^t_h(S_h,A_h)]/Z^\pi_1(s_1) \le 84He^{\beta(H+1)}\,y_t$.
+\end{proof}
+
+\textbf{Lean remark.} Lemma~\ref{lem:cauchy_schwarz_traj} allows the weight $w_h$ to depend on
+the whole trajectory up to step $h$ (here on the past rewards), not only on $(S_h, A_h)$, which
+is needed here. The identity of Lemma~\ref{lem:entropic_variance_sum} is where the entropic
+variance $\sigma V^\pi_1(s_1)$ of Definition~\ref{def:entropic_variance} is identified with the
+variance of $e^{\beta R_1^\pi}$ under $\Prob^\pi_{(s_1,1)}$.
+
+\section{Bounding the stopping time}
+\label{sec:pos_stopping_time}
+
+\begin{lemma}[Progress at a non-stopping episode]\label{lem:progress_pos}
+\uses{def:good_event, def:stopping_rule, def:certificate, def:backups, def:upper_bound_const, def:entropic_bpi}
+Let $\kappa(\beta, \eps) := (e^{|\beta|\eps} - 1)e^{-2|\beta|\eps}/2$ (Definition~\ref{def:upper_bound_const}).
+On $\evGood^+$, for every $t \ge 0$ such that the stopping condition of Definition~\ref{def:stopping_rule}
+\emph{fails} after $t$ episodes,
+\[
+  \kappa(\beta, \eps) \le \frac{(\pi_1\cert_1^t)(s_1)}{\Zt_1^t(s_1)} .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{def:stopping_rule, lem:backups_range}
+Failure of the condition means $(\pi_1\cert_1^t)(s_1) > \frac{e^{\beta\eps} - 1}{e^{\beta\eps}}\Zt_1^t(s_1)$, and
+$\Zt_1^t(s_1) \ge 1 > 0$ (Lemma~\ref{lem:backups_range}), so the ratio exceeds
+$(e^{\beta\eps} - 1)e^{-\beta\eps} \ge (e^{\beta\eps} - 1)e^{-2\beta\eps}/2 = \kappa(\beta,\eps)$ (as $e^{-\beta\eps} \le 1$ and $\frac12 \le 1$;
+here $|\beta| = \beta$). No event is actually needed.
+\end{proof}
+
+\begin{lemma}[Bound on the stopping time]\label{lem:stopping_time_bound_pos}
+\uses{def:good_event, def:entropic_bpi, def:upper_bound_const, def:gmax}
+On $\evGood^+$, the stopping time of the run satisfies
+$\tau \le \mathrm{upperBound}(S, A, H, \beta, \eps, \delta, \Gmax(\mathcal M))$ (Definition~\ref{def:upper_bound_const});
+in particular $\tau < \infty$.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:progress_pos, lem:ratio_bound_pos, lem:sum_counts_bound, lem:entropic_bpi_run, lem:self_bounding, def:rates, def:upper_bound_const, lem:rates_props, def:rate_min}
+Fix $\omega \in \evGood^+$ (in particular $\omega \in \evCnt$) and write $\kappa := \kappa(\beta,\eps) > 0$,
+$A_0 := \log(3SAH/\delta) > 0$, $C := 10^9\sqrt{V_G SAH}/\kappa$ and $D := 10^{10}e^{\beta(H+1)}H^2SA/\kappa$ (the
+constants of Definition~\ref{def:upper_bound_const}, with $|\beta| = \beta$).
+
+\emph{Step 1: an inequality for every $T \le \tau$.} Let $T \ge 1$ be an integer with $T \le \tau$
+(i.e.\ the stopping condition fails after $t$ episodes for every $t < T$: by
+Lemma~\ref{lem:entropic_bpi_run}, $\tau$ is the first $t$ at which it holds). Summing
+Lemma~\ref{lem:progress_pos} and Lemma~\ref{lem:ratio_bound_pos} over $t = 0, \dots, T - 1$,
+\[
+  T\kappa \le \sum_{t < T}\frac{(\pi_1\cert_1^t)(s_1)}{\Zt_1^t(s_1)}
+  \le 36e^{13}\sqrt{V_G}\sum_{t < T}\sqrt{x_t} + 84e^{13}He^{\beta(H+1)}\sum_{t < T}y_t .
+\]
+By the Cauchy--Schwarz inequality, $\sum_{t < T}\sqrt{x_t} \le \sqrt{T}\sqrt{\sum_{t < T}x_t}$.
+
+\emph{Step 2: the counting bounds.} $x_t$ and $y_t$ are the inner sums of
+Lemma~\ref{lem:sum_counts_bound} (with the policy $\pi^{t+1}$, the counts $n_h^t$ of the run and the
+rates $\alpha^*$, resp.\ $\alpha$), so on $\evCnt$,
+$\sum_{t < T}x_t \le 16SAH\,\alpha^*(T-1,\delta)\log(T+1)$ and $\sum_{t < T}y_t \le 16SAH\,\alpha(T-1,\delta)\log(T+1)$.
+Put $L := \log(8eT)$; for $T \ge 1$, $\log(T+1) \le L$ and, by Definition~\ref{def:rates},
+$\alpha^*(T-1,\delta) = A_0 + L$ and $\alpha(T-1,\delta) = A_0 + SL$. Hence
+\[
+  \sum_{t < T}x_t \le 16SAH\,(A_0L + L^2), \qquad \sum_{t < T}y_t \le 16SAH\,(A_0L + SL^2) .
+\]
+
+\emph{Step 3: the self-bounding inequality.} Combining,
+\[
+  T \le \frac{144\,e^{13}\sqrt{V_G SAH}}{\kappa}\sqrt{T(A_0L + L^2)}
+     + \frac{1344\,e^{13}e^{\beta(H+1)}H^2SA}{\kappa}\,(A_0L + SL^2) .
+\]
+Numerically $e^{13} \le 4.43\cdot 10^5$, so $144\,e^{13} \le 6.4\cdot 10^7 \le 10^9$ and
+$1344\,e^{13} \le 6.0\cdot 10^8 \le 10^{10}$; both brackets are nonnegative, so
+\[
+  T \le C\sqrt{T(A_0L + L^2)} + D\,(A_0L + SL^2), \qquad L = \log(8eT) .
+\]
+This is the hypothesis of Lemma~\ref{lem:self_bounding} with $\tau := T$, $A := A_0$, $B := 1$,
+$E := S$, $\alpha := 8e \ge e$ (so that $\log(\alpha\tau) = L$) and the constants $C \ge 0$, $D$: indeed
+$E \ge B$, $A_0 > 0$, and $D \ge 1$ (because $\kappa \le 1/8$: $(u - 1)/u^2 \le 1/4$ for $u > 1$).
+Its conclusion is
+\[
+  T \le C^2(A_0 + 1)C_1^2 + \big(D + 2\sqrt{D}C\big)(A_0 + S)C_1^2 + 1 = \mathrm{upperBound}(S,A,H,\beta,\eps,\delta,\Gmax),
+\]
+with the $C_1$ of Lemma~\ref{lem:self_bounding} for $\alpha = 8e$, $A + E = A_0 + S$ and the constants
+$C$, $D$, which is the $C_1$ of Definition~\ref{def:upper_bound_const} (Remark~\ref{rem:pos_c1_constant}).
+
+\emph{Step 4: conclusion.} If $\tau = \infty$, every integer $T \ge 1$ satisfies $T \le \tau$, so every
+$T \ge 1$ is at most the finite number $\mathrm{upperBound}$: contradiction. Hence $\tau < \infty$; if
+$\tau \ge 1$, take $T = \tau$ in Step~3; if $\tau = 0$ the bound holds since $\mathrm{upperBound} \ge 1$.
+\end{proof}
+
+\textbf{Lean remark.} $\tau$ is \texttt{IdentAlg.stoppingTime}, with values in \texttt{ℕ∞}; the
+statement ``for every $t < \tau$ the stopping condition fails'' is the characterization of the
+hitting time (\texttt{hittingAfter}, Lemma~\ref{lem:entropic_bpi_run}), valid also when $\tau = \infty$.
+The proof is organized as: (a) a lemma ``for all $T \ge 1$ with $(T : \texttt{ℕ∞}) \le \tau$,
+$T \le \mathrm{upperBound}$'' proved on $\evGood^+$ by Steps~1--3; (b) the deduction $\tau \le \mathrm{upperBound}$
+by a case split on $\tau = \top$. The step $T\kappa \le \sum_t(\cdot)$ is a sum of $T$ inequalities each
+valid at an $\omega$ of the event, the sums $\sum_{t<T}x_t$ are \texttt{Finset.sum (Finset.range T)},
+and the final numeric inequalities are \texttt{norm\_num} with the bound
+\texttt{Real.exp 13 ≤ 4.43e5} (obtained from \texttt{Real.exp\_one\_lt\_d9}). When
+$\Gmax(\mathcal M) = 0$ (all returns vanish a.s.), $V_G = 0$ and $C = 0$, which Lemma~\ref{lem:self_bounding}
+allows.
+
+\begin{remark}[The constant $C_1$]\label{rem:pos_c1_constant}
+\uses{lem:self_bounding, def:upper_bound_const}
+The outline of this blueprint states Lemma~\ref{lem:self_bounding} with
+$C_1 = \frac85\log(11\alpha^2(A + E)(C + D))$, and Definition~\ref{def:upper_bound_const} copies this form
+with $\alpha = 8e$, $A + E = A_0 + S$. Chapter~\ref{chap:pre_analysis}, as written, proves the lemma with
+$C_1 = \frac85\log(11\alpha^2(A + E)(C + \sqrt D)^2)$, and with $(C + D)^2$ in place of $(C + \sqrt D)^2$ when
+$D \ge 1$ (which holds here); for $C + D \ge 1$ this is larger than the outline's $C_1$ by
+$\frac85\log(C + D)$. The two must agree: $\mathrm{upperBound}$ is only meaningful with the $C_1$ that
+Lemma~\ref{lem:self_bounding} actually provides, so Definition~\ref{def:upper_bound_const} should be
+read (and, if needed, amended) with that $C_1$. Nothing else in this chapter depends on the form
+of $C_1$; the asymptotic form $\tilde O(\kappa^{-2}V_GSAH)$ of the bound is the same in both cases.
+\end{remark}
+
+\begin{lemma}[PAC guarantee and sample complexity of Entropic-BPI for $\beta > 0$]\label{lem:pac_pos}
+\uses{def:entropic_bpi, def:entropic_value, def:opt_value, def:upper_bound_const, def:gmax, def:good_event}
+In the standing setting,
+\[
+  \Prob\big(V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps\big) \le \delta
+  \qquad\text{and}\qquad
+  \Prob\big(\tau \le \mathrm{upperBound}(S,A,H,\beta,\eps,\delta,\Gmax(\mathcal M))\big) \ge 1 - \delta ,
+\]
+(on the event $\{\tau = \infty\}$, of probability at most $\delta$ by the second statement, the
+output $\mathrm{out}$ is whatever policy the run assigns).
+\end{lemma}
+
+\begin{proof}
+\uses{lem:stopping_time_bound_pos, lem:entropic_bpi_run, lem:pac_at_stopping_pos, lem:good_event}
+By Lemma~\ref{lem:good_event}, $\Prob(\evGood^+) \ge 1 - \delta$, so it suffices to show that, up to a
+$\Prob$-null set $N$, $\evGood^+ \setminus N$ is contained in both events. Let $N$ be the null set
+outside of which the conclusions of Lemma~\ref{lem:entropic_bpi_run} hold (the actions are the
+greedy policies of the histories, the stopping condition holds at $\tau$ when $\tau < \infty$, and
+$\mathrm{out} = \pi^{\tau + 1}$ on $\{\tau < \infty\}$). For $\omega \in \evGood^+ \setminus N$:
+Lemma~\ref{lem:stopping_time_bound_pos} gives $\tau(\omega) \le \mathrm{upperBound} < \infty$; then the
+stopping condition holds after $t := \tau(\omega)$ episodes and $\mathrm{out}(\omega) = \pi^{t+1}$, so
+Lemma~\ref{lem:pac_at_stopping_pos} gives $V^*_1(s_1) - V^{\mathrm{out}(\omega)}_1(s_1) \le \eps$.
+\end{proof}
+
+\textbf{Lean remark.} This is the run-level statement (\texttt{IdentAlg.IsRun}) that
+Chapter~\ref{chap:sample_complexity} converts into the PAC property of the algorithm
+(\texttt{IdentAlg.IsPAC} is about the law of the output, Definition~\ref{def:entropic_pac}) and into
+Theorem~\ref{thm:upper_bound_complexity}. The measurability of the events $\{V^*_1 - V^{\mathrm{out}}_1 > \eps\}$
+and $\{\tau \le \mathrm{upperBound}\}$ is immediate: the policy type is finite and $\tau$ is a stopping time.
+The proof needs $\evGood^+$ only through its three defining properties, and the inclusion
+$\evGood^+ \setminus N \subseteq \{\tau \le \mathrm{upperBound}\} \cap \{V^*_1 - V^{\mathrm{out}}_1 \le \eps\}$ is proved
+pointwise.

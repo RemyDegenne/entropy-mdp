@@ -1,0 +1,29 @@
+{
+    "challenge_module": "Challenge_probReal_stoppingTime_entropicBPI_le_ge",
+    "solution_module": "Solution",
+    "theorem_names": [
+        "Essakine2026Tight.probReal_stoppingTime_entropicBPI_le_ge",
+        "exists_argmax",
+        "exists_argmin",
+        "Learning.MDP.measurable_lastObsAction",
+        "Learning.MDP.measurable_obsAction",
+        "Learning.MDP.isMarkovKernel_envObs",
+        "Learning.MDP.measurable_policyAlg_next",
+        "Learning.MDP.Episodic.measurable_layerTransFun",
+        "Learning.MDP.Episodic.isProbabilityMeasure_layerTrans",
+        "Learning.MDP.Episodic.measurable_layerRewardFun",
+        "Learning.MDP.Episodic.isProbabilityMeasure_layerReward",
+        "Learning.MDP.Episodic.Policy.measurable_layer",
+        "Learning.MDP.Episodic.measurable_statesLaw",
+        "Learning.MDP.Episodic.isProbabilityMeasure_statesKernel",
+        "Essakine2026Tight.sub_one_sub_lt",
+        "Essakine2026Tight.measurable_greedy_fst",
+        "Essakine2026Tight.measurable_greedy_snd",
+        "Essakine2026Tight.measurableSet_stopCond"
+    ],
+    "permitted_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+    ]
+}

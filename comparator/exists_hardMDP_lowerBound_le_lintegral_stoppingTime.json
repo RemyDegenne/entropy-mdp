@@ -1,0 +1,25 @@
+{
+    "challenge_module": "Challenge_exists_hardMDP_lowerBound_le_lintegral_stoppingTime",
+    "solution_module": "Solution",
+    "theorem_names": [
+        "Essakine2026Tight.exists_hardMDP_lowerBound_le_lintegral_stoppingTime",
+        "exists_argmax",
+        "exists_argmin",
+        "Learning.MDP.measurable_lastObsAction",
+        "Learning.MDP.measurable_obsAction",
+        "Learning.MDP.isMarkovKernel_envObs",
+        "Learning.MDP.measurable_policyAlg_next",
+        "Learning.MDP.Episodic.measurable_layerTransFun",
+        "Learning.MDP.Episodic.isProbabilityMeasure_layerTrans",
+        "Learning.MDP.Episodic.measurable_layerRewardFun",
+        "Learning.MDP.Episodic.isProbabilityMeasure_layerReward",
+        "Learning.MDP.Episodic.Policy.measurable_layer",
+        "Learning.MDP.Episodic.measurable_statesLaw",
+        "Learning.MDP.Episodic.isProbabilityMeasure_statesKernel"
+    ],
+    "permitted_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+    ]
+}

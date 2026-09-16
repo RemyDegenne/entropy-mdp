@@ -1,0 +1,363 @@
+\chapter{Sample complexity of Entropic-BPI}
+\label{chap:sample_complexity}
+
+This chapter proves Theorem~4 of the paper (Section~4, restated with explicit constants in
+Appendix~B), in the two-part form of deviation~6: the PAC guarantee
+(Theorem~\ref{thm:upper_bound_pac}) and the high-probability bound on the number of episodes
+(Theorem~\ref{thm:upper_bound_complexity}). The sign-specific work is done in
+Chapters~\ref{chap:analysis_pos} and~\ref{chap:analysis_neg}; what remains here is common to
+both signs: the counting argument of Appendix~B.1 (the paper's Lemmas~27 and~28), which
+converts a sum of rate terms $\alpha(n)/n \wedge 1$ along the episodes into a logarithmic
+bound (Lemma~\ref{lem:sum_counts_bound}), the definition of the constants of the bound
+(Definition~\ref{def:upper_bound_const}), and the final assembly.
+
+Standing setting. $\beta \ne 0$; $\mathcal M$ is a finite-horizon MDP (Definition~\ref{def:episodic_mdp})
+with the reward function $r$ (Definition~\ref{def:reward_fn}) with values in $[0,1]$;
+$\delta \in (0,1)$, $\eps > 0$, $s_1 \in \Ss$; $(X, Y, \mathrm{out})$ is a run of an algorithm
+in the episode environment of $\mathcal M$ from $s_1$ (Definition~\ref{def:episode_env}) on a
+probability space $(\Omega, \Prob)$, with $X_t = \pi^{t+1}$ the policy of episode $t + 1$ and
+$Y_t$ its state sequence; $n_h^t(s,a)$ are the counts (Definition~\ref{def:counts}),
+$\nbar_h^t(s,a) = \sum_{i \le t} p^{\pi^i}_h(s,a)$ the (random) pseudo-counts
+(Definition~\ref{def:pseudo_counts}, deviation~10), $p^\pi_h(s,a)$ the occupancy measure
+(Definition~\ref{def:occupancy}), and $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$,
+$\alpha^{\mathrm{cnt}}(\delta)$ the rates of Definition~\ref{def:rates}. We write $S := \abs{\Ss}$,
+$A := \abs{\As}$. When the algorithm is Entropic-BPI (Definition~\ref{def:entropic_bpi}), $\tau$
+denotes its stopping time (Definition~\ref{def:bpi_alg}).
+
+\section{The counting argument}
+\label{sec:sc_counting}
+
+\begin{definition}[Rate terms]\label{def:rate_min}
+\lean{Essakine2026Tight.rateMin, Essakine2026Tight.klRateMinAt, Essakine2026Tight.starRateMinAt}\leanok
+\uses{def:counts, def:rates}
+For a function $\alpha : [0, \infty) \to \R$ and $n \in \N$ let
+\[
+  \rho_\alpha(n) := \min\Big\{\frac{\alpha(n)}{n},\, 1\Big\} \quad (n \ge 1), \qquad \rho_\alpha(0) := 1 .
+\]
+The \emph{rate terms} of a run are, for $t \in \N$, $h \in [H]$ and $(s,a) \in \Ss\times\As$,
+\[
+  \rho^t_h(s,a) := \rho_{\alpha(\cdot,\delta)}\big(n_h^t(s,a)\big), \qquad
+  \rho^{*t}_h(s,a) := \rho_{\alpha^*(\cdot,\delta)}\big(n_h^t(s,a)\big) .
+\]
+(The paper writes $\alpha(n)/n \wedge 1$ with the convention $\alpha(0)/0 = \infty$; the value
+$1$ for an unvisited pair is deviation~11.)
+\end{definition}
+
+\textbf{Lean remark.} \texttt{rateMin (α : ℝ → ℝ) (n : ℕ) : ℝ := if n = 0 then 1 else min (α n / n) 1};
+on a run, \texttt{klRateMinAt X Y δ h s a t ω := rateMin (alphaKL S A H δ) (visitCountAt X Y h s a t ω)}
+and \texttt{starRateMinAt} with \texttt{alphaStar}. The rates of Definition~\ref{def:rates} are
+defined as functions of a \emph{real} argument $x \ge 0$ by the same formulas
+($\alpha(x,\delta) = \log(3SAH/\delta) + S\log(8e(x+1))$, etc.): Lemma~\ref{lem:pseudo_counts_bound}
+evaluates them at the real-valued pseudo-counts. Lean's $\alpha(0)/0 = 0$ never appears in a
+statement thanks to the case $n = 0$ of \texttt{rateMin}.
+
+\begin{lemma}[The rates as real functions]\label{lem:sc_rates_real}
+\uses{def:rates}
+Let $\delta \in (0, 1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$,
+viewed as a function of a real argument $x \ge 0$. Then
+\begin{enumerate}
+  \item[(i)] $\alpha$ is nondecreasing on $[0,\infty)$;
+  \item[(ii)] $x \mapsto \alpha(x)/x$ is nonincreasing on $[1, \infty)$;
+  \item[(iii)] $\alpha(x) \ge \alpha^{\mathrm{cnt}}(\delta) = \log(3SAH/\delta) \ge \log 3 > 1$ for all $x \ge 0$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\uses{def:rates}
+Write $a_0 := \log(3SAH/\delta)$ and $\alpha(x) = a_0 + k\log(8e(x+1))$ with $k = S$ or $k = 1$.
+(i) $x \mapsto \log(8e(x+1))$ is increasing. (ii) $\alpha(x)/x = a_0/x + k\,\log(8e(x+1))/x$;
+$a_0/x$ is nonincreasing on $(0,\infty)$ since $a_0 \ge 0$, and $f(x) := \log(8e(x+1))/x$ has
+derivative $f'(x) = \big(\tfrac{x}{x+1} - \log(8e(x+1))\big)/x^2 < 0$ on $(0,\infty)$ because
+$\tfrac{x}{x+1} < 1 < 1 + \log 8 = \log(8e) \le \log(8e(x+1))$. (iii) $k\log(8e(x+1)) \ge 0$ since
+$8e(x+1) \ge 8e > 1$, and $a_0 \ge \log 3 > 1$ because $3SAH/\delta \ge 3$ ($S, A, H \ge 1$,
+$\delta \le 1$) and $\log 3 > 1.09$.
+\end{proof}
+
+\begin{lemma}[Rate terms against pseudo-counts: the arithmetic]\label{lem:sc_rate_min_arith}
+\uses{def:rate_min}
+Let $a_0 \ge 1$ and let $\alpha : [0,\infty) \to \R$ satisfy
+(i) $\alpha$ nondecreasing, (ii) $x \mapsto \alpha(x)/x$ nonincreasing on $[1,\infty)$ and
+(iii) $\alpha(x) \ge a_0$ for all $x \ge 0$. Let $n \in \N$ and $\nbar \ge 0$ be such that
+$n \ge \nbar/2 - a_0$. Then
+\[
+  \rho_\alpha(n) \le \frac{4\,\alpha(\nbar)}{\max\{\nbar, 1\}} .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{def:rate_min}
+This is the case analysis of \cite[Lemma~7]{menard2021fast}.
+
+\emph{Case $\nbar \ge 4a_0$.} Then $n \ge \nbar/2 - a_0 \ge \nbar/2 - \nbar/4 = \nbar/4 \ge a_0 \ge 1$;
+in particular $n \ge 1$, so $\rho_\alpha(n) \le \alpha(n)/n$. By (ii) applied to
+$1 \le \nbar/4 \le n$ and then (i),
+\[
+  \frac{\alpha(n)}{n} \le \frac{\alpha(\nbar/4)}{\nbar/4} = \frac{4\,\alpha(\nbar/4)}{\nbar} \le \frac{4\,\alpha(\nbar)}{\nbar}
+  = \frac{4\,\alpha(\nbar)}{\max\{\nbar,1\}},
+\]
+the last equality because $\nbar \ge 4a_0 \ge 4$.
+
+\emph{Case $\nbar < 4a_0$.} Here $\rho_\alpha(n) \le 1$ in all cases (by definition when $n = 0$,
+by the minimum when $n \ge 1$), and by (iii) $4\alpha(\nbar)/\max\{\nbar,1\} \ge 4a_0/\max\{\nbar,1\}$.
+If $\nbar \le 1$ the right-hand side is $4a_0 \ge 4 \ge 1$; if $\nbar > 1$ it is
+$4a_0/\nbar > 4a_0/(4a_0) = 1$. Hence $\rho_\alpha(n) \le 1 \le 4\alpha(\nbar)/\max\{\nbar,1\}$.
+\end{proof}
+
+\begin{remark}[On the paper's Lemma~27]\label{rem:sc_lemma27}
+The paper states Lemma~27 (from \cite[Lemma~7]{menard2021fast}) for every rate $\alpha$ that is
+nondecreasing with $\alpha(x)/x$ nonincreasing on $x \ge 1$, and for $t \ge 1$. These hypotheses
+do not suffice: the unvisited case $n = 0$, where the left-hand side is $1$, needs
+$\alpha(\nbar) \ge \max\{\nbar,1\}/4$, which is hypothesis (iii) of
+Lemma~\ref{lem:sc_rate_min_arith} together with $a_0 \ge 1$ (for $\alpha \equiv 1/8$, $n = 0$ and
+$\nbar = 1/2$ the event inequality $0 \ge 1/4 - \alpha^{\mathrm{cnt}}$ holds while $1 > 4\cdot\frac18$).
+The proof of M\'enard et al.\ uses, exactly as above, that the rate dominates the count rate
+$\alpha^{\mathrm{cnt}}(\delta) = \log(3SAH/\delta) \ge \log 3 > 1$ of the event
+$\evCnt$ (Definition~\ref{def:event_cnt}), which holds for both rates of the paper
+(Lemma~\ref{lem:sc_rates_real}) and for $\delta \le 1$; this is how the lemma is stated below.
+The restriction $t \ge 1$ is not needed (at $t = 0$, $n = \nbar = 0$ and the inequality reads
+$1 \le 4\alpha(0)$).
+\end{remark}
+
+\begin{lemma}[Lemma~27: rate terms against pseudo-counts]\label{lem:pseudo_counts_bound}
+\uses{def:rate_min, def:pseudo_counts, def:rates, def:event_cnt}
+Let $\delta \in (0, 1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$.
+For every run of any algorithm in the episode environment of $\mathcal M$, on the event
+$\evCnt$, for all $t \in \N$, $h \in [H]$, $(s,a) \in \Ss\times\As$, with
+$n := n_h^t(s,a)$ and $\nbar := \nbar_h^t(s,a)$,
+\[
+  \rho_\alpha(n) \le \frac{4\,\alpha(\nbar)}{\max\{\nbar, 1\}} \le \frac{4\,\alpha(t)}{\max\{\nbar,1\}} .
+\]
+In particular $\rho^t_h(s,a) \le 4\alpha(t,\delta)/\max\{\nbar_h^t(s,a),1\}$ and
+$\rho^{*t}_h(s,a) \le 4\alpha^*(t,\delta)/\max\{\nbar_h^t(s,a),1\}$ on $\evCnt$.
+\end{lemma}
+
+\begin{proof}
+\uses{lem:sc_rate_min_arith, lem:sc_rates_real, lem:pseudo_counts_increments, def:event_cnt}
+On $\evCnt$, $n \ge \nbar/2 - \alpha^{\mathrm{cnt}}(\delta)$ (Definition~\ref{def:event_cnt}, with the
+random pseudo-counts of deviation~10). Lemma~\ref{lem:sc_rates_real} gives the hypotheses
+(i)--(iii) of Lemma~\ref{lem:sc_rate_min_arith} with $a_0 := \alpha^{\mathrm{cnt}}(\delta) \ge 1$,
+which yields the first inequality. For the second, $\nbar_h^t(s,a) \le t$
+(Lemma~\ref{lem:pseudo_counts_increments}: the increments are probabilities) and $\alpha$ is
+nondecreasing.
+\end{proof}
+
+\begin{lemma}[Counting argument]\label{lem:sum_counts_bound}
+\uses{def:rate_min, def:pseudo_counts, def:occupancy, def:event_cnt, def:rates, def:episode_env}
+Let $\delta \in (0,1]$ and let $\alpha$ be one of $\alpha(\cdot,\delta)$, $\alpha^*(\cdot,\delta)$.
+For every run of any algorithm in the episode environment of $\mathcal M$, with
+$\pi^{t+1} := X_t$, on the event $\evCnt$, for every integer $T \ge 1$,
+\[
+  \sum_{t=0}^{T-1}\sum_{h=1}^H\sum_{(s,a)\in\Ss\times\As} p^{\pi^{t+1}}_h(s,a)\,\rho_\alpha\big(n_h^t(s,a)\big)
+  \;\le\; 16\, S A H\, \alpha(T-1)\log(T+1) \;\le\; 16\, SAH\,\alpha(T)\log(T+1) .
+\]
+\end{lemma}
+
+\begin{proof}
+\uses{lem:pseudo_counts_bound, lem:pseudo_counts_increments, lem:log_sum_bound, lem:sc_rates_real}
+Fix $h$ and $(s,a)$ and put $u_{t+1} := p^{\pi^{t+1}}_h(s,a) \in [0,1]$ and
+$U_t := \sum_{i=1}^t u_i$ for $t \ge 0$. By Lemma~\ref{lem:pseudo_counts_increments},
+$U_t = \nbar_h^t(s,a)$ (both vanish at $t = 0$ and have the same increments). By
+Lemma~\ref{lem:pseudo_counts_bound}, on $\evCnt$ and for $0 \le t \le T-1$,
+$\rho_\alpha(n_h^t(s,a)) \le 4\alpha(t)/\max\{U_t,1\} \le 4\alpha(T-1)/\max\{U_t,1\}$ (the rate
+is nondecreasing, Lemma~\ref{lem:sc_rates_real}). Hence
+\[
+  \sum_{t=0}^{T-1} u_{t+1}\,\rho_\alpha\big(n_h^t(s,a)\big) \le 4\alpha(T-1)\sum_{t=0}^{T-1}\frac{u_{t+1}}{\max\{U_t,1\}}
+  \le 4\alpha(T-1)\cdot 4\log(U_T + 1) \le 16\,\alpha(T-1)\log(T+1),
+\]
+by Lemma~\ref{lem:log_sum_bound} (applied with its $T$ equal to $T - 1 \ge 0$) and
+$U_T = \nbar_h^T(s,a) \le T$. Summing over the $SAH$ triples $(h, s, a)$ gives the first bound;
+the second follows from $\alpha(T-1) \le \alpha(T)$.
+\end{proof}
+
+\begin{remark}[On the paper's constant]\label{rem:sc_counting_constant}
+The paper's Appendix~B.1 states this bound with the constant $3$ (``$\le 3SAH\alpha(\tau-1,\delta)\log(\tau+1)$'').
+Its chain of inequalities drops the factor $4$ of Lemma~27 (it writes
+$\alpha(\tilde n \vee 1)$ for $4\alpha(\tilde n)/(\tilde n \vee 1)$) and the factor $4$ of
+Lemma~28; the product of the two factors is $16$. The value $\alpha(T-1)$ (rather than
+$\alpha(T)$) is the one used by Lemmas~\ref{lem:stopping_time_bound_pos}
+and~\ref{lem:stopping_time_bound_neg}: $\alpha(T-1,\delta) = \log(3SAH/\delta) + S\log(8eT)$
+and $\alpha^*(T-1,\delta) = \log(3SAH/\delta) + \log(8eT)$ exactly.
+\end{remark}
+
+\textbf{Lean remark.} In a run, $p^{\pi^{t+1}}_h(s,a)$ is \texttt{occupancy M (X t ω) s₁ h s a}
+and the pseudo-count is the finite sum of these over the past episodes, so the per-$(h,s,a)$
+inequality is a statement about the real sequence $t \mapsto \texttt{occupancy M (X t ω) s₁ h s a}$
+on the event; the lemma is a \texttt{Finset.sum\_le\_sum} over \texttt{Finset.range T} and over
+$(h, s, a)$ on top of Lemma~\ref{lem:log_sum_bound}. Nothing about the algorithm is used
+(for Entropic-BPI, $X_t = \pi^{t+1}$ is the greedy policy, Lemma~\ref{lem:entropic_bpi_run}).
+
+\section{The sample complexity theorem}
+\label{sec:sc_theorem}
+
+\begin{definition}[Constants of the upper bound]\label{def:upper_bound_const}
+\lean{Essakine2026Tight.progress, Essakine2026Tight.varianceFactor, Essakine2026Tight.coeffSqrt, Essakine2026Tight.coeffLin, Essakine2026Tight.logFactor, Essakine2026Tight.upperBound}\leanok
+\uses{def:rates, def:gmax}
+For $\beta \ne 0$, $\eps > 0$, $\delta \in (0,1)$, integers $S, A, H \ge 1$ and $G \ge 0$ let
+\begin{align*}
+  \kappa(\beta,\eps) &:= \frac{(e^{|\beta|\eps} - 1)\,e^{-2|\beta|\eps}}{2}, &
+  V_G &:= \frac{(e^{|\beta| G} - 1)^2}{e^{|\beta| G}}, &
+  A_0 &:= \log\frac{3SAH}{\delta}, \\
+  C &:= \frac{10^9\sqrt{V_G\, S A H}}{\kappa(\beta,\eps)}, &
+  D &:= \frac{10^{10}\, e^{|\beta|(H+1)} H^2 S A}{\kappa(\beta,\eps)}, &
+  C_1 &:= \frac85\log\big(11\,(8e)^2\,(A_0 + S)\,(C + D)^2\big),
+\end{align*}
+and
+\[
+  \mathrm{upperBound}(S, A, H, \beta, \eps, \delta, G) := C^2 (A_0 + 1)\, C_1^2 + \big(D + 2\sqrt{D}\, C\big)(A_0 + S)\, C_1^2 + 1 .
+\]
+The bound is applied with $G = \Gmax(\mathcal M)$ (Definition~\ref{def:gmax}).
+\end{definition}
+
+\textbf{Lean remark.} \texttt{upperBound (S A H : ℕ) (β ε δ G : ℝ) : ℝ} in
+\texttt{Essakine2026Tight/EV2026/Constants.lean}, with $S$, $A$ the cardinalities of the
+state and action types. All quantities are real numbers; $\kappa > 0$ for $\eps > 0$, $\beta \ne 0$,
+and $A_0 > 0$ for $\delta < 1$.
+
+\begin{remark}[Where the constants come from; the asymptotic form]\label{rem:sc_constants}
+The constants are chosen so that the recursive inequality proved in
+Lemmas~\ref{lem:stopping_time_bound_pos} and~\ref{lem:stopping_time_bound_neg} is exactly the
+hypothesis of the self-bounding Lemma~\ref{lem:self_bounding} (the paper's Lemma~29). We
+record the computation. Let $T \ge 1$ with $T \le \tau$ and write $L := \log(8eT)$, so that
+$\log(T+1) \le L$, $\alpha^*(T-1,\delta) = A_0 + L$ and $\alpha(T-1,\delta) = A_0 + SL$. On the
+good event, the stopping condition fails at every $t < T$, so by
+Lemma~\ref{lem:progress_pos} (resp.~\ref{lem:progress_neg}) and
+Lemma~\ref{lem:ratio_bound_pos} (resp.~\ref{lem:ratio_bound_neg}, whose additive constant is
+smaller), with $x_t := \sum_{h,s,a} p^{\pi^{t+1}}_h(s,a)\rho^{*t}_h(s,a)$ and
+$y_t := \sum_{h,s,a} p^{\pi^{t+1}}_h(s,a)\rho^t_h(s,a)$,
+\[
+  T\kappa \le e^{13}\Big[36\sqrt{V_{\Gmax}}\sum_{t<T}\sqrt{x_t} + 84 H e^{|\beta|(H+1)}\sum_{t<T} y_t\Big]
+  \le e^{13}\Big[36\sqrt{V_{\Gmax}\, T \textstyle\sum_{t<T} x_t} + 84 H e^{|\beta|(H+1)}\sum_{t<T} y_t\Big]
+\]
+by the Cauchy--Schwarz inequality, and Lemma~\ref{lem:sum_counts_bound} (on $\evCnt$) gives
+$\sum_{t<T} x_t \le 16 SAH(A_0 L + L^2)$ and $\sum_{t<T} y_t \le 16SAH(A_0 L + S L^2)$. Hence
+\[
+  T \le C_0\sqrt{T(A_0 L + L^2)} + D_0 (A_0 L + S L^2), \qquad
+  C_0 := \frac{144 e^{13}\sqrt{V_{\Gmax} SAH}}{\kappa}, \quad
+  D_0 := \frac{1344 e^{13} e^{|\beta|(H+1)} H^2 SA}{\kappa}.
+\]
+Since $e^{13} < 4.5\cdot 10^5$, $144 e^{13} < 6.5\cdot 10^7 \le 10^9$ and
+$1344 e^{13} < 6.0\cdot 10^8 \le 10^{10}$, so $C_0 \le C$ and $D_0 \le D$ and the inequality holds
+with $C$, $D$. Lemma~\ref{lem:self_bounding} with $A = A_0$, $B = 1$, $E = S$, $\alpha = 8e$
+(so $L = \log(\alpha T)$, $\alpha \ge e$, $1 \le B \le E$) then gives
+$T \le C^2(A_0 + 1)C_1^2 + (D + 2\sqrt D C)(A_0+S)C_1^2 + 1 = \mathrm{upperBound}$.
+The slack (a factor $\ge 15$ in each of $C$, $D$) is deliberate (deviation~6): the constants of
+the analysis chapters may be adjusted without touching this definition.
+
+\emph{Degenerate case.} Lemma~\ref{lem:self_bounding} is stated for $C > 0$, while
+$C = 0$ when $\Gmax(\mathcal M) = 0$ (all returns vanish, $V_{\Gmax} = 0$). The recursive
+inequality with $C = 0$ implies the one with any $C' > 0$, and the conclusion of
+Lemma~\ref{lem:self_bounding} is continuous in $C'$ at $0$, so the bound holds by letting
+$C' \downarrow 0$; the formalization should rather state Lemma~\ref{lem:self_bounding} for
+$C \ge 0$ (the proof of \cite[Lemma~13]{menard2021fast} only uses $C \ge 0$).
+
+\emph{Asymptotic form.} Since $1/\kappa^2 = 4e^{4|\beta|\eps}/(e^{|\beta|\eps}-1)^2$, the first
+term is
+\[
+  4\cdot 10^{18}\,\frac{e^{4|\beta|\eps}}{(e^{|\beta|\eps} - 1)^2}\,
+  \frac{(e^{|\beta|\Gmax(\mathcal M)} - 1)^2}{e^{|\beta|\Gmax(\mathcal M)}}\, SAH\,(A_0 + 1)\,C_1^2 ,
+\]
+and $C_1 = O(\log(SAH e^{|\beta| H}/(\kappa\delta)))$, so it is
+$\tilde O\big(e^{4|\beta|\eps}(e^{|\beta|\eps}-1)^{-2} V_{\Gmax} SAH\log(1/\delta)\big)$: the
+paper's form (Theorem~4: $e^{2\max\{\beta,0\}\eps}(e^{|\beta|\eps}-1)^{-2}V_{\Gmax}SAH$, up to
+logarithms), the exponent $4|\beta|\eps$ instead of $2\max\{\beta,0\}\eps$ coming from the
+common progress constant $\kappa$ of the two signs (deviation~11); under the hypothesis
+$\eps \le 2/(|\beta|HS)$ of Theorem~\ref{thm:upper_bound_complexity}, $e^{4|\beta|\eps} \le e^8$
+is a constant. The second term $(D + 2\sqrt D C)(A_0+S)C_1^2$ is of lower order in
+$1/(e^{|\beta|\eps}-1)$ but carries $e^{|\beta|(H+1)}$ instead of $e^{|\beta|\Gmax}$; the
+paper's ``in particular'' single-term bound assumes that the first term dominates, which the
+hypothesis on $\eps$ does not guarantee (deviation~6). The paper's displayed two-term bound
+omits the absolute constants of its own $C$ and $D$ (e.g.\ the factor $(36e^{13})^2$ of $C^2$),
+and its $C_1$ is not the $C_1$ of its Lemma~29 evaluated at its $C$, $D$; we use
+Lemma~\ref{lem:self_bounding} verbatim.
+\end{remark}
+
+\begin{theorem}[Theorem~4, PAC guarantee]\label{thm:upper_bound_pac}
+\lean{Essakine2026Tight.isEntropicPAC_entropicBPI}\leanok
+\uses{def:entropic_bpi, def:entropic_pac, def:reward_fn, def:episode_env}
+Let $\beta \ne 0$, $H \ge 1$, $\Ss$ and $\As$ finite, $r : [H]\times\Ss\times\As \to [0,1]$ a
+reward function, $\delta \in (0,1)$, $\eps \in (0, 2/(|\beta| H S)]$ and $s_1 \in \Ss$. Then
+Entropic-BPI with parameters $(r, \beta, \delta, \eps, s_1)$ (Definition~\ref{def:entropic_bpi})
+is $(\eps,\delta)$-PAC for entropic best-policy identification with reward function $r$,
+parameter $\beta$ and initial state $s_1$ (Definition~\ref{def:entropic_pac}): for every
+$\mathcal M \in \mathcal M_r$, the output $\hat\pi$ of Entropic-BPI in the episode environment
+of $\mathcal M$ from $s_1$ satisfies
+\[
+  \Prob\big(V^*_1(s_1) - V^{\hat\pi}_1(s_1) > \eps\big) \le \delta .
+\]
+\end{theorem}
+
+\begin{proof}
+\uses{lem:pac_pos, lem:pac_neg, def:entropic_pac, def:bpi_alg, def:episode_env, lem:entropic_bpi_run}
+Fix $\mathcal M \in \mathcal M_r$. The PAC property is a statement about the law of the output
+of the algorithm in the episode environment of $\mathcal M$, which is the same for every run
+(Definition~\ref{def:bpi_alg}); a run exists (the canonical run of LML). Let
+$(X, Y, \mathrm{out})$ be a run on $(\Omega, \Prob)$. If $\beta > 0$, Lemma~\ref{lem:pac_pos}
+gives $\Prob(V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps) \le \delta$; if $\beta < 0$,
+Lemma~\ref{lem:pac_neg} gives the same. (Both lemmas hold for every $\delta \in (0,1)$ and
+$\eps > 0$; the hypothesis $\eps \le 2/(|\beta|HS)$ is not used, see
+Remark~\ref{rem:sc_hypotheses}.) Since the law of $\mathrm{out}$ is the output law, the
+output law gives mass at most $\delta$ to the bad set $\{\pi : V^*_1(s_1) - V^\pi_1(s_1) > \eps\}$
+of $\mathcal M$; this for every $\mathcal M \in \mathcal M_r$ is the PAC property.
+\end{proof}
+
+\textbf{Lean remark.} \texttt{Essakine2026Tight.isEntropicPAC\_entropicBPI}. LML's
+\texttt{IdentAlg.IsPAC} is a property of \texttt{IdentAlg.outputMeasure alg env}: the law of the
+output, defined as the composition of the law of the stopped history with the output kernel;
+\texttt{IsEntropicPAC 𝒜 r β ε δ s₁ := 𝒜.IsPAC (fun M : \{M // M.HasRewardFn r\} ↦ statesEnv M.1 s₁) (fun M π ↦ ε < optEntropicValue M.1 β 0 s₁ - entropicValue M.1 β π 0 s₁) δ}.
+Lemmas~\ref{lem:pac_pos} and~\ref{lem:pac_neg} are statements about a run
+(\texttt{IdentAlg.IsRun}) on an arbitrary probability space; the transfer to
+\texttt{outputMeasure} is \texttt{IdentAlg.IsRun.hasLaw\_output} (the law of the output of a
+run is \texttt{outputMeasure}) applied to the canonical run
+\texttt{IdentAlg.runMeasure}/\texttt{IdentAlg.isRun\_runMeasure} on the Ionescu-Tulcea space of
+trajectories, or directly the criterion \texttt{IdentAlg.IsPAC.of\_forall\_isRun}, which
+quantifies over probability spaces in the universe of the trajectory space (as in the sister
+project \texttt{colt-2026-83}, \texttt{LinearBandit.isPAC\_of\_forall\_isRun}). Conversely
+\texttt{IsPAC.measureReal\_bad\_of\_isRun} gives $\Prob(\mathrm{bad}) \le \delta$ in every run; this
+direction is the one used by the lower bound (Lemma~\ref{lem:hard_pac_event}). The event
+$\{V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps\}$ is measurable since the policy type is finite
+(discrete $\sigma$-algebra).
+
+\begin{theorem}[Theorem~4, sample complexity]\label{thm:upper_bound_complexity}
+\lean{Essakine2026Tight.probReal_stoppingTime_entropicBPI_le_ge}\leanok
+\uses{def:entropic_bpi, def:upper_bound_const, def:gmax, def:bpi_alg, def:reward_fn, def:episode_env}
+Under the hypotheses of Theorem~\ref{thm:upper_bound_pac}, for every $\mathcal M \in \mathcal M_r$
+and every run $(X, Y, \mathrm{out})$ of Entropic-BPI in the episode environment of $\mathcal M$
+from $s_1$ on a probability space $(\Omega, \Prob)$, the number of episodes $\tau$ satisfies
+\[
+  \Prob\big(\tau \le \mathrm{upperBound}(S, A, H, \beta, \eps, \delta, \Gmax(\mathcal M))\big) \ge 1 - \delta ;
+\]
+in particular $\Prob(\tau < \infty) \ge 1 - \delta$.
+\end{theorem}
+
+\begin{proof}
+\uses{lem:stopping_time_bound_pos, lem:stopping_time_bound_neg, lem:good_event, def:good_event}
+Fix $\mathcal M \in \mathcal M_r$ and a run. If $\beta > 0$, Lemma~\ref{lem:stopping_time_bound_pos}
+gives $\tau \le \mathrm{upperBound}(S,A,H,\beta,\eps,\delta,\Gmax(\mathcal M))$ (in particular
+$\tau < \infty$) at every $\omega \in \evGood^+$, and $\Prob(\evGood^+) \ge 1 - \delta$ by
+Lemma~\ref{lem:good_event}. If $\beta < 0$, the same holds with
+Lemma~\ref{lem:stopping_time_bound_neg} and $\evGood^-$. Hence
+$\{\tau \le \mathrm{upperBound}\} \supseteq \evGood^\pm$ has probability at least $1 - \delta$.
+\end{proof}
+
+\textbf{Lean remark.} \texttt{Essakine2026Tight.probReal\_stoppingTime\_entropicBPI\_le\_ge}.
+The stopping time \texttt{IdentAlg.stoppingTime} of a run takes values in $\N \cup \{\infty\}$
+(\texttt{ℕ∞}); the event is $\{\omega : (\tau(\omega) : \texttt{ℝ≥0∞}) \le \texttt{ENNReal.ofReal}\ \mathrm{upperBound}\}$,
+which contains $\tau < \infty$. The run hypothesis (\texttt{IdentAlg.IsRun}) makes
+$\tau$ the hitting time of the stopping set by the history process, so that the good event and
+$\{\tau \le B\}$ are events of the same probability space; no law transfer is needed here, the
+statement being about an arbitrary run (deviation~6 separates the two conclusions of Theorem~4
+because this one is naturally a statement about runs while the PAC one is about the output law).
+
+\begin{remark}[On the hypotheses]\label{rem:sc_hypotheses}
+The paper states Theorem~4 for $\delta \in [0,1]$ and $\eps > 0$ ``small enough'', made precise
+in the appendix as $\eps \in (0, 2/(|\beta|HS)]$. We require $\delta \in (0,1)$ (for $\delta = 0$
+the rates are infinite, for $\delta = 1$ the statements are empty). The hypothesis on $\eps$ is
+kept for fidelity to the paper, but it is not used by the proof as decomposed in
+Chapters~\ref{chap:analysis_pos}--\ref{chap:analysis_neg} and above: every lemma holds for all
+$\eps > 0$, the bound $\mathrm{upperBound}$ being valid for every $\eps > 0$ (it only becomes
+weak, through $1/\kappa$, when $|\beta|\eps$ is large); its only role is to make
+$e^{4|\beta|\eps} \le e^8$ a constant in Remark~\ref{rem:sc_constants}. Finally, the theorem
+is stated for the class $\mathcal M_r$ of MDPs with the reward function $r$ known to the
+algorithm (deviation~7), which is the paper's setting (``rewards are known and
+deterministic'').
+\end{remark}
