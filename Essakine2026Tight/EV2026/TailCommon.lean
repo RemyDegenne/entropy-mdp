@@ -30,6 +30,10 @@ public import Essakine2026Tight.Mathlib.Analysis.SpecialFunctions.Log.SelfBoundi
   statements on an event of probability at least `1 - δ` (the good event) to the probability
   statements of Lemmas `lem:pac_pos` and `lem:pac_neg`, in a run of Entropic-BPI (the policies
   played and the output are almost surely the greedy ones).
+* `starRateMin`, `klRateMin`: the rate terms `min {α*(n_h(s, a))/n_h(s, a), 1}` and
+  `min {α(n_h(s, a))/n_h(s, a), 1}` of a history as functions of the step `h : ℕ` (`0` beyond the
+  horizon, `extendFin`), the form in which they enter the unrolling lemmas of
+  `MDP/UnrollBounds.lean`.
 -/
 
 @[expose] public section
@@ -277,12 +281,126 @@ lemma natCast_le_upperBound {nS nA H : ℕ} (hS : 1 ≤ nS) (hA : 1 ≤ nA) {β 
 
 /-! ### From the good event to probabilities -/
 
+/-! ### Rate terms of a history as functions of the step -/
+
+section Rates
+
+variable {S A : Type*} {H : ℕ}
+
+/-- The extension by `0` beyond the horizon of a function of the steps `h : Fin H`. -/
+def extendFin (f : Fin H → S → A → ℝ) (h : ℕ) (s : S) (a : A) : ℝ :=
+  if hh : h < H then f ⟨h, hh⟩ s a else 0
+
+lemma extendFin_of_lt (f : Fin H → S → A → ℝ) {h : ℕ} (hh : h < H) (s : S) (a : A) :
+    extendFin f h s a = f ⟨h, hh⟩ s a := by
+  simp only [extendFin, hh, ↓reduceDIte]
+
+lemma extendFin_fin (f : Fin H → S → A → ℝ) (h : Fin H) (s : S) (a : A) :
+    extendFin f h s a = f h s a := by
+  simp only [extendFin, h.is_lt, ↓reduceDIte, Fin.eta]
+
+lemma extendFin_nonneg {f : Fin H → S → A → ℝ} (hf : ∀ h s a, 0 ≤ f h s a) (h : ℕ) (s : S)
+    (a : A) : 0 ≤ extendFin f h s a := by
+  unfold extendFin
+  split_ifs
+  · exact hf _ _ _
+  · exact le_rfl
+
+lemma sum_range_mul_extendFin [Fintype S] [Fintype A] (g : ℕ → S → A → ℝ)
+    (f : Fin H → S → A → ℝ) :
+    ∑ h ∈ range H, ∑ s, ∑ a, g h s a * extendFin f h s a
+      = ∑ h : Fin H, ∑ s, ∑ a, g h s a * f h s a := by
+  rw [← Fin.sum_univ_eq_sum_range (fun h ↦ ∑ s, ∑ a, g h s a * extendFin f h s a) H]
+  exact sum_congr rfl fun h _ ↦ sum_congr rfl fun s _ ↦ sum_congr rfl fun a _ ↦ by
+    rw [extendFin_fin]
+
+variable [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] {t : ℕ}
+
+/-- The rate term `min {α*(n_h(s, a))/n_h(s, a), 1}` of a history, as a function of the step
+`h : ℕ` (`0` beyond the horizon). -/
+noncomputable def starRateMin (δ : ℝ) (hist : Hist Unit (Policy S A H) (Traj S H) t) :
+    ℕ → S → A → ℝ :=
+  extendFin fun h s a ↦
+    rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a)
+
+/-- The rate term `min {α(n_h(s, a))/n_h(s, a), 1}` of a history, as a function of the step
+`h : ℕ` (`0` beyond the horizon). -/
+noncomputable def klRateMin (δ : ℝ) (hist : Hist Unit (Policy S A H) (Traj S H) t) :
+    ℕ → S → A → ℝ :=
+  extendFin fun h s a ↦
+    rateMin (alphaKL (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a)
+
+variable (δ : ℝ) (hist : Hist Unit (Policy S A H) (Traj S H) t)
+
+lemma starRateMin_of_lt {h : ℕ} (hh : h < H) (s : S) (a : A) :
+    starRateMin δ hist h s a
+      = rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) (visitCount hist ⟨h, hh⟩ s a) :=
+  extendFin_of_lt _ hh s a
+
+lemma klRateMin_of_lt {h : ℕ} (hh : h < H) (s : S) (a : A) :
+    klRateMin δ hist h s a
+      = rateMin (alphaKL (Fintype.card S) (Fintype.card A) H δ) (visitCount hist ⟨h, hh⟩ s a) :=
+  extendFin_of_lt _ hh s a
+
+lemma starRateMin_fin (h : Fin H) (s : S) (a : A) :
+    starRateMin δ hist h s a
+      = rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a) :=
+  extendFin_fin _ h s a
+
+lemma klRateMin_fin (h : Fin H) (s : S) (a : A) :
+    klRateMin δ hist h s a
+      = rateMin (alphaKL (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a) :=
+  extendFin_fin _ h s a
+
+variable {δ}
+
+lemma starRateMin_nonneg (hδ : 0 < δ) (hδ1 : δ ≤ 1) (h : ℕ) (s : S) (a : A) :
+    0 ≤ starRateMin δ hist h s a :=
+  extendFin_nonneg (fun _ _ _ ↦ rateMin_nonneg (alphaStar_nonneg _ _ _ hδ hδ1) _) h s a
+
+lemma klRateMin_nonneg (hδ : 0 < δ) (hδ1 : δ ≤ 1) (h : ℕ) (s : S) (a : A) :
+    0 ≤ klRateMin δ hist h s a :=
+  extendFin_nonneg (fun _ _ _ ↦ rateMin_nonneg (alphaKL_nonneg _ _ _ hδ hδ1) _) h s a
+
+variable (δ) [MeasurableSpace S] [MeasurableSpace A] (M : EpisodicMDP S A)
+  (π : ℕ → S → A) (s₁ : S)
+
+/-- The sum over the steps of the occupancies against the Bernstein rate terms, with the steps
+`h : ℕ` or `h : Fin H`. -/
+lemma sum_range_occupancy_mul_starRateMin :
+    ∑ h ∈ range H, ∑ s, ∑ a, occupancy M π s₁ h s a * starRateMin δ hist h s a
+      = ∑ h : Fin H, ∑ s, ∑ a, occupancy M π s₁ h s a
+        * rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a) :=
+  sum_range_mul_extendFin _ _
+
+/-- The sum over the steps of the occupancies against the KL rate terms, with the steps `h : ℕ`
+or `h : Fin H`. -/
+lemma sum_range_occupancy_mul_klRateMin :
+    ∑ h ∈ range H, ∑ s, ∑ a, occupancy M π s₁ h s a * klRateMin δ hist h s a
+      = ∑ h : Fin H, ∑ s, ∑ a, occupancy M π s₁ h s a
+        * rateMin (alphaKL (Fintype.card S) (Fintype.card A) H δ) (visitCount hist h s a) :=
+  sum_range_mul_extendFin _ _
+
+variable {Ω : Type*} (X : ℕ → Ω → Policy S A H) (Y : ℕ → Ω → Traj S H)
+
+omit [MeasurableSpace S] [MeasurableSpace A] in
+lemma starRateMin_histAt (t : ℕ) (ω : Ω) (h : Fin H) (s : S) (a : A) :
+    starRateMin δ (histAt X Y t ω) h s a = starRateMinAt X Y δ h s a t ω :=
+  starRateMin_fin δ _ h s a
+
+omit [MeasurableSpace S] [MeasurableSpace A] in
+lemma klRateMin_histAt (t : ℕ) (ω : Ω) (h : Fin H) (s : S) (a : A) :
+    klRateMin δ (histAt X Y t ω) h s a = klRateMinAt X Y δ h s a t ω :=
+  klRateMin_fin δ _ h s a
+
+end Rates
+
 section Run
 
 variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [Nonempty A]
   [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A]
   {H : ℕ} {Ω : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω} [IsProbabilityMeasure P]
-  {M : EpisodicMDP S A H} {r : Fin H → S → A → ℝ} {β δ ε : ℝ} {s₁ : S}
+  {M : EpisodicMDP S A} {r : ℕ → S → A → ℝ} {β δ ε : ℝ} {s₁ : S}
   {env : Environment Unit (Policy S A H) (Traj S H)} {X : ℕ → Ω → Policy S A H}
   {Y : ℕ → Ω → Traj S H} {out : Ω → Policy S A H} {E : Set Ω} {U : ℝ}
 
@@ -290,13 +408,14 @@ variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [
 at most `U` at every `ω` of an event `E` at which the policies played are the greedy ones, and
 `P(Eᶜ) ≤ δ`, then `τ ≤ U` with probability at least `1 - δ`. -/
 lemma one_sub_le_measureReal_stoppingTime_le
-    (h : (entropicBPI r β δ ε s₁).IsRun env (fun _ _ ↦ ()) X Y out P) (hδ : 0 ≤ δ)
+    (h : (entropicBPI H r β δ ε s₁).IsRun env (fun _ _ ↦ ()) X Y out P) (hδ : 0 ≤ δ)
     (hE : P Eᶜ ≤ ENNReal.ofReal δ)
     (hτ : ∀ ω ∈ E, (∀ t, X t ω = greedyAt X Y r β δ t ω) →
-      ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤ ENNReal.ofReal U) :
+      ((entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤ ENNReal.ofReal U) :
     1 - δ ≤ P.real {ω |
-      ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤ ENNReal.ofReal U} := by
-  set F := {ω | ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞)
+      ((entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞)
+        ≤ ENNReal.ofReal U} := by
+  set F := {ω | ((entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞)
     ≤ ENNReal.ofReal U} with hF
   have hsub : Fᶜ ≤ᵐ[P] Eᶜ := by
     filter_upwards [ae_action_eq_greedy h] with ω hX
@@ -315,20 +434,20 @@ lemma one_sub_le_measureReal_stoppingTime_le
 greedy policy is `ε`-optimal whenever the stopping condition holds, and `P(Eᶜ) ≤ δ`, then the
 output is `ε`-optimal with probability at least `1 - δ`. -/
 lemma measureReal_bad_le
-    (h : (entropicBPI r β δ ε s₁).IsRun env (fun _ _ ↦ ()) X Y out P) (hδ : 0 ≤ δ)
+    (h : (entropicBPI H r β δ ε s₁).IsRun env (fun _ _ ↦ ()) X Y out P) (hδ : 0 ≤ δ)
     (hE : P Eᶜ ≤ ENNReal.ofReal δ)
     (hτ : ∀ ω ∈ E, (∀ t, X t ω = greedyAt X Y r β δ t ω) →
-      (entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω ≠ ⊤)
+      (entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω ≠ ⊤)
     (hsound : ∀ ω ∈ E, ∀ t, stopCond r β δ ε s₁ (histAt X Y t ω) →
-      optEntropicValue M β (startStep H) s₁
-        - entropicValue M β (greedyAt X Y r β δ t ω) (startStep H) s₁ ≤ ε) :
-    P.real {ω | ε < optEntropicValue M β (startStep H) s₁
-      - entropicValue M β (out ω) (startStep H) s₁} ≤ δ := by
-  have hsub : {ω | ε < optEntropicValue M β (startStep H) s₁
-      - entropicValue M β (out ω) (startStep H) s₁} ≤ᵐ[P] Eᶜ := by
+      optEntropicValue M H β 0 s₁
+        - entropicValue M H β (greedyAt X Y r β δ t ω).extend 0 s₁ ≤ ε) :
+    P.real {ω | ε < optEntropicValue M H β 0 s₁
+      - entropicValue M H β (out ω).extend 0 s₁} ≤ δ := by
+  have hsub : {ω | ε < optEntropicValue M H β 0 s₁
+      - entropicValue M H β (out ω).extend 0 s₁} ≤ᵐ[P] Eᶜ := by
     filter_upwards [ae_action_eq_greedy h, ae_output_eq_greedy h] with ω hX hout
-    change ε < optEntropicValue M β (startStep H) s₁
-      - entropicValue M β (out ω) (startStep H) s₁ → ω ∉ E
+    change ε < optEntropicValue M H β 0 s₁
+      - entropicValue M H β (out ω).extend 0 s₁ → ω ∉ E
     intro hbad hωE
     have hstop := stopCond_histAt_stoppingTime (hτ ω hωE hX)
     have := hsound ω hωE _ hstop
@@ -339,9 +458,9 @@ lemma measureReal_bad_le
 
 /-- A stopping time bounded by a real number is finite. -/
 lemma stoppingTime_ne_top_of_le {ω' : Ω}
-    (hτ : ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω' : ℝ≥0∞)
+    (hτ : ((entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω' : ℝ≥0∞)
       ≤ ENNReal.ofReal U) :
-    (entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω' ≠ ⊤ := by
+    (entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω' ≠ ⊤ := by
   intro htop
   rw [htop, ENat.toENNReal_top, top_le_iff] at hτ
   exact ENNReal.ofReal_ne_top hτ

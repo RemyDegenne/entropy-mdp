@@ -191,7 +191,7 @@ end History
 section Recursion
 
 variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [Nonempty A]
-  {H : ℕ} {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H) t) (r : Fin H → S → A → ℝ)
+  {H : ℕ} {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H) t) (r : ℕ → S → A → ℝ)
   (β δ : ℝ)
 
 omit [Nonempty A] in

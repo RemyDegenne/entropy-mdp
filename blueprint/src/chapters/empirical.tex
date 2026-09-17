@@ -305,9 +305,9 @@ vanish for every visited pair. The concentration inequality (Corollary~\ref{cor:
 gives the non-strict form, and the analysis only uses the event as an upper bound.
 \end{remark}
 
-\textbf{Lean remark.} \texttt{eventBern X Y M δ f b : Set Ω} with \texttt{f : Fin (H + 1) → S → ℝ}
-and \texttt{b : Fin H → ℝ}: for all \texttt{t h s a} with \texttt{0 < visitCountAt X Y h s a t ω},
-\texttt{|vecExp (empTransAt …) (f h.succ) - vecExp (M.transVec h s a) (f h.succ)| ≤ √(2 * vecVar (M.transVec h s a) (f h.succ) * (alphaStar … n / n)) + 3 * b h * (alphaStar … n / n)}.
+\textbf{Lean remark.} \texttt{eventBern X Y M δ f b : Set Ω} with \texttt{f : ℕ → S → ℝ}
+and \texttt{b : ℕ → ℝ}: for all \texttt{t (h : Fin H) s a} with \texttt{0 < visitCountAt X Y h s a t ω},
+\texttt{|vecExp (empTransAt …) (f (h + 1)) - vecExp (M.transVec h s a) (f (h + 1))| ≤ √(2 * vecVar (M.transVec h s a) (f (h + 1)) * (alphaStar … n / n)) + 3 * b h * (alphaStar … n / n)}.
 
 \begin{definition}[Counts concentration event]\label{def:event_cnt}
 \lean{Essakine2026Tight.eventCnt}\leanok
@@ -655,7 +655,7 @@ $\Prob(\Omega \setminus \evKL) \le SAH \cdot \delta/(3SAH) = \delta/3$.
 \end{proof}
 
 \textbf{Lean remark.} \texttt{measure\_compl\_eventKL\_le : P (eventKL X Y M δ)ᶜ ≤ ENNReal.ofReal (δ / 3)}
-(\texttt{EV2026/Events.lean}) for \texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M s₁) P}
+(\texttt{EV2026/Events.lean}) for \texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M H s₁) P}
 and \texttt{0 < δ}: the lemma of the paper only needs $\delta > 0$ (the time-uniform bound holds for
 every $\delta' > 0$). The bound for one triple is \texttt{measure\_exists\_klThreshold\_lt\_klDiv\_le},
 with $B_n$ = \texttt{\{x | klThreshold S A H δ n < klDiv (weightedMeasure (empiricalFreq x)) (M.trans h (s, a))\}}
@@ -749,7 +749,7 @@ bound over the $SAH$ triples give $\Prob(\Omega \setminus \evBern(f, b)) \le SAH
 \textbf{Lean remark.} \texttt{measure\_compl\_eventBern\_le : P (eventBern X Y M δ f b)ᶜ ≤ ENNReal.ofReal (δ / 3)}
 (\texttt{EV2026/Events.lean}) for a run \texttt{hseq} as in Lemma~\ref{lem:event_kl_prob},
 \texttt{0 < δ}, \texttt{δ ≤ 1} (for $\delta' < 1$, \texttt{div\_three\_mul\_lt\_one}) and the range
-condition written \texttt{∀ h x y, f h.succ x - f h.succ y ≤ b h}. The bound for one triple is
+condition written \texttt{∀ (h : Fin H) x y, f (h + 1) x - f (h + 1) y ≤ b h}. The bound for one triple is
 \texttt{measure\_exists\_lt\_abs\_vecExp\_empTransAt\_sub\_le}, for any $g$ and $c$ with
 $g(x) - g(y) \le c$; $\abs{g(x) - pg} \le c$ is \texttt{abs\_sub\_vecExp\_le}, the empirical mean
 $(\hat q_n(x)) g = \frac1n \sum_k g(x_k)$ is \texttt{vecExp\_empiricalFreq}, $L_n \le \alpha^*(n, \delta)$ is
@@ -835,7 +835,7 @@ $\Prob(\Omega \setminus \evGood^\pm) \le \delta/3 + \delta/3 + \delta/3 = \delta
 \textbf{Lean remark.} \texttt{one\_sub\_le\_measureReal\_goodEvent : 1 - δ ≤ P.real (goodEvent X Y M s₁ β δ)}
 and \texttt{measure\_compl\_goodEvent\_le : P (goodEvent X Y M s₁ β δ)ᶜ ≤ ENNReal.ofReal δ}
 (\texttt{EV2026/Events.lean}), for any algorithm-environment sequence
-\texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M s₁) P} (for a run of Entropic-BPI,
+\texttt{hseq : IsAlgEnvSeq (fun \_ \_ ↦ ()) X Y alg (statesEnv M H s₁) P} (for a run of Entropic-BPI,
 the field \texttt{isAlgEnvSeq} of \texttt{IdentAlg.IsRun}), with the hypotheses
 \texttt{M.HasRewardFn r}, \texttt{∀ h s a, r h s a ∈ Set.Icc 0 1}, \texttt{0 < δ}, \texttt{δ ≤ 1} and
 every \texttt{β : ℝ} (for $\beta = 0$, $Z^* \equiv 1$ and the range $1 - e^0 = 0$ of the definition is

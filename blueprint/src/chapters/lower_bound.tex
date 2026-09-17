@@ -422,7 +422,7 @@ $\ell(\pi) = \ell^*$, $h'(\pi) = h_e + 1 + k$ and $a(\pi) = \pi_{h_e+1+k}(\ell^*
 
 \begin{lemma}[Trajectories of the hard instances]\label{lem:hard_trajectory}
 \uses{def:hard_mdp, def:hard_triple, def:step_law, def:episode_return, lem:hard_params_valid}
-\lean{Essakine2026Tight.statesLaw_hardMDP, Essakine2026Tight.stateSeqLaw_hardMDP_path, Essakine2026Tight.stateSeqLaw_hardMDP_arrival, Essakine2026Tight.stateSeqLaw_hardMDP_absorbing, Essakine2026Tight.hardTransFun_absorbing, Essakine2026Tight.hardTransFun_path, Essakine2026Tight.hardTransFun_arrival, Essakine2026Tight.hardMDP_trans_apply, Learning.MDP.Episodic.stateSeqLaw, Learning.MDP.Episodic.stateSeqLaw_castSucc, Learning.MDP.Episodic.stateSeqLaw_last, Learning.MDP.Episodic.statesLaw_eq_map_stateSeqLaw, ProbabilityTheory.ae_bernoulliMeasure}\leanok
+\lean{Essakine2026Tight.statesLaw_hardMDP, Essakine2026Tight.stateSeqLaw_hardMDP_path, Essakine2026Tight.stateSeqLaw_hardMDP_arrival, Essakine2026Tight.stateSeqLaw_hardMDP_absorbing, Essakine2026Tight.hardTransFun_absorbing, Essakine2026Tight.hardTransFun_path, Essakine2026Tight.hardTransFun_arrival, Essakine2026Tight.hardMDP_trans_apply, Learning.MDP.Episodic.stateSeqLaw, Learning.MDP.Episodic.stateSeqLaw_succ, Learning.MDP.Episodic.stateSeqLaw_eq_dirac_of_absorbing, Learning.MDP.Episodic.statesLaw_eq_map_stateSeqLaw, ProbabilityTheory.ae_bernoulliMeasure}\leanok
 Let $\mathcal M \in \{\mathcal M_0\} \cup \{\mathcal M_u : u \in \mathcal U\}$ (under
 Condition~A) and let $\pi$ be a policy, $h' := h'(\pi)$ and
 $p := p^{\mathcal M}_{h'}(\ell(\pi), a(\pi))$. Under $\Prob^{\pi}_{(s_w, 1)}$ of $\mathcal M$
@@ -460,11 +460,13 @@ $S_h = S_{\tilde H}$ for $h \ge \tilde H$ and $H - \tilde H + 1 = H'$.
 \end{proof}
 
 \textbf{Lean remark.} Only the law of the state sequence is formalized:
-\texttt{statesLaw\_hardMDP}, \texttt{statesLaw (hardMDP H β ε u) (stateAt S 0) π = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map (pathSeq π)}.
+\texttt{statesLaw\_hardMDP}, \texttt{statesLaw (hardMDP H β ε u) H (stateAt S 0) π.extend = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map (pathSeq π)}.
 It is proved by backward induction on the steps with the law of the state sequence from a step
-(\texttt{Learning.MDP.Episodic.stateSeqLaw}, whose one-step recursion \texttt{stateSeqLaw\_castSucc} comes
+(\texttt{Learning.MDP.Episodic.stateSeqLaw}, whose one-step recursion \texttt{stateSeqLaw\_succ} comes
 from Lemma~\ref{lem:step_law_markov}): absorbing states after the arrival
-(\texttt{stateSeqLaw\_hardMDP\_absorbing}), the Bernoulli step at the arrival
+(\texttt{stateSeqLaw\_hardMDP\_absorbing}, from the general
+\texttt{stateSeqLaw\_eq\_dirac\_of\_absorbing}: the state sequence from an absorbing state is
+almost surely constant), the Bernoulli step at the arrival
 (\texttt{stateSeqLaw\_hardMDP\_arrival}) and the Dirac steps of the prefix
 (\texttt{stateSeqLaw\_hardMDP\_path}). The return is not computed: the exponential values are obtained
 directly from the Bellman equation (Lemma~\ref{lem:hard_exp_value}).
@@ -497,7 +499,7 @@ at the triple of $\pi$, and \texttt{coe\_succProb} is the displayed dichotomy
 
 \begin{lemma}[Exponential values]\label{lem:hard_exp_value}
 \uses{def:exp_value, lem:hard_trajectory, lem:hard_success, def:hard_params}
-\lean{Essakine2026Tight.hardZ, Essakine2026Tight.hardZ_pos, Essakine2026Tight.expValue_hardMDP_start, Essakine2026Tight.expValue_hardMDP_path, Essakine2026Tight.expValue_hardMDP_good, Essakine2026Tight.expValue_hardMDP_bad, Essakine2026Tight.vecExp_hardMDP_transVec, Essakine2026Tight.integrable_exp_hardMDP, Essakine2026Tight.rewardCount, Essakine2026Tight.hardReward_path}\leanok
+\lean{Essakine2026Tight.hardZ, Essakine2026Tight.hardZ_pos, Essakine2026Tight.expValue_hardMDP_start, Essakine2026Tight.expValue_hardMDP_path, Essakine2026Tight.expValue_hardMDP_good, Essakine2026Tight.expValue_hardMDP_bad, Essakine2026Tight.rewardsIn_hardMDP, Essakine2026Tight.rewardCount, Essakine2026Tight.hardReward_path}\leanok
 For every instance $\mathcal M$ and policy $\pi$, with $p := p^{\mathcal M}(\pi)$,
 \[
   Z^\pi_1(s_w) = 1 + p\,(e^{\beta H'} - 1) = \begin{cases} 1 + c\,p & (\beta > 0), \\ e^{\beta H'}\big(1 + c\,(1 - p)\big) & (\beta < 0). \end{cases}
@@ -709,7 +711,7 @@ all terms are finite ($N_\pi(\tau) \le \tau$).
 (step \texttt{hcm}), in the form with the pull counts of the policies,
 $\klbin(\Prob_0(E_u), \Prob_u(E_u)) \le \sum_\pi \E_0[N_\pi(\tau)]\,\indic\{u(\pi) = u\}\,\klbin(p_-, p_+)$,
 under the hypothesis that $\tau$ is $\Prob_0$-a.s.\ finite (which follows from $\E_0[\tau] < \infty$).
-\texttt{statesEnv M s₁ := stationaryEnv (statesKernel M s₁)} by
+\texttt{statesEnv M H s₁ := stationaryEnv (statesKernel M H s₁)} by
 definition, so Theorem~\ref{thm:change_of_measure}
 (\texttt{Essakine2026Tight/LeanMachineLearning/SequentialLearning/ChangeOfMeasure.lean})
 applies verbatim with the action type \texttt{Policy S A H} (a \texttt{Fintype}) and the

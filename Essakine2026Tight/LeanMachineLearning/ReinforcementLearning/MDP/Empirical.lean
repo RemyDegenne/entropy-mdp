@@ -17,13 +17,12 @@ state-action pairs. It is an additive monoid: the model of a single transition `
 rewards are `EmpiricalModel.empReward` and the empirical transition probabilities
 `EmpiricalModel.empTrans` (`0` for unvisited pairs).
 
-* Episodes (`MDP/Episodic.lean`): `ofEpisodeAt π τ r h` is the model of the transition at step
-  `h` of the episode with policy `π`, states `τ` and rewards `r`, and `ofEpisode π τ r` the model
-  of the whole episode (the counts of all steps pooled, as for a stationary MDP; step-indexed
-  counts are `fun h ↦ ofEpisodeAt π τ r h`).
-* Rounds of a stationary MDP (`MDP/Basic.lean`, one state-action-reward per round): the next state
-  of round `i` is the observation of round `i + 1` (or the current state `o` for the last round,
-  `nextObs`), and `ofRounds h o` is the model of the history `h` followed by the state `o`.
+The accessors are `count` (`N(s, a)`), `rewardSum` and `transCount` (`N(s, a, s')`).
+
+Episodes (`MDP/Episodic.lean`): `ofEpisodeAt π τ r h` is the model of the transition at step `h`
+of the episode with the `H`-step policy `π`, states `τ` and rewards `r`, and `ofEpisode π τ r` the
+model of the whole episode (the counts of all steps pooled, as for a stationary MDP; step-indexed
+counts are `fun h ↦ ofEpisodeAt π τ r h`).
 -/
 
 @[expose] public section
@@ -38,15 +37,16 @@ abbrev EmpiricalModel (S A : Type*) := (S × A → ℕ) × (S × A → ℝ) × (
 
 namespace EmpiricalModel
 
-variable {S A : Type*} [DecidableEq S] [DecidableEq A]
-
-/-- The empirical model of the single transition `(s, a, r, s')`. -/
-def single (s : S) (a : A) (r : ℝ) (s' : S) : EmpiricalModel S A :=
-  (fun p ↦ if (s, a) = p then 1 else 0, fun p ↦ if (s, a) = p then r else 0,
-    fun p t ↦ if (s, a) = p ∧ s' = t then 1 else 0)
+variable {S A : Type*}
 
 /-- The visit count `N(s, a)`. -/
 def count (m : EmpiricalModel S A) (p : S × A) : ℕ := m.1 p
+
+/-- The sum of the rewards received at `(s, a)`. -/
+def rewardSum (m : EmpiricalModel S A) (p : S × A) : ℝ := m.2.1 p
+
+/-- The transition count `N(s, a, s')`. -/
+def transCount (m : EmpiricalModel S A) (p : S × A) (s' : S) : ℕ := m.2.2 p s'
 
 /-- The empirical mean reward `r̂(s, a)` (`0` for unvisited pairs). -/
 noncomputable def empReward (m : EmpiricalModel S A) (p : S × A) : ℝ := m.2.1 p / m.1 p
@@ -54,6 +54,50 @@ noncomputable def empReward (m : EmpiricalModel S A) (p : S × A) : ℝ := m.2.1
 /-- The empirical transition probabilities `P̂(· | s, a)` (`0` for unvisited pairs). -/
 noncomputable def empTrans (m : EmpiricalModel S A) (p : S × A) : S → ℝ :=
   fun s' ↦ m.2.2 p s' / m.1 p
+
+@[simp] lemma count_add (m m' : EmpiricalModel S A) (p : S × A) :
+    (m + m').count p = m.count p + m'.count p := rfl
+
+@[simp] lemma rewardSum_add (m m' : EmpiricalModel S A) (p : S × A) :
+    (m + m').rewardSum p = m.rewardSum p + m'.rewardSum p := rfl
+
+@[simp] lemma transCount_add (m m' : EmpiricalModel S A) (p : S × A) (s' : S) :
+    (m + m').transCount p s' = m.transCount p s' + m'.transCount p s' := rfl
+
+@[simp] lemma count_zero (p : S × A) : (0 : EmpiricalModel S A).count p = 0 := rfl
+
+lemma count_sum {ι : Type*} (u : Finset ι) (m : ι → EmpiricalModel S A) (p : S × A) :
+    (∑ i ∈ u, m i).count p = ∑ i ∈ u, (m i).count p := by
+  classical
+  induction u using Finset.induction_on with
+  | empty => rfl
+  | insert i u hi ih => rw [sum_insert hi, sum_insert hi, count_add, ih]
+
+lemma transCount_sum {ι : Type*} (u : Finset ι) (m : ι → EmpiricalModel S A) (p : S × A)
+    (s' : S) : (∑ i ∈ u, m i).transCount p s' = ∑ i ∈ u, (m i).transCount p s' := by
+  classical
+  induction u using Finset.induction_on with
+  | empty => rfl
+  | insert i u hi ih => rw [sum_insert hi, sum_insert hi, transCount_add, ih]
+
+lemma empTrans_eq (m : EmpiricalModel S A) (p : S × A) (s' : S) :
+    m.empTrans p s' = m.transCount p s' / m.count p := rfl
+
+lemma empReward_eq (m : EmpiricalModel S A) (p : S × A) :
+    m.empReward p = m.rewardSum p / m.count p := rfl
+
+variable [DecidableEq S] [DecidableEq A]
+
+/-- The empirical model of the single transition `(s, a, r, s')`. -/
+def single (s : S) (a : A) (r : ℝ) (s' : S) : EmpiricalModel S A :=
+  (fun p ↦ if (s, a) = p then 1 else 0, fun p ↦ if (s, a) = p then r else 0,
+    fun p t ↦ if (s, a) = p ∧ s' = t then 1 else 0)
+
+@[simp] lemma count_single (s : S) (a : A) (r : ℝ) (s' : S) (p : S × A) :
+    (single s a r s').count p = if (s, a) = p then 1 else 0 := rfl
+
+@[simp] lemma transCount_single (s : S) (a : A) (r : ℝ) (s' : S) (p : S × A) (t : S) :
+    (single s a r s').transCount p t = if (s, a) = p ∧ s' = t then 1 else 0 := rfl
 
 section Measurability
 
@@ -115,18 +159,6 @@ lemma measurable_ofEpisode {π : X → Policy S A H} {τ : X → Traj S H} {r : 
   Finset.measurable_sum _ fun h _ ↦ measurable_ofEpisodeAt hπ hτ hr h
 
 end Measurability
-
-/-! ### Rounds of a stationary MDP -/
-
-/-- The state following round `i` of the history `h` (the observation of round `i + 1`, or the
-current state `o` for the last round). -/
-def nextObs {t : ℕ} (h : Hist S A ℝ t) (o : S) (i : Fin t) : S :=
-  if hi : (i : ℕ) + 1 < t then (h ⟨i + 1, hi⟩).obs else o
-
-/-- The empirical model of the history `h` of rounds of a stationary MDP followed by the current
-state `o`. -/
-def ofRounds {t : ℕ} (h : Hist S A ℝ t) (o : S) : EmpiricalModel S A :=
-  ∑ i, single (h i).obs (h i).action (h i).feedback (nextObs h o i)
 
 end EmpiricalModel
 

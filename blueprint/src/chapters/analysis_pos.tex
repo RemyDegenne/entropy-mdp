@@ -692,7 +692,7 @@ $1$ for never-visited pairs, so that the statement has no $\alpha(0)/0$.
 about \texttt{cert r β δ hist (H - h) s} (\texttt{certAt X Y r β δ t ω h.castSucc s}) and the certificate
 at the next step \texttt{cert r β δ hist (H - 1 - h)} (\texttt{certAt X Y r β δ t ω h.succ}); the clip
 $c_h$ is \texttt{Real.exp (β * (H - h : ℕ))}, the variance is
-\texttt{vecVar (M.transVec h s a) (expValue M β π h.succ)} and the rate terms are
+\texttt{vecVar (M.transVec h s a) (expValue M H β π.extend (h + 1))} and the rate terms are
 \texttt{rateMin (alphaStar …) n} and \texttt{rateMin (alphaKL …) n} (\texttt{starRateMinAt},
 \texttt{klRateMinAt} for a run). The proof follows the three steps above: step (i) is
 Lemma~\ref{lem:pos_core_recursion}(i) with range $B_h$, step (ii) is Lemma~\ref{lem:pos_core_recursion}(ii)
@@ -1030,7 +1030,7 @@ Theorem~\ref{thm:upper_bound_complexity}. The measurability of the events $\{V^*
 and $\{\tau \le \mathrm{upperBound}\}$ is immediate: the policy type is finite and $\tau$ is a stopping time.
 The proof needs $\evGood^+$ only through its three defining properties, and the inclusion
 $\evGood^+ \setminus N \subseteq \{\tau \le \mathrm{upperBound}\} \cap \{V^*_1 - V^{\mathrm{out}}_1 \le \eps\}$ is proved
-pointwise. In Lean the two statements are two lemmas for a run in \texttt{statesEnv M s₁}, with $\delta \in (0, 1]$
+pointwise. In Lean the two statements are two lemmas for a run in \texttt{statesEnv M H s₁}, with $\delta \in (0, 1]$
 and $\eps > 0$, each an instance of Lemma~\ref{lem:pos_core_pac} with $E = \evGood^+$ and
 $\Prob((\evGood^+)^c) \le \delta$ (\texttt{measure\_compl\_goodEvent\_le}, Lemma~\ref{lem:good_event}); in fact no
 measurability of the events is used (outer measure and complements).

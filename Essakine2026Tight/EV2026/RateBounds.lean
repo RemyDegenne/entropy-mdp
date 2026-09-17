@@ -218,22 +218,23 @@ lemma rateMin_rateReal_le {a₀ k : ℝ} (ha₀ : 1 ≤ a₀) (hk : 0 ≤ k) {n 
 section Run
 
 variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [Nonempty A]
-  [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A]
+  [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   {H : ℕ} {Ω : Type*} {mΩ : MeasurableSpace Ω} {X : ℕ → Ω → Policy S A H}
-  {Y : ℕ → Ω → Traj S H} {M : EpisodicMDP S A H} {s₁ : S} {δ : ℝ}
+  {Y : ℕ → Ω → Traj S H} {M : EpisodicMDP S A} {s₁ : S} {δ : ℝ}
 
-omit [DecidableEq S] [DecidableEq A] in
-lemma pseudoCount_nonneg (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A H) (s₁ : S) (h : Fin H)
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [MeasurableSingletonClass S] in
+lemma pseudoCount_nonneg (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A) (s₁ : S) (h : Fin H)
     (s : S) (a : A) (t : ℕ) (ω : Ω) : 0 ≤ pseudoCount X M s₁ h s a t ω :=
   sum_nonneg fun _ _ ↦ occupancy_nonneg M _ s₁ h s a
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] in
 /-- The pseudo-count after `t` episodes is at most `t`. -/
-lemma pseudoCount_le (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A H) (s₁ : S) (h : Fin H)
+lemma pseudoCount_le [Countable S] (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A) (s₁ : S)
+    (h : Fin H)
     (s : S) (a : A) (t : ℕ) (ω : Ω) : pseudoCount X M s₁ h s a t ω ≤ t := by
   unfold pseudoCount
-  calc ∑ i ∈ range t, occupancy M (X i ω) s₁ h s a ≤ ∑ _i ∈ range t, (1 : ℝ) :=
-        sum_le_sum fun _ _ ↦ occupancy_le_one M _ s₁ h s a
+  calc ∑ i ∈ range t, occupancy M (X i ω).extend s₁ h s a ≤ ∑ _i ∈ range t, (1 : ℝ) :=
+        sum_le_sum fun i _ ↦ occupancy_le_one M (X i ω).measurable_extend s₁ h s a
     _ = t := by simp
 
 /-- Lemma 27 on the counts event, for a rate `rateReal (α^cnt(δ)) k` with `k ≥ 0`. -/
@@ -275,7 +276,7 @@ lemma starRateMinAt_le_of_mem_eventCnt (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω
 /-- The counting argument for one triple `(h, s, a)` and a rate `rateReal (α^cnt(δ)) k`. -/
 lemma sum_occupancy_mul_rateMin_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
     (hω : ω ∈ eventCnt X Y M s₁ δ) {k : ℝ} (hk : 0 ≤ k) (h : Fin H) (s : S) (a : A) (T : ℕ) :
-    ∑ t ∈ range T, occupancy M (X t ω) s₁ h s a
+    ∑ t ∈ range T, occupancy M (X t ω).extend s₁ h s a
         * rateMin (fun n : ℕ ↦ rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k n)
           (visitCountAt X Y h s a t ω)
       ≤ 16 * rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k (T - 1 : ℕ)
@@ -285,9 +286,9 @@ lemma sum_occupancy_mul_rateMin_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
   have hA : 1 ≤ Fintype.card A := Fintype.card_pos
   have hH : 1 ≤ H := h.pos
   have ha₀ : 0 ≤ a₀ := alphaCnt_nonneg hS hA hH hδ hδ1
-  set u : ℕ → ℝ := fun t ↦ occupancy M (X t ω) s₁ h s a with hu
+  set u : ℕ → ℝ := fun t ↦ occupancy M (X t ω).extend s₁ h s a with hu
   have hu01 : ∀ t, u t ∈ Set.Icc 0 1 := fun t ↦
-    ⟨occupancy_nonneg M _ s₁ h s a, occupancy_le_one M _ s₁ h s a⟩
+    ⟨occupancy_nonneg M _ s₁ h s a, occupancy_le_one M (X t ω).measurable_extend s₁ h s a⟩
   have hαT : 0 ≤ rateReal a₀ k (T - 1 : ℕ) :=
     ha₀.trans (le_rateReal hk (Nat.cast_nonneg _))
   have hUT : ∑ i ∈ range T, u i ≤ T := pseudoCount_le X M s₁ h s a T ω
@@ -316,17 +317,17 @@ lemma sum_occupancy_mul_rateMin_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
 `rateReal (α^cnt(δ)) k`. -/
 lemma sum_sum_occupancy_mul_rateMin_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
     (hω : ω ∈ eventCnt X Y M s₁ δ) {k : ℝ} (hk : 0 ≤ k) (T : ℕ) :
-    ∑ t ∈ range T, ∑ h, ∑ s, ∑ a, occupancy M (X t ω) s₁ h s a
+    ∑ t ∈ range T, ∑ h : Fin H, ∑ s, ∑ a, occupancy M (X t ω).extend s₁ h s a
         * rateMin (fun n : ℕ ↦ rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k n)
           (visitCountAt X Y h s a t ω)
       ≤ 16 * (Fintype.card S * Fintype.card A * H)
         * rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k (T - 1 : ℕ)
         * Real.log (T + 1) := by
   rw [sum_comm]
-  calc ∑ h, ∑ t ∈ range T, ∑ s, ∑ a, occupancy M (X t ω) s₁ h s a
+  calc ∑ h : Fin H, ∑ t ∈ range T, ∑ s, ∑ a, occupancy M (X t ω).extend s₁ h s a
         * rateMin (fun n : ℕ ↦ rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k n)
           (visitCountAt X Y h s a t ω)
-      = ∑ h : Fin H, ∑ s, ∑ a, ∑ t ∈ range T, occupancy M (X t ω) s₁ h s a
+      = ∑ h : Fin H, ∑ s, ∑ a, ∑ t ∈ range T, occupancy M (X t ω).extend s₁ h s a
         * rateMin (fun n : ℕ ↦ rateReal (alphaCnt (Fintype.card S) (Fintype.card A) H δ) k n)
           (visitCountAt X Y h s a t ω) := by
         refine sum_congr rfl fun h _ ↦ ?_
@@ -348,7 +349,8 @@ lemma sum_sum_occupancy_mul_rateMin_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω
 ≤ 16 S A H α(T - 1, δ) log(T + 1)`. -/
 lemma sum_occupancy_mul_klRateMinAt_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
     (hω : ω ∈ eventCnt X Y M s₁ δ) (T : ℕ) :
-    ∑ t ∈ range T, ∑ h, ∑ s, ∑ a, occupancy M (X t ω) s₁ h s a * klRateMinAt X Y δ h s a t ω
+    ∑ t ∈ range T, ∑ h : Fin H, ∑ s, ∑ a,
+        occupancy M (X t ω).extend s₁ h s a * klRateMinAt X Y δ h s a t ω
       ≤ 16 * (Fintype.card S * Fintype.card A * H)
         * alphaKL (Fintype.card S) (Fintype.card A) H δ (T - 1) * Real.log (T + 1) := by
   simp only [klRateMinAt, alphaKL_eq_fun_rateReal]
@@ -359,7 +361,8 @@ lemma sum_occupancy_mul_klRateMinAt_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω
 ≤ 16 S A H α*(T - 1, δ) log(T + 1)`. -/
 lemma sum_occupancy_mul_starRateMinAt_le (hδ : 0 < δ) (hδ1 : δ ≤ 1) {ω : Ω}
     (hω : ω ∈ eventCnt X Y M s₁ δ) (T : ℕ) :
-    ∑ t ∈ range T, ∑ h, ∑ s, ∑ a, occupancy M (X t ω) s₁ h s a * starRateMinAt X Y δ h s a t ω
+    ∑ t ∈ range T, ∑ h : Fin H, ∑ s, ∑ a,
+        occupancy M (X t ω).extend s₁ h s a * starRateMinAt X Y δ h s a t ω
       ≤ 16 * (Fintype.card S * Fintype.card A * H)
         * alphaStar (Fintype.card S) (Fintype.card A) H δ (T - 1) * Real.log (T + 1) := by
   simp only [starRateMinAt, alphaStar_eq_fun_rateReal]

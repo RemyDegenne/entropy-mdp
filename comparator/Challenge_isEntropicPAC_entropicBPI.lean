@@ -8,6 +8,7 @@ import Mathlib.Probability.Kernel.IonescuTulcea.Traj
 import Mathlib.Probability.Process.HittingTime
 import Mathlib.Probability.Kernel.Basic
 import Mathlib.MeasureTheory.Measure.Real
+import Mathlib.Probability.Kernel.Composition.Lemmas
 import Mathlib.MeasureTheory.Function.EssSup
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
@@ -19,15 +20,14 @@ import Mathlib.Basic.ENNReal.Real
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
 import Mathlib.Analysis.SpecialFunctions.Sqrt
 import Mathlib.Analysis.SpecialFunctions.Exp
+import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.Probability.Kernel.Composition.IntegralCompProd
-import Mathlib.Probability.Kernel.Composition.Lemmas
 import Mathlib.Probability.Moments.Variance
 import Mathlib.Algebra.Order.Field.Basic
 import Mathlib.Tactic.FieldSimp
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Positivity
 import Mathlib.Tactic.Ring
-import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.InformationTheory.KullbackLeibler.Basic
 import Mathlib.MeasureTheory.Measure.GiryMonad
 import Mathlib.MeasureTheory.Measure.Dirac.Basic
@@ -576,151 +576,145 @@ end
 section
 open MeasureTheory ProbabilityTheory Finset Learning Learning.MDP
 namespace Learning.MDP.Episodic
-variable {S A : Type*} [Fintype S] [Fintype A] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A] {H : ℕ}
+variable {S A : Type*} [MeasurableSpace S] [MeasurableSpace A]
 
-/-- A finite-horizon MDP with horizon `H`: the transition kernels `trans h : Kernel (S × A) S`
-and the reward kernels `reward h : Kernel (S × A) ℝ` at each step `h : Fin H`. -/
-structure EpisodicMDP (S A : Type*) [MeasurableSpace S] [MeasurableSpace A] (H : ℕ) where
+/-- A finite-horizon MDP: the transition kernels `trans h : Kernel (S × A) S` and the reward
+kernels `reward h : Kernel (S × A) ℝ` at each step `h : ℕ`. -/
+structure EpisodicMDP (S A : Type*) [MeasurableSpace S] [MeasurableSpace A] where
   /-- The transition kernel at step `h`: the law of the next state. -/
-  trans : Fin H → Kernel (S × A) S
+  trans : ℕ → Kernel (S × A) S
   /-- The transition kernels are Markov kernels. -/
   [isMarkovKernel_trans : ∀ h, IsMarkovKernel (trans h)]
   /-- The reward kernel at step `h`: the law of the reward. -/
-  reward : Fin H → Kernel (S × A) ℝ
+  reward : ℕ → Kernel (S × A) ℝ
   /-- The reward kernels are Markov kernels. -/
   [isMarkovKernel_reward : ∀ h, IsMarkovKernel (reward h)]
 
-/-- A deterministic non-stationary policy. -/
+omit [MeasurableSpace S] [MeasurableSpace A] in
+/-- The stationary policy of the time-augmented state space `S × ℕ` associated with the policy
+`π : ℕ → S → A`: the action `π h s` at the state `(s, h)`. -/
+def augPolicy (π : ℕ → S → A) (p : S × ℕ) : A := π p.2 p.1
+
+lemma measurable_augPolicy {π : ℕ → S → A} (hπ : ∀ h, Measurable (π h)) :
+    Measurable (augPolicy π) := sorry
+
+/-- A deterministic `H`-step policy: the action `π h s` played at the step `h : Fin H` in the
+state `s`. -/
 abbrev Policy (S A : Type*) (H : ℕ) := Fin H → S → A
 
-/-- The state sequence `s_1, …, s_{H+1}` of an episode. -/
+/-- The state sequence `s_0, …, s_H` of an episode of horizon `H`. -/
 abbrev Traj (S : Type*) (H : ℕ) := Fin (H + 1) → S
 
-/-- The layered state space: a state together with a step index. -/
-abbrev LayerState (S : Type*) (H : ℕ) := S × Fin (H + 1)
+section Extend
+variable [Nonempty A] {H : ℕ}
 
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
-/-- The first step, `0 : Fin (H + 1)` (written without the numeral, which would introduce a
-nested `NeZero` proof in every definition using it). -/
-def startStep (H : ℕ) : Fin (H + 1) := ⟨0, Nat.zero_lt_succ H⟩
+omit [MeasurableSpace S] [MeasurableSpace A] in
+/-- The `H`-step policy `π` extended to all steps by a fixed action beyond the horizon. -/
+noncomputable def Policy.extend (π : Policy S A H) (h : ℕ) (s : S) : A :=
+  if hh : h < H then π ⟨h, hh⟩ s else Classical.arbitrary A
 
+end Extend
 namespace EpisodicMDP
+variable (M : EpisodicMDP S A)
 
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The rewards of `M` are the deterministic reward function `r`: the reward of `(s, a)` at step
 `h` is `r h s a` almost surely. -/
-def HasRewardFn (M : EpisodicMDP S A H) (r : Fin H → S → A → ℝ) : Prop :=
-  ∀ h s a, M.reward h (s, a) = Measure.dirac (r h s a)
+def HasRewardFn (r : ℕ → S → A → ℝ) : Prop := ∀ h s a, M.reward h (s, a) = Measure.dirac (r h s a)
+
+/-- The transition function of the time-augmented MDP: from `(s, h)` with action `a`, the next
+augmented state is `(s', h + 1)` with `s' ∼ M.trans h (s, a)`. -/
+noncomputable def augTransFun (p : (S × ℕ) × A) : Measure (S × ℕ) :=
+  (M.trans p.1.2 (p.1.1, p.2)).map fun s' ↦ (s', p.1.2 + 1)
+
+lemma measurable_augTransFun : Measurable M.augTransFun := sorry
+
+/-- The transition kernel of the time-augmented MDP. -/
+noncomputable def augTrans : Kernel ((S × ℕ) × A) (S × ℕ) :=
+  ⟨M.augTransFun, M.measurable_augTransFun⟩
+
+lemma isProbabilityMeasure_augTrans (p : (S × ℕ) × A) : IsProbabilityMeasure (M.augTrans p) := sorry
+
+instance : IsMarkovKernel M.augTrans := ⟨M.isProbabilityMeasure_augTrans⟩
+
+/-- The reward function of the time-augmented MDP: `M.reward h (s, a)` at `(s, h)`. -/
+noncomputable def augRewardFun (p : (S × ℕ) × A) : Measure ℝ := M.reward p.1.2 (p.1.1, p.2)
+
+lemma measurable_augRewardFun : Measurable M.augRewardFun := sorry
+
+/-- The reward kernel of the time-augmented MDP. -/
+noncomputable def augReward : Kernel ((S × ℕ) × A) ℝ :=
+  ⟨M.augRewardFun, M.measurable_augRewardFun⟩
+
+lemma isProbabilityMeasure_augReward (p : (S × ℕ) × A) :
+    IsProbabilityMeasure (M.augReward p) := sorry
+
+instance : IsMarkovKernel M.augReward := ⟨M.isProbabilityMeasure_augReward⟩
+
+/-- The stationary MDP on the time-augmented state space `S × ℕ` which embeds the finite-horizon
+MDP `M`. -/
+noncomputable def augmented : MDP (S × ℕ) A ℝ where
+  P := M.augTrans
+  R := M.augReward
 
 end EpisodicMDP
 
-/-- The transition function of the layered MDP: from `(s, h)` with action `a`, the next layered
-state is `(s', h + 1)` with `s' ∼ M.trans h (s, a)` if `h < H`, and `(s, h)` is absorbing at the
-terminal layer. -/
-noncomputable def layerTransFun (M : EpisodicMDP S A H) (p : LayerState S H × A) :
-    Measure (LayerState S H) :=
-  if hh : (p.1.2 : ℕ) < H then
-    (M.trans ⟨p.1.2, hh⟩ (p.1.1, p.2)).map fun s' ↦ (s', ⟨p.1.2 + 1, Nat.succ_lt_succ hh⟩)
-  else Measure.dirac p.1
+open Classical in
+/-- The law of the trajectory of the time-augmented MDP under the policy `π` started at the
+augmented state `p₀ = (s, h)`: the law of `((S_{h+k}, h + k), A_{h+k}, R_{h+k})_{k ≥ 0}` from the
+state `s` at the step `h`. It is `0` if `π` is not measurable at every step. -/
+noncomputable def stepLaw (M : EpisodicMDP S A) (π : ℕ → S → A) (p₀ : S × ℕ) :
+    Measure (ℕ → Round (S × ℕ) A ℝ) :=
+  if hπ : ∀ k, Measurable (π k) then
+    M.augmented.policyMeasure (augPolicy π) (measurable_augPolicy hπ) p₀
+  else 0
 
-omit [Fintype S] [Fintype A] in
-lemma measurable_layerTransFun [Finite S] [Finite A] (M : EpisodicMDP S A H) :
-    Measurable (layerTransFun M) := sorry
+omit [MeasurableSpace S] [MeasurableSpace A] in
+/-- The return `∑_{k < n} R_k` of the first `n` rounds of a trajectory of the time-augmented
+MDP. -/
+def episodeReturn (n : ℕ) (traj : ℕ → Round (S × ℕ) A ℝ) : ℝ :=
+  ∑ k ∈ range n, IT.feedback k traj
 
-/-- The transition kernel of the layered MDP. -/
-noncomputable def layerTrans (M : EpisodicMDP S A H) :
-    Kernel (LayerState S H × A) (LayerState S H) :=
-  ⟨layerTransFun M, measurable_layerTransFun M⟩
-
-lemma isProbabilityMeasure_layerTrans (M : EpisodicMDP S A H) (p : LayerState S H × A) :
-    IsProbabilityMeasure (layerTrans M p) := sorry
-
-instance (M : EpisodicMDP S A H) : IsMarkovKernel (layerTrans M) :=
-  ⟨isProbabilityMeasure_layerTrans M⟩
-
-/-- The reward function of the layered MDP: `M.reward h (s, a)` at `(s, h)` with `h < H`, and the
-reward `0` at the terminal layer. -/
-noncomputable def layerRewardFun (M : EpisodicMDP S A H) (p : LayerState S H × A) : Measure ℝ :=
-  if hh : (p.1.2 : ℕ) < H then M.reward ⟨p.1.2, hh⟩ (p.1.1, p.2) else Measure.dirac 0
-
-omit [Fintype S] [Fintype A] in
-lemma measurable_layerRewardFun [Finite S] [Finite A] (M : EpisodicMDP S A H) :
-    Measurable (layerRewardFun M) := sorry
-
-/-- The reward kernel of the layered MDP. -/
-noncomputable def layerReward (M : EpisodicMDP S A H) : Kernel (LayerState S H × A) ℝ :=
-  ⟨layerRewardFun M, measurable_layerRewardFun M⟩
-
-lemma isProbabilityMeasure_layerReward (M : EpisodicMDP S A H) (p : LayerState S H × A) :
-    IsProbabilityMeasure (layerReward M p) := sorry
-
-instance (M : EpisodicMDP S A H) : IsMarkovKernel (layerReward M) :=
-  ⟨isProbabilityMeasure_layerReward M⟩
-
-/-- The stationary MDP on the layered state space which embeds the finite-horizon MDP `M`. -/
-noncomputable def layerMDP (M : EpisodicMDP S A H) : MDP (LayerState S H) A ℝ where
-  P := layerTrans M
-  R := layerReward M
-
-variable [Nonempty A]
-
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
-/-- A policy of the finite-horizon MDP as a stationary policy of the layered MDP (arbitrary at
-the terminal layer). -/
-noncomputable def Policy.layer (π : Policy S A H) (p : LayerState S H) : A :=
-  if hh : (p.2 : ℕ) < H then π ⟨p.2, hh⟩ p.1 else Classical.arbitrary A
-
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass A] in
-lemma Policy.measurable_layer [Finite S] (π : Policy S A H) : Measurable π.layer := sorry
-
-/-- The law of the trajectory of the layered MDP under the policy `π` started at `p₀`: the law
-of `(S_i, A_i, R_i)_{i ≥ h}` from the state `s` at step `h` for `p₀ = (s, h)`. -/
-noncomputable def stepLaw (M : EpisodicMDP S A H) (π : Policy S A H) (p₀ : LayerState S H) :
-    Measure (ℕ → Round (LayerState S H) A ℝ) :=
-  (layerMDP M).policyMeasure π.layer π.measurable_layer p₀
-
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A]
-  [Nonempty A] in
-/-- The return `∑_{i < H} R_i` of a trajectory of the layered MDP (the rewards after the terminal
-layer are `0`, so this is the return of the episode from any starting step). -/
-def episodeReturn (H : ℕ) (traj : ℕ → Round (LayerState S H) A ℝ) : ℝ :=
-  ∑ k ∈ range H, IT.feedback k traj
-
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A]
-  [Nonempty A] in
-/-- The states `s_1, …, s_{H+1}` of a trajectory of the layered MDP. -/
-def episodeStates (H : ℕ) (traj : ℕ → Round (LayerState S H) A ℝ) : Traj S H :=
+omit [MeasurableSpace S] [MeasurableSpace A] in
+/-- The states `s_0, …, s_H` of a trajectory of the time-augmented MDP. -/
+def episodeStates (H : ℕ) (traj : ℕ → Round (S × ℕ) A ℝ) : Traj S H :=
   fun h ↦ (IT.obs h traj).1
 
-variable (M : EpisodicMDP S A H)
+section EpisodeEnv
+variable (M : EpisodicMDP S A) (H : ℕ)
 
-/-- The law of the state sequence of the episode played with the policy `π` from `s₁`. -/
-noncomputable def statesLaw (s₁ : S) (π : Policy S A H) : Measure (Traj S H) :=
-  (stepLaw M π (s₁, startStep H)).map (episodeStates H)
+/-- The law of the state sequence of the episode of horizon `H` played with the policy `π`
+from `s₁`. -/
+noncomputable def statesLaw (s₁ : S) (π : ℕ → S → A) : Measure (Traj S H) :=
+  (stepLaw M π (s₁, 0)).map (episodeStates H)
 
-lemma measurable_statesLaw (s₁ : S) : Measurable (statesLaw M s₁) := sorry
+variable [Finite S] [Countable A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] [Nonempty A]
 
-/-- The kernel from policies to the law of the state sequence of the episode played with the
-policy from `s₁`. -/
+omit [MeasurableSingletonClass S] in
+lemma measurable_statesLaw_extend (s₁ : S) :
+    Measurable fun π : Policy S A H ↦ statesLaw M H s₁ π.extend := sorry
+
+/-- The kernel from `H`-step policies to the law of the state sequence of the episode played with
+the policy from `s₁`. -/
 noncomputable def statesKernel (s₁ : S) : Kernel (Policy S A H) (Traj S H) :=
-  ⟨statesLaw M s₁, measurable_statesLaw M s₁⟩
+  ⟨fun π ↦ statesLaw M H s₁ π.extend, measurable_statesLaw_extend M H s₁⟩
 
 lemma isProbabilityMeasure_statesKernel (s₁ : S) (π : Policy S A H) :
-    IsProbabilityMeasure (statesKernel M s₁ π) := sorry
+    IsProbabilityMeasure (statesKernel M H s₁ π) := sorry
 
-instance (s₁ : S) : IsMarkovKernel (statesKernel M s₁) :=
-  ⟨isProbabilityMeasure_statesKernel M s₁⟩
+instance (s₁ : S) : IsMarkovKernel (statesKernel M H s₁) :=
+  ⟨isProbabilityMeasure_statesKernel M H s₁⟩
 
-/-- The episodic environment with the fixed initial state `s₁` in which the learner observes the
-states of the episode only (the rewards being known): at each round, the learner plays a policy
-and observes the states. -/
+/-- The episodic environment with horizon `H` and the fixed initial state `s₁`, in which the
+learner observes the states of the episode only (the rewards being known): at each round, the
+learner plays an `H`-step policy and observes the states. -/
 noncomputable def statesEnv (s₁ : S) : Environment Unit (Policy S A H) (Traj S H) :=
-  stationaryEnv (statesKernel M s₁)
+  stationaryEnv (statesKernel M H s₁)
 
-omit [Fintype S] [Fintype A] [MeasurableSingletonClass S] [MeasurableSingletonClass A]
-  [Nonempty A] in
-/-- A best-policy identification algorithm: an identification algorithm playing a policy at each
-episode, observing the states, and outputting a policy. -/
+end EpisodeEnv
+
+omit [MeasurableSpace S] [MeasurableSpace A] in
+/-- A best-policy identification algorithm: an identification algorithm playing an `H`-step
+policy at each episode, observing the states, and outputting an `H`-step policy. -/
 abbrev BPIAlg (S A : Type*) [MeasurableSpace S] [MeasurableSpace A] (H : ℕ) :=
   IdentAlg Unit (Policy S A H) (Traj S H) (Policy S A H)
 
@@ -731,31 +725,33 @@ end
 section
 open MeasureTheory ProbabilityTheory Finset Learning Learning.MDP
 namespace Learning.MDP.Episodic
-variable {S A : Type*} [Fintype S] [Fintype A] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A] [Nonempty A] {H : ℕ}
+variable {S A : Type*} [MeasurableSpace S] [MeasurableSpace A]
 
-/-- The exponential value `Z^π_h(s) = E[exp(β R_h) | S_h = s]`. -/
-noncomputable def expValue (M : EpisodicMDP S A H) (β : ℝ) (π : Policy S A H) (h : Fin (H + 1))
+/-- The exponential value `Z^π_h(s) = E[exp(β R_h) | S_h = s]` with the horizon `H`, where `R_h`
+is the return of the `H - h` steps from `h`. -/
+noncomputable def expValue (M : EpisodicMDP S A) (H : ℕ) (β : ℝ) (π : ℕ → S → A) (h : ℕ)
     (s : S) : ℝ :=
-  ∫ traj, Real.exp (β * episodeReturn H traj) ∂(stepLaw M π (s, h))
+  ∫ traj, Real.exp (β * episodeReturn (H - h) traj) ∂(stepLaw M π (s, h))
 
 /-- The entropic value `V^π_h(s) = β⁻¹ log E[exp(β R_h) | S_h = s]`. -/
-noncomputable def entropicValue (M : EpisodicMDP S A H) (β : ℝ) (π : Policy S A H)
-    (h : Fin (H + 1)) (s : S) : ℝ :=
-  β⁻¹ * Real.log (expValue M β π h s)
+noncomputable def entropicValue (M : EpisodicMDP S A) (H : ℕ) (β : ℝ) (π : ℕ → S → A)
+    (h : ℕ) (s : S) : ℝ :=
+  β⁻¹ * Real.log (expValue M H β π h s)
 
-/-- The optimal entropic value `V*_h(s) = ⨆ π, V^π_h(s)`. -/
-noncomputable def optEntropicValue (M : EpisodicMDP S A H) (β : ℝ) (h : Fin (H + 1)) (s : S) :
-    ℝ :=
-  ⨆ π : Policy S A H, entropicValue M β π h s
+/-- The optimal entropic value `V*_h(s) = ⨆ π, V^π_h(s)`, the supremum over all the policies
+`π : ℕ → S → A` which are measurable at every step. -/
+noncomputable def optEntropicValue (M : EpisodicMDP S A) (H : ℕ) (β : ℝ) (h : ℕ) (s : S) : ℝ :=
+  ⨆ π : {π : ℕ → S → A // ∀ k, Measurable (π k)}, entropicValue M H β π h s
+
+variable [Finite S] [Countable A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] [Nonempty A] {H : ℕ}
 
 /-- `𝒜` is `(ε, δ)`-PAC for best-policy identification under the entropic risk measure with
 parameter `β`, for the known reward function `r`, from the initial state `s₁`: for every MDP
 with reward function `r`, the output `π̂` of `𝒜` in its states-only environment satisfies
-`V*_1(s₁) - V^π̂_1(s₁) > ε` with probability at most `δ`. -/
-def IsEntropicPAC (𝒜 : BPIAlg S A H) (r : Fin H → S → A → ℝ) (β ε δ : ℝ) (s₁ : S) : Prop :=
-  𝒜.IsPAC (fun M : {M : EpisodicMDP S A H // M.HasRewardFn r} ↦ statesEnv M.1 s₁)
-    (fun M π ↦
-      ε < optEntropicValue M.1 β (startStep H) s₁ - entropicValue M.1 β π (startStep H) s₁) δ
+`V*_0(s₁) - V^π̂_0(s₁) > ε` with probability at most `δ`. -/
+def IsEntropicPAC (𝒜 : BPIAlg S A H) (r : ℕ → S → A → ℝ) (β ε δ : ℝ) (s₁ : S) : Prop :=
+  𝒜.IsPAC (fun M : {M : EpisodicMDP S A // M.HasRewardFn r} ↦ statesEnv M.1 H s₁)
+    (fun M π ↦ ε < optEntropicValue M.1 H β 0 s₁ - entropicValue M.1 H β π.extend 0 s₁) δ
 
 end Learning.MDP.Episodic
 end
@@ -770,12 +766,7 @@ the state-action pairs. -/
 abbrev EmpiricalModel (S A : Type*) := (S × A → ℕ) × (S × A → ℝ) × (S × A → S → ℕ)
 
 namespace EmpiricalModel
-variable {S A : Type*} [DecidableEq S] [DecidableEq A]
-
-/-- The empirical model of the single transition `(s, a, r, s')`. -/
-def single (s : S) (a : A) (r : ℝ) (s' : S) : EmpiricalModel S A :=
-  (fun p ↦ if (s, a) = p then 1 else 0, fun p ↦ if (s, a) = p then r else 0,
-    fun p t ↦ if (s, a) = p ∧ s' = t then 1 else 0)
+variable {S A : Type*}
 
 /-- The visit count `N(s, a)`. -/
 def count (m : EmpiricalModel S A) (p : S × A) : ℕ := m.1 p
@@ -783,6 +774,13 @@ def count (m : EmpiricalModel S A) (p : S × A) : ℕ := m.1 p
 /-- The empirical transition probabilities `P̂(· | s, a)` (`0` for unvisited pairs). -/
 noncomputable def empTrans (m : EmpiricalModel S A) (p : S × A) : S → ℝ :=
   fun s' ↦ m.2.2 p s' / m.1 p
+
+variable [DecidableEq S] [DecidableEq A]
+
+/-- The empirical model of the single transition `(s, a, r, s')`. -/
+def single (s : S) (a : A) (r : ℝ) (s' : S) : EmpiricalModel S A :=
+  (fun p ↦ if (s, a) = p then 1 else 0, fun p ↦ if (s, a) = p then r else 0,
+    fun p t ↦ if (s, a) = p ∧ s' = t then 1 else 0)
 
 variable {H : ℕ}
 
@@ -885,7 +883,7 @@ noncomputable def empTrans {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H)
 /-- One backward step of the optimistic planning: the values `(Z̃, Z̲)` at the step with `k`
 steps after it, from the values `prev` at the next step (`stepU` for every pair, then the max
 (`β > 0`) or the min (`β < 0`) over the actions); the identity if `k ≥ H`. -/
-noncomputable def optZStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def optZStep (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) (prev : (S → ℝ) × (S → ℝ)) :
     (S → ℝ) × (S → ℝ) :=
   if hk : k < H then
@@ -898,12 +896,12 @@ noncomputable def optZStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : �
 
 /-- The optimistic and pessimistic exponential values `(Z̃, Z̲)` at the step `H - j` computed
 from the history `hist` (backward recursion; `j = 0` is the terminal step, with values `1`). -/
-noncomputable def optZ (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def optZ (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (j : ℕ) : (S → ℝ) × (S → ℝ) :=
   Nat.rec (motive := fun _ ↦ (S → ℝ) × (S → ℝ)) (fun _ ↦ 1, fun _ ↦ 1) (optZStep r β δ hist) j
 
 /-- The backups `(Ũ, U̲)(s, a)` at the step `h` computed from the history `hist`. -/
-noncomputable def stepUAt (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def stepUAt (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (h : Fin H) (s : S) (a : A) : ℝ × ℝ :=
   let prev := optZ r β δ hist (H - 1 - h)
   stepU (Fintype.card S) (Fintype.card A) H β δ (H - 1 - h) (visitCount hist h s a) (r h s a)
@@ -911,14 +909,14 @@ noncomputable def stepUAt (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ
 
 /-- The greedy policy `π^{t+1}` computed from the history `hist`: `argmax_a Ũ(s, a)` if `β > 0`,
 `argmin_a U̲(s, a)` if `β < 0`. -/
-noncomputable def greedy (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def greedy (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : Policy S A H :=
   fun h s ↦ if 0 < β then argmax fun a ↦ (stepUAt r β δ hist h s a).1
     else argmin fun a ↦ (stepUAt r β δ hist h s a).2
 
 /-- One backward step of the certificate: `π^{t+1} G` at the step with `k` steps after it, from
 the certificate `prev` at the next step; the identity if `k ≥ H`. -/
-noncomputable def certStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def certStep (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) (prev : S → ℝ) : S → ℝ :=
   fun s ↦
     if hk : k < H then
@@ -936,32 +934,33 @@ noncomputable def certStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : �
 /-- The certificate `π^{t+1} G` at the step `H - j` computed from the history `hist` (backward
 recursion; `j = 0` is the terminal step, with value `0`), clipped at `e^{β (k + 1)}` (`β > 0`)
 or `1` (`β < 0`) where `k` is the number of steps after the current step. -/
-noncomputable def cert (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def cert (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (j : ℕ) : S → ℝ :=
   Nat.rec (motive := fun _ ↦ S → ℝ) (fun _ ↦ 0) (certStep r β δ hist) j
 
 /-- The stopping rule of Entropic-BPI: `π^{t+1} G_1(s₁) ≤ (e^{βε} - 1) e^{-βε} Z̃_1(s₁)` if
 `β > 0`, `π^{t+1} G_1(s₁) ≤ (1 - e^{βε}) Z̲_1(s₁)` if `β < 0`. -/
-noncomputable def stopCond (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) {t : ℕ}
+noncomputable def stopCond (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : Prop :=
   if 0 < β then
     cert r β δ hist H s₁ ≤ (Real.exp (β * ε) - 1) / Real.exp (β * ε) * (optZ r β δ hist H).1 s₁
   else cert r β δ hist H s₁ ≤ (1 - Real.exp (β * ε)) * (optZ r β δ hist H).2 s₁
 
-lemma measurable_greedy_fst (r : Fin H → S → A → ℝ) (β δ : ℝ) (n : ℕ) :
+lemma measurable_greedy_fst (r : ℕ → S → A → ℝ) (β δ : ℝ) (n : ℕ) :
     Measurable fun p : Hist Unit (Policy S A H) (Traj S H) n × Unit ↦ greedy r β δ p.1 := sorry
 
-lemma measurable_greedy_snd (r : Fin H → S → A → ℝ) (β δ : ℝ) :
+lemma measurable_greedy_snd (r : ℕ → S → A → ℝ) (β δ : ℝ) :
     Measurable fun h : Σ n : ℕ, Hist Unit (Policy S A H) (Traj S H) n ↦ greedy r β δ h.2 := sorry
 
-lemma measurableSet_stopCond (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) :
+lemma measurableSet_stopCond (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) :
     MeasurableSet {h : Σ n : ℕ, Hist Unit (Policy S A H) (Traj S H) n | stopCond r β δ ε s₁ h.2} := sorry
 
-/-- **Algorithm 1** (Entropic-BPI) with known rewards `r`, risk parameter `β`, confidence `δ`,
-accuracy `ε` and initial state `s₁`: at each episode, play the greedy policy of the optimistic
-backups computed from the past episodes; stop when the certificate of the greedy policy is small
-enough, and output the greedy policy. -/
-noncomputable def entropicBPI (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) : BPIAlg S A H where
+variable (H) in
+/-- **Algorithm 1** (Entropic-BPI) with horizon `H`, known rewards `r`, risk parameter `β`,
+confidence `δ`, accuracy `ε` and initial state `s₁`: at each episode, play the greedy policy of
+the optimistic backups computed from the past episodes; stop when the certificate of the greedy
+policy is small enough, and output the greedy policy. -/
+noncomputable def entropicBPI (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) : BPIAlg S A H where
   alg := detAlgorithm (fun _ p ↦ greedy r β δ p.1) (measurable_greedy_fst r β δ)
   stopSet := {h | stopCond r β δ ε s₁ h.2}
   measurableSet_stopSet := measurableSet_stopCond r β δ ε s₁
@@ -982,10 +981,10 @@ variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [
 `r` with values in `[0, 1]`, `β ≠ 0`, `δ ∈ (0, 1)` and `ε ∈ (0, 2 / (|β| H S)]`, Entropic-BPI
 with parameters `r, β, δ, ε` and initial state `s₁` is `(ε, δ)`-PAC for entropic best-policy
 identification on the class of MDPs with reward function `r`. -/
-theorem isEntropicPAC_entropicBPI (r : Fin H → S → A → ℝ) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
+theorem isEntropicPAC_entropicBPI (r : ℕ → S → A → ℝ) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
     {β δ ε : ℝ} (hβ : β ≠ 0) (hδ : δ ∈ Set.Ioo 0 1)
     (hε : ε ∈ Set.Ioc 0 (2 / (|β| * H * Fintype.card S))) (s₁ : S) :
-    IsEntropicPAC (entropicBPI r β δ ε s₁) r β ε δ s₁ := sorry
+    IsEntropicPAC (entropicBPI H r β δ ε s₁) r β ε δ s₁ := sorry
 
 end Essakine2026Tight
 end

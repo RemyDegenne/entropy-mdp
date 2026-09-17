@@ -139,15 +139,17 @@ lemma empTransAt_eq (h : Fin H) (s : S) (a : A) (t : ℕ) (ω : Ω)
   rw [empTransAt, empTrans, ite_eq_right hn', EmpiricalModel.empTrans, transCount_eq_card]
   rfl
 
+omit [Fintype S] [Fintype A] in
 /-- **Domination of the observed next states by an i.i.d. sample, uniformly in the episodes**: in
 a run of any algorithm in the episode environment of `M` from `s₁`, for every `n` and every set
 `C` of sequences of `n` states,
 `P(∃ t, n_h^t(s, a) = n and (W_1, …, W_n) ∈ C) ≤ p_h(· | s, a)^{⊗ n}(C)`. -/
-lemma measure_exists_visitCountAt_eq_le_pi [Nonempty A] [MeasurableSpace S]
-    [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A]
+lemma measure_exists_visitCountAt_eq_le_pi [Finite S] [Countable A] [Nonempty A]
+    [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
+    [MeasurableSingletonClass A]
     {mΩ : MeasurableSpace Ω} {P : Measure Ω} [IsProbabilityMeasure P]
-    {alg : Algorithm Unit (Policy S A H) (Traj S H)} (M : EpisodicMDP S A H) (s₁ : S)
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (h : Fin H) (s : S) (a : A)
+    {alg : Algorithm Unit (Policy S A H) (Traj S H)} (M : EpisodicMDP S A) (s₁ : S)
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (h : Fin H) (s : S) (a : A)
     (n : ℕ) (C : Set (Fin n → S)) :
     P {ω | (∃ t, visitCountAt X Y h s a t ω = n)
         ∧ (fun k : Fin n ↦ visitNextState X Y h s a (k + 1) ω) ∈ C}

@@ -9,12 +9,12 @@
         "Learning.MDP.measurable_obsAction",
         "Learning.MDP.isMarkovKernel_envObs",
         "Learning.MDP.measurable_policyAlg_next",
-        "Learning.MDP.Episodic.measurable_layerTransFun",
-        "Learning.MDP.Episodic.isProbabilityMeasure_layerTrans",
-        "Learning.MDP.Episodic.measurable_layerRewardFun",
-        "Learning.MDP.Episodic.isProbabilityMeasure_layerReward",
-        "Learning.MDP.Episodic.Policy.measurable_layer",
-        "Learning.MDP.Episodic.measurable_statesLaw",
+        "Learning.MDP.Episodic.measurable_augPolicy",
+        "Learning.MDP.Episodic.EpisodicMDP.measurable_augTransFun",
+        "Learning.MDP.Episodic.EpisodicMDP.isProbabilityMeasure_augTrans",
+        "Learning.MDP.Episodic.EpisodicMDP.measurable_augRewardFun",
+        "Learning.MDP.Episodic.EpisodicMDP.isProbabilityMeasure_augReward",
+        "Learning.MDP.Episodic.measurable_statesLaw_extend",
         "Learning.MDP.Episodic.isProbabilityMeasure_statesKernel"
     ],
     "permitted_axioms": [

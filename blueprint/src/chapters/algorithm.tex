@@ -352,7 +352,8 @@ $(e^{\beta\eps} - 1)/e^{\beta\eps}$, $1 - e^{\beta\eps}$ are less than $1$; henc
 \end{enumerate}
 \end{definition}
 
-\textbf{Lean remark.} \texttt{entropicBPI r β δ ε s₁ : BPIAlg S A H} with
+\textbf{Lean remark.} \texttt{entropicBPI H r β δ ε s₁ : BPIAlg S A H} (the horizon is an
+explicit argument, the reward function \texttt{r : ℕ → S → A → ℝ} being defined on all steps) with
 \texttt{alg := detAlgorithm (fun \_ p ↦ greedy r β δ p.1) (fun \_ ↦ measurable\_of\_countable \_)}
 (LML \texttt{detAlgorithm}: the next action is a measurable function of the pair (history,
 observation); the observation is \texttt{()}), \texttt{stopSet := \{h : Σ n, Hist Unit (Policy S A H) (Traj S H) n | stopCond r β δ ε s₁ h.2\}}

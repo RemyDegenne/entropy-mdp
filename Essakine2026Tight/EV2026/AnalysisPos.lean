@@ -49,28 +49,30 @@ namespace Essakine2026Tight
 
 variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [Nonempty A]
   [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A]
-  {H : ℕ} {M : EpisodicMDP S A H} {r : Fin H → S → A → ℝ} {β δ : ℝ} {t : ℕ}
+  {H : ℕ} {M : EpisodicMDP S A} {r : ℕ → S → A → ℝ} {β δ : ℝ} {t : ℕ}
   {hist : Hist Unit (Policy S A H) (Traj S H) t}
 
 /-! ### Ranges -/
 
 section Ranges
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] in
 /-- Range of the optimal exponential values for `β > 0`: `[1, e^{β (H - h)}]`. -/
-lemma optExpValue_mem_Icc_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
+lemma optExpValue_mem_Icc_of_pos [Finite S] [Finite A] (hM : M.HasRewardFn r)
+    (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
     (hβ : 0 < β) (h : Fin (H + 1)) (s : S) :
-    optExpValue M β h s ∈ Set.Icc 1 (Real.exp (β * (H - h : ℕ))) :=
+    optExpValue M H β h s ∈ Set.Icc 1 (Real.exp (β * (H - h : ℕ))) :=
   mem_Icc_one_exp_of_pos hβ (Nat.cast_nonneg _)
-    (optExpValue_mem_Icc M β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h s)
+    (optExpValue_mem_Icc M H β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h s)
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] in
 /-- Range of the exponential values for `β > 0`: `[1, e^{β (H - h)}]`. -/
-lemma expValue_mem_Icc_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
+lemma expValue_mem_Icc_of_pos [Finite S] (hM : M.HasRewardFn r)
+    (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
     (hβ : 0 < β) (π : Policy S A H) (h : Fin (H + 1)) (s : S) :
-    expValue M β π h s ∈ Set.Icc 1 (Real.exp (β * (H - h : ℕ))) :=
+    expValue M H β π.extend h s ∈ Set.Icc 1 (Real.exp (β * (H - h : ℕ))) :=
   mem_Icc_one_exp_of_pos hβ (Nat.cast_nonneg _)
-    (expValue_mem_Icc M β (rewardsIn_Icc_of_hasRewardFn hM hr) π h s)
+    (expValue_mem_Icc M H β (rewardsIn_Icc_of_hasRewardFn hM hr) π.measurable_extend h s)
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
@@ -96,17 +98,17 @@ lemma abs_vecExp_sub_le_bonus_add_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin H) (s : S) (a : A)
     (hn : 0 < visitCount hist h s a) :
-    |vecExp (empTrans hist h s a) (optExpValue M β h.succ)
-        - vecExp (M.transVec h s a) (optExpValue M β h.succ)|
+    |vecExp (empTrans hist h s a) (optExpValue M H β (h + 1))
+        - vecExp (M.transVec h s a) (optExpValue M H β (h + 1))|
       ≤ bonus (Fintype.card S) (Fintype.card A) H β δ (H - 1 - h) (visitCount hist h s a)
           (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1 (optZ r β δ hist (H - 1 - h)).2
         + 1 / H * vecExp (empTrans hist h s a)
-          (fun s' ↦ |(optZ r β δ hist (H - 1 - h)).1 s' - optExpValue M β h.succ s'|) := by
+          (fun s' ↦ |(optZ r β δ hist (H - 1 - h)).1 s' - optExpValue M H β (h + 1) s'|) := by
   set k := H - 1 - (h : ℕ) with hk
   have hB : 0 ≤ Real.exp (β * k) := (Real.exp_pos _).le
-  have hf : ∀ s', optExpValue M β h.succ s' ∈ Set.Icc 1 (1 + Real.exp (β * k)) := fun s' ↦ by
+  have hf : ∀ s', optExpValue M H β (h + 1) s' ∈ Set.Icc 1 (1 + Real.exp (β * k)) := fun s' ↦ by
     have := optExpValue_mem_Icc_of_pos hM hr hβ h.succ s'
-    rw [sub_succ_eq] at this
+    rw [sub_succ_eq, Fin.val_succ] at this
     exact ⟨this.1, by linarith [this.2]⟩
   have hg : ∀ s', (optZ r β δ hist k).1 s' ∈ Set.Icc 1 (1 + Real.exp (β * k)) := fun s' ↦ by
     have := optZ_mem_of_pos (hist := hist) hr hβ hδ hδ1 k (by omega) s'
@@ -125,10 +127,10 @@ lemma abs_vecExp_sub_le_bonus_add_of_pos (hM : M.HasRewardFn r)
 lemma optExpQ_le_stepUAt_fst_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin H)
-    (hZ : ∀ s', optExpValue M β h.succ s'
+    (hZ : ∀ s', optExpValue M H β (h + 1) s'
       ∈ Set.Icc ((optZ r β δ hist (H - 1 - h)).2 s') ((optZ r β δ hist (H - 1 - h)).1 s'))
-    (s : S) (a : A) : optExpQ M β h s a ≤ (stepUAt r β δ hist h s a).1 := by
-  have hQ := optExpQ_mem_Icc M β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h s a
+    (s : S) (a : A) : optExpQ M H β h s a ≤ (stepUAt r β δ hist h s a).1 := by
+  have hQ := optExpQ_mem_Icc M H β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h.is_lt s a
   rw [cast_sub_castSucc_eq] at hQ
   have hQ' := mem_Icc_one_exp_of_pos hβ (by positivity) hQ
   simp only [stepUAt, stepU, hβ, ↓reduceIte]
@@ -138,7 +140,7 @@ lemma optExpQ_le_stepUAt_fst_of_pos (hM : M.HasRewardFn r)
   have h7 := abs_vecExp_sub_le_bonus_add_of_pos hM hr hβ hδ hδ1 hc h s a (Nat.pos_of_ne_zero hn)
   have hp := empTrans_nonneg hist h s a
   rw [vecExp_abs_sub_eq_of_le _ fun s' ↦ (hZ s').2] at h7
-  rw [optExpQ_of_hasRewardFn M β hM]
+  rw [optExpQ_of_hasRewardFn_eq_vecExp M H β hM]
   refine mul_le_mul_of_nonneg_left ?_ (Real.exp_pos _).le
   set u := (1 / H : ℝ)
   have hu0 : 0 ≤ u := by positivity
@@ -148,11 +150,11 @@ lemma optExpQ_le_stepUAt_fst_of_pos (hM : M.HasRewardFn r)
   have e2 := vecExp_mono hp fun s' ↦ (hZ s').2
   rw [vecExp_sub]
   have e3 : u * (vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1
-      - vecExp (empTrans hist h s a) (optExpValue M β h.succ))
+      - vecExp (empTrans hist h s a) (optExpValue M H β (h + 1)))
       ≤ vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1
-      - vecExp (empTrans hist h s a) (optExpValue M β h.succ) :=
+      - vecExp (empTrans hist h s a) (optExpValue M H β (h + 1)) :=
     mul_le_of_le_one_left (by linarith) hu1
-  have e4 : 0 ≤ u * (vecExp (empTrans hist h s a) (optExpValue M β h.succ)
+  have e4 : 0 ≤ u * (vecExp (empTrans hist h s a) (optExpValue M H β (h + 1))
       - vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).2) :=
     mul_nonneg hu0 (by linarith)
   have := (abs_le.1 h7).1
@@ -163,10 +165,10 @@ lemma optExpQ_le_stepUAt_fst_of_pos (hM : M.HasRewardFn r)
 lemma stepUAt_snd_le_optExpQ_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin H)
-    (hZ : ∀ s', optExpValue M β h.succ s'
+    (hZ : ∀ s', optExpValue M H β (h + 1) s'
       ∈ Set.Icc ((optZ r β δ hist (H - 1 - h)).2 s') ((optZ r β δ hist (H - 1 - h)).1 s'))
-    (s : S) (a : A) : (stepUAt r β δ hist h s a).2 ≤ optExpQ M β h s a := by
-  have hQ := optExpQ_mem_Icc M β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h s a
+    (s : S) (a : A) : (stepUAt r β δ hist h s a).2 ≤ optExpQ M H β h s a := by
+  have hQ := optExpQ_mem_Icc M H β (rewardsIn_Icc_of_hasRewardFn hM hr) hβ.ne' h.is_lt s a
   rw [cast_sub_castSucc_eq] at hQ
   have hQ' := mem_Icc_one_exp_of_pos hβ (by positivity) hQ
   simp only [stepUAt, stepU, hβ, ↓reduceIte]
@@ -176,14 +178,14 @@ lemma stepUAt_snd_le_optExpQ_of_pos (hM : M.HasRewardFn r)
   have h7 := abs_vecExp_sub_le_bonus_add_of_pos hM hr hβ hδ hδ1 hc h s a (Nat.pos_of_ne_zero hn)
   have hp := empTrans_nonneg hist h s a
   rw [vecExp_abs_sub_eq_of_le _ fun s' ↦ (hZ s').2] at h7
-  rw [optExpQ_of_hasRewardFn M β hM]
+  rw [optExpQ_of_hasRewardFn_eq_vecExp M H β hM]
   refine mul_le_mul_of_nonneg_left ?_ (Real.exp_pos _).le
   set u := (1 / H : ℝ)
   have hu0 : 0 ≤ u := by positivity
   have e1 := vecExp_mono hp fun s' ↦ (hZ s').1
   have e2 := vecExp_mono hp fun s' ↦ (hZ s').2
   rw [vecExp_sub]
-  have e4 : 0 ≤ u * (vecExp (empTrans hist h s a) (optExpValue M β h.succ)
+  have e4 : 0 ≤ u * (vecExp (empTrans hist h s a) (optExpValue M H β (h + 1))
       - vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).2) :=
     mul_nonneg hu0 (by linarith)
   have := (abs_le.1 h7).2
@@ -194,13 +196,13 @@ inequalities: `Z̲_h ≤ Z*_h ≤ Z̃_h` at every step. -/
 lemma optExpValue_mem_Icc_optZ_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin (H + 1)) (s : S) :
-    optExpValue M β h s
+    optExpValue M H β h s
       ∈ Set.Icc ((optZ r β δ hist (H - h)).2 s) ((optZ r β δ hist (H - h)).1 s) := by
-  have hR := integrable_exp_mul_of_rewardsIn M β (rewardsIn_Icc_of_hasRewardFn hM hr)
+  have hR := rewardsIn_Icc_of_hasRewardFn hM hr
   induction h using Fin.reverseInduction generalizing s with
-  | last => simp [optExpValue_last, optZ_zero]
+  | last => simp [Fin.val_last, optExpValue_of_le M H β hR hβ.ne' le_rfl, optZ_zero]
   | cast i ih =>
-    have ih' : ∀ s', optExpValue M β i.succ s'
+    have ih' : ∀ s', optExpValue M H β (i + 1) s'
         ∈ Set.Icc ((optZ r β δ hist (H - 1 - i)).2 s') ((optZ r β δ hist (H - 1 - i)).1 s') := by
       intro s'; rw [← sub_succ_eq]; exact ih s'
     rw [Fin.val_castSucc, optZ_eq]
@@ -208,8 +210,8 @@ lemma optExpValue_mem_Icc_optZ_of_pos (hM : M.HasRewardFn r)
     constructor
     · rw [← argmax_spec]
       exact (stepUAt_snd_le_optExpQ_of_pos hM hr hβ hδ hδ1 hc i ih' s _).trans
-        (optExpQ_le_optExpValue M β hβ hR i s _)
-    · rw [optExpValue_castSucc_eq M β hβ.ne' hR]
+        (optExpQ_le_optExpValue M H β hR hβ i.is_lt s _)
+    · rw [optExpValue_succ_eq M H β hR hβ.ne' i.is_lt]
       exact (optExpQ_le_stepUAt_fst_of_pos hM hr hβ hδ hδ1 hc i ih' s _).trans
         (Function.le_max (fun a ↦ (stepUAt r β δ hist i s a).1) _)
 
@@ -217,8 +219,8 @@ lemma optExpValue_mem_Icc_optZ_of_pos (hM : M.HasRewardFn r)
 lemma optExpQ_mem_Icc_stepUAt_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin H) (s : S) (a : A) :
-    optExpQ M β h s a ∈ Set.Icc (stepUAt r β δ hist h s a).2 (stepUAt r β δ hist h s a).1 := by
-  have hZ : ∀ s', optExpValue M β h.succ s'
+    optExpQ M H β h s a ∈ Set.Icc (stepUAt r β δ hist h s a).2 (stepUAt r β δ hist h s a).1 := by
+  have hZ : ∀ s', optExpValue M H β (h + 1) s'
       ∈ Set.Icc ((optZ r β δ hist (H - 1 - h)).2 s') ((optZ r β δ hist (H - 1 - h)).1 s') := by
     intro s'; rw [← sub_succ_eq]
     exact optExpValue_mem_Icc_optZ_of_pos hM hr hβ hδ hδ1 hc h.succ s'
@@ -284,11 +286,13 @@ lemma ringU_le_stepUAt_snd_of_pos (hβ : 0 < β) (h : Fin H)
     have := mul_nonneg hu0 (sub_nonneg.2 e1)
     linarith
 
+omit [MeasurableSingletonClass A] in
 /-- `Ů_h ≤ U^π_h` when `Z̊_{h+1} ≤ Z^π_{h+1}` (`β > 0`). -/
 lemma ringU_le_expQ_of_pos (hM : M.HasRewardFn r) (hβ : 0 < β) (π : Policy S A H) (h : Fin H)
-    (hZ : ∀ s', ringZ M r β δ hist (H - 1 - h) s' ≤ expValue M β π h.succ s') (s : S) (a : A) :
-    ringU M r β δ hist h s a ≤ expQ M β π h s a := by
-  rw [expQ_of_hasRewardFn M β hM]
+    (hZ : ∀ s', ringZ M r β δ hist (H - 1 - h) s' ≤ expValue M H β π.extend (h + 1) s') (s : S)
+    (a : A) :
+    ringU M r β δ hist h s a ≤ expQ M H β π.extend h s a := by
+  rw [expQ_of_hasRewardFn_eq_vecExp M H β hM]
   refine le_trans ?_ (mul_le_mul_of_nonneg_left (vecExp_mono (M.transVec_nonneg h s a) hZ)
     (Real.exp_pos _).le)
   simp only [ringU, ringUAux, hβ, ↓reduceIte]
@@ -299,27 +303,30 @@ lemma ringU_le_expQ_of_pos (hM : M.HasRewardFn r) (hβ : 0 < β) (π : Policy S 
 lemma ringZ_le_optZ_snd_and_expValue_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (h : Fin (H + 1)) (s : S) :
     ringZ M r β δ hist (H - h) s ≤ (optZ r β δ hist (H - h)).2 s
-      ∧ ringZ M r β δ hist (H - h) s ≤ expValue M β (greedy r β δ hist) h s := by
-  have hR := integrable_exp_mul_of_rewardsIn M β (rewardsIn_Icc_of_hasRewardFn hM hr)
+      ∧ ringZ M r β δ hist (H - h) s ≤ expValue M H β (greedy r β δ hist).extend h s := by
+  have hR := rewardsIn_Icc_of_hasRewardFn hM hr
   induction h using Fin.reverseInduction generalizing s with
-  | last => simp [optZ_zero, ringZ_zero, expValue_last]
+  | last =>
+    simp [Fin.val_last, optZ_zero, ringZ_zero,
+      expValue_of_le M H β (greedy r β δ hist).measurable_extend le_rfl]
   | cast i ih =>
     have ih1 : ∀ s', ringZ M r β δ hist (H - 1 - i) s' ≤ (optZ r β δ hist (H - 1 - i)).2 s' :=
       fun s' ↦ by rw [← sub_succ_eq]; exact (ih s').1
     have ih2 : ∀ s', ringZ M r β δ hist (H - 1 - i) s'
-        ≤ expValue M β (greedy r β δ hist) i.succ s' :=
+        ≤ expValue M H β (greedy r β δ hist).extend (i + 1) s' :=
       fun s' ↦ by rw [← sub_succ_eq]; exact (ih s').2
-    rw [Fin.val_castSucc, ringZ_sub_eq, optZ_eq, expValue_castSucc M β hR]
+    rw [Fin.val_castSucc, ringZ_sub_eq, optZ_eq,
+      expValue_succ M H β hR (greedy r β δ hist).measurable_extend i.is_lt, Policy.extend_fin]
     simp only [hβ, ↓reduceIte]
     exact ⟨(ringU_le_stepUAt_snd_of_pos hβ i ih1 s _).trans
         (Function.le_max (fun a ↦ (stepUAt r β δ hist i s a).2) _),
-      ringU_le_expQ_of_pos hM hβ _ i ih2 s _⟩
+      ringU_le_expQ_of_pos hM hβ (greedy r β δ hist) i ih2 s (greedy r β δ hist i s)⟩
 
 /-- **Lemma 10** for the backups (`β > 0`): `Ů_h ≤ U̲_h` and `Ů_h ≤ U^π_h`. -/
 lemma ringU_le_stepUAt_snd_and_expQ_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (h : Fin H) (s : S) (a : A) :
     ringU M r β δ hist h s a ≤ (stepUAt r β δ hist h s a).2
-      ∧ ringU M r β δ hist h s a ≤ expQ M β (greedy r β δ hist) h s a :=
+      ∧ ringU M r β δ hist h s a ≤ expQ M H β (greedy r β δ hist).extend h s a :=
   ⟨ringU_le_stepUAt_snd_of_pos hβ h
       (fun s' ↦ by
         rw [← sub_succ_eq]; exact (ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ _ s').1) s a,
@@ -346,7 +353,7 @@ lemma stepUAt_fst_sub_ringU_le_of_pos (hM : M.HasRewardFn r)
             (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1 (optZ r β δ hist (H - 1 - h)).2
           + (1 + 3 / H) * vecExp (empTrans hist h s a)
             ((optZ r β δ hist (H - 1 - h)).1 - ringZ M r β δ hist (H - 1 - h))) := by
-  have hZ : ∀ s', optExpValue M β h.succ s'
+  have hZ : ∀ s', optExpValue M H β (h + 1) s'
       ∈ Set.Icc ((optZ r β δ hist (H - 1 - h)).2 s') ((optZ r β δ hist (H - 1 - h)).1 s') := by
     intro s'; rw [← sub_succ_eq]
     exact optExpValue_mem_Icc_optZ_of_pos hM hr hβ hδ hδ1 hc h.succ s'
@@ -354,10 +361,10 @@ lemma stepUAt_fst_sub_ringU_le_of_pos (hM : M.HasRewardFn r)
     intro s'; rw [← sub_succ_eq]
     exact (ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ h.succ s').1
   have hR1 : ∀ s', 1 ≤ ringZ M r β δ hist (H - 1 - h) s' := one_le_ringZ_of_pos hr hβ _
-  have hZs : ∀ s', optExpValue M β h.succ s' ≤ Real.exp (β * (H - 1 - h : ℕ)) := by
+  have hZs : ∀ s', optExpValue M H β (h + 1) s' ≤ Real.exp (β * (H - 1 - h : ℕ)) := by
     intro s'
     have := (optExpValue_mem_Icc_of_pos hM hr hβ h.succ s').2
-    rwa [sub_succ_eq] at this
+    rwa [sub_succ_eq, Fin.val_succ] at this
   have hH := one_le_cast_of_fin h
   have hHpos : (0 : ℝ) < H := by linarith
   have hp := empTrans_nonneg hist h s a
@@ -367,7 +374,7 @@ lemma stepUAt_fst_sub_ringU_le_of_pos (hM : M.HasRewardFn r)
   rw [vecExp_abs_sub_eq_of_le _ fun s' ↦ (hZ s').2] at h7
   have h3 := vecExp_sub_vecExp_le_of_klDiv_le hp (sum_empTrans hist h s a)
     (measureReal_trans_singleton M h s a) hαn (Real.exp_pos _).le hH
-    (f := optExpValue M β h.succ - ringZ M r β δ hist (H - 1 - h))
+    (f := optExpValue M H β (h + 1) - ringZ M r β δ hist (H - 1 - h))
     (fun s' ↦ ⟨sub_nonneg.2 ((hRl s').trans (hZ s').1), by
       simp only [Pi.sub_apply]; linarith [hZs s', hR1 s']⟩) (hc.klDiv_le_ofReal h s a hn)
   have hbB : (5 + 4 * (H : ℝ)) * Real.exp (β * (H - 1 - h : ℕ))
@@ -413,9 +420,9 @@ lemma stepUAt_fst_sub_ringU_le_of_pos (hM : M.HasRewardFn r)
     (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1 (optZ r β δ hist (H - 1 - h)).2
   set xt := vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).1
   set xl := vecExp (empTrans hist h s a) (optZ r β δ hist (H - 1 - h)).2
-  set xs := vecExp (empTrans hist h s a) (optExpValue M β h.succ)
+  set xs := vecExp (empTrans hist h s a) (optExpValue M H β (h + 1))
   set xr := vecExp (empTrans hist h s a) (ringZ M r β δ hist (H - 1 - h))
-  set ys := vecExp (M.transVec h s a) (optExpValue M β h.succ)
+  set ys := vecExp (M.transVec h s a) (optExpValue M H β (h + 1))
   set yr := vecExp (M.transVec h s a) (ringZ M r β δ hist (H - 1 - h))
   set u := (1 / H : ℝ) with hu
   have hu0 : 0 ≤ u := by positivity
@@ -472,7 +479,8 @@ satisfying the concentration inequalities: `Z*_h - Z^π_h ≤ π_h G_h` for the 
 lemma optExpValue_sub_expValue_le_cert_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) (h : Fin (H + 1)) (s : S) :
-    optExpValue M β h s - expValue M β (greedy r β δ hist) h s ≤ cert r β δ hist (H - h) s := by
+    optExpValue M H β h s - expValue M H β (greedy r β δ hist).extend h s
+      ≤ cert r β δ hist (H - h) s := by
   have h1 := (optExpValue_mem_Icc_optZ_of_pos hM hr hβ hδ hδ1 hc h s).2
   have h2 := (ringZ_le_optZ_snd_and_expValue_of_pos (δ := δ) (hist := hist) hM hr hβ h s).2
   have h3 := optZ_fst_sub_ringZ_le_cert_of_pos hM hr hβ hδ hδ1 hc h s
@@ -484,20 +492,23 @@ lemma optEntropicValue_sub_entropicValue_le_of_stopCond_of_pos (hM : M.HasReward
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hc : HistConcentration M β δ hist) {ε : ℝ} (hε : 0 ≤ ε) {s₁ : S}
     (hstop : stopCond r β δ ε s₁ hist) :
-    optEntropicValue M β (startStep H) s₁ - entropicValue M β (greedy r β δ hist) (startStep H) s₁
+    optEntropicValue M H β 0 s₁ - entropicValue M H β (greedy r β δ hist).extend 0 s₁
       ≤ ε := by
-  have hR := integrable_exp_mul_of_rewardsIn M β (rewardsIn_Icc_of_hasRewardFn hM hr)
+  have hR := rewardsIn_Icc_of_hasRewardFn hM hr
   simp only [stopCond, hβ, ↓reduceIte] at hstop
   have hg0 : 0 ≤ cert r β δ hist H s₁ := (cert_mem hist r β δ hδ hδ1 H le_rfl s₁).1
-  have h1 : (optZ r β δ hist H).1 s₁ - ringZ M r β δ hist H s₁ ≤ cert r β δ hist H s₁ :=
-    optZ_fst_sub_ringZ_le_cert_of_pos hM hr hβ hδ hδ1 hc (startStep H) s₁
-  have h2 : ringZ M r β δ hist H s₁ ≤ expValue M β (greedy r β δ hist) (startStep H) s₁ :=
-    (ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ (startStep H) s₁).2
-  have h3 : optExpValue M β (startStep H) s₁ - expValue M β (greedy r β δ hist) (startStep H) s₁
-      ≤ cert r β δ hist H s₁ :=
-    optExpValue_sub_expValue_le_cert_of_pos hM hr hβ hδ hδ1 hc (startStep H) s₁
-  refine optEntropicValue_sub_entropicValue_le_of_pos M β hβ
-    (expValue_pos M β hR (greedy r β δ hist) (startStep H) s₁) ?_
+  have h1 : (optZ r β δ hist H).1 s₁ - ringZ M r β δ hist H s₁ ≤ cert r β δ hist H s₁ := by
+    simpa only [Fin.val_zero, Nat.sub_zero] using
+      optZ_fst_sub_ringZ_le_cert_of_pos hM hr hβ hδ hδ1 hc 0 s₁
+  have h2 : ringZ M r β δ hist H s₁ ≤ expValue M H β (greedy r β δ hist).extend 0 s₁ := by
+    simpa only [Fin.val_zero, Nat.sub_zero] using
+      (ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ 0 s₁).2
+  have h3 : optExpValue M H β 0 s₁ - expValue M H β (greedy r β δ hist).extend 0 s₁
+      ≤ cert r β δ hist H s₁ := by
+    simpa only [Fin.val_zero, Nat.sub_zero] using
+      optExpValue_sub_expValue_le_cert_of_pos hM hr hβ hδ hδ1 hc 0 s₁
+  refine optEntropicValue_sub_entropicValue_le_of_pos M H β hβ
+    (expValue_pos M H β hR (greedy r β δ hist).measurable_extend 0 s₁) ?_
   set E := Real.exp (β * ε)
   have hE1 : 1 ≤ E := Real.one_le_exp (mul_nonneg hβ.le hε)
   have hEpos : 0 < E := Real.exp_pos _
@@ -505,7 +516,7 @@ lemma optEntropicValue_sub_entropicValue_le_of_stopCond_of_pos (hM : M.HasReward
     have := mul_le_mul_of_nonneg_left hstop hEpos.le
     rwa [← mul_assoc, mul_div_cancel₀ _ hEpos.ne'] at this
   have hZ : (optZ r β δ hist H).1 s₁ - cert r β δ hist H s₁
-      ≤ expValue M β (greedy r β δ hist) (startStep H) s₁ := by linarith
+      ≤ expValue M H β (greedy r β δ hist).extend 0 s₁ := by linarith
   have := mul_le_mul_of_nonneg_left hZ (by linarith : 0 ≤ E - 1)
   nlinarith
 
@@ -523,7 +534,7 @@ lemma cert_le_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc
     (hδ : 0 < δ) (hδ1 : δ ≤ 1) (hc : HistConcentration M β δ hist) (h : Fin H) (s : S) :
     cert r β δ hist (H - h) s ≤ Real.exp (β * r h s (greedy r β δ hist h s)) *
       (36 * √(vecVar (M.transVec h s (greedy r β δ hist h s))
-          (expValue M β (greedy r β δ hist) h.succ)
+          (expValue M H β (greedy r β δ hist).extend (h + 1))
           * rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ)
             (visitCount hist h s (greedy r β δ hist h s)))
         + (1 + 13 / H) * vecExp (M.transVec h s (greedy r β δ hist h s))
@@ -570,15 +581,15 @@ lemma cert_le_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc
   · -- trivial case: the rate term is `1`
     rw [rateMin_eq_one htriv, mul_one]
     have h84 : C ≤ 84 * H * C := by nlinarith
-    have hσ : 0 ≤ √(vecVar (M.transVec h s a) (expValue M β π h.succ)
+    have hσ : 0 ≤ √(vecVar (M.transVec h s a) (expValue M H β π.extend (h + 1))
       * rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) n) := Real.sqrt_nonneg _
-    have hbr : C ≤ 36 * √(vecVar (M.transVec h s a) (expValue M β π h.succ)
+    have hbr : C ≤ 36 * √(vecVar (M.transVec h s a) (expValue M H β π.extend (h + 1))
           * rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) n)
         + (1 + 13 / H) * vecExp (M.transVec h s a) (cert r β δ hist k) + 84 * H * C := by
       have : 0 ≤ (1 + 13 / (H : ℝ)) * vecExp (M.transVec h s a) (cert r β δ hist k) := by
         positivity
       linarith
-    have hbr0 : 0 ≤ 36 * √(vecVar (M.transVec h s a) (expValue M β π h.succ)
+    have hbr0 : 0 ≤ 36 * √(vecVar (M.transVec h s a) (expValue M H β π.extend (h + 1))
           * rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) n)
         + (1 + 13 / H) * vecExp (M.transVec h s a) (cert r β δ hist k) + 84 * H * C := by
       linarith
@@ -599,7 +610,7 @@ lemma cert_le_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc
     have hρs : rateMin (alphaStar (Fintype.card S) (Fintype.card A) H δ) n = αs :=
       rateMin_eq_div hn0 (hαsn.trans_lt hαlt)
     rw [hρ, hρs]
-    have hσ : 0 ≤ √(vecVar (M.transVec h s a) (expValue M β π h.succ) * αs) :=
+    have hσ : 0 ≤ √(vecVar (M.transVec h s a) (expValue M H β π.extend (h + 1)) * αs) :=
       Real.sqrt_nonneg _
     have hkl := hc.klDiv_le_ofReal h s a hnpos
     -- drop the clip
@@ -617,29 +628,29 @@ lemma cert_le_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc
     have hi := vecExp_le_one_add_mul_vecExp_add hp hp1 (measureReal_trans_singleton M h s a)
       hαn0 hBpos.le hH hg hkl
     -- facts at the next step
-    have hZ : ∀ s', optExpValue M β h.succ s'
+    have hZ : ∀ s', optExpValue M H β (h + 1) s'
         ∈ Set.Icc ((optZ r β δ hist k).2 s') ((optZ r β δ hist k).1 s') := by
       intro s'; rw [hk, ← sub_succ_eq]
       exact optExpValue_mem_Icc_optZ_of_pos hM hr hβ hδ hδ1 hc h.succ s'
-    have hRπ : ∀ s', ringZ M r β δ hist k s' ≤ expValue M β π h.succ s' := by
+    have hRπ : ∀ s', ringZ M r β δ hist k s' ≤ expValue M H β π.extend (h + 1) s' := by
       intro s'; rw [hk, ← sub_succ_eq]
       exact (ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ h.succ s').2
     have hGap : ∀ s', (optZ r β δ hist k).1 s' - ringZ M r β δ hist k s'
         ≤ cert r β δ hist k s' := by
       intro s'; rw [hk, ← sub_succ_eq]
       exact optZ_fst_sub_ringZ_le_cert_of_pos hM hr hβ hδ hδ1 hc h.succ s'
-    have hR := integrable_exp_mul_of_rewardsIn M β (rewardsIn_Icc_of_hasRewardFn hM hr)
-    have hπZ : ∀ s', expValue M β π h.succ s' ≤ optExpValue M β h.succ s' := fun s' ↦
-      expValue_le_optExpValue M β hβ (expValue_pos M β hR π _ _)
+    have hR := rewardsIn_Icc_of_hasRewardFn hM hr
+    have hπZ : ∀ s', expValue M H β π.extend (h + 1) s' ≤ optExpValue M H β (h + 1) s' := fun s' ↦
+      expValue_le_optExpValue M H β hR hβ π.measurable_extend _ _
     have hZt : ∀ s', (optZ r β δ hist k).1 s' ∈ Set.Icc 1 (1 + B) := fun s' ↦ by
       have := optZ_mem_of_pos (hist := hist) hr hβ hδ hδ1 k (by omega) s'
       exact ⟨this.2.1.trans this.1, by linarith [this.2.2]⟩
-    have hZπ : ∀ s', expValue M β π h.succ s' ∈ Set.Icc 1 (1 + B) := fun s' ↦ by
+    have hZπ : ∀ s', expValue M H β π.extend (h + 1) s' ∈ Set.Icc 1 (1 + B) := fun s' ↦ by
       have := expValue_mem_Icc_of_pos hM hr hβ π h.succ s'
-      rw [sub_succ_eq] at this
+      rw [sub_succ_eq, Fin.val_succ] at this
       exact ⟨this.1, by linarith [this.2]⟩
     have hΔ : vecExp (M.transVec h s a)
-        (fun s' ↦ |(optZ r β δ hist k).1 s' - expValue M β π h.succ s'|)
+        (fun s' ↦ |(optZ r β δ hist k).1 s' - expValue M H β π.extend (h + 1) s'|)
         ≤ vecExp (M.transVec h s a) (cert r β δ hist k) := by
       refine vecExp_mono hq0 fun s' ↦ ?_
       rw [abs_of_nonneg (sub_nonneg.2 ((hπZ s').trans (hZ s').2))]
@@ -669,10 +680,10 @@ lemma abs_vecExp_sub_le_bonusAt_add_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hω : ω ∈ goodEvent X Y M s₁ β δ) (t : ℕ) (h : Fin H) (s : S) (a : A)
     (hn : 0 < visitCountAt X Y h s a t ω) :
-    |vecExp (empTransAt X Y h s a t ω) (optExpValue M β h.succ)
-        - vecExp (M.transVec h s a) (optExpValue M β h.succ)|
+    |vecExp (empTransAt X Y h s a t ω) (optExpValue M H β (h + 1))
+        - vecExp (M.transVec h s a) (optExpValue M H β (h + 1))|
       ≤ bonusAt X Y r β δ t ω h s a + 1 / H * vecExp (empTransAt X Y h s a t ω)
-          (fun s' ↦ |ZtildeAt X Y r β δ t ω h.succ s' - optExpValue M β h.succ s'|) := by
+          (fun s' ↦ |ZtildeAt X Y r β δ t ω h.succ s' - optExpValue M H β (h + 1) s'|) := by
   have := abs_vecExp_sub_le_bonus_add_of_pos hM hr hβ hδ hδ1 (histConcentration_histAt hω t) h s
     a hn
   simp only [bonusAt, ZtildeAt, ZlowerAt, sub_succ_eq]
@@ -682,14 +693,14 @@ lemma abs_vecExp_sub_le_bonusAt_add_of_pos (hM : M.HasRewardFn r)
 lemma optExpValue_mem_Icc_ZlowerAt_ZtildeAt_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hω : ω ∈ goodEvent X Y M s₁ β δ) (t : ℕ) (h : Fin (H + 1)) (s : S) :
-    optExpValue M β h s ∈ Set.Icc (ZlowerAt X Y r β δ t ω h s) (ZtildeAt X Y r β δ t ω h s) :=
+    optExpValue M H β h s ∈ Set.Icc (ZlowerAt X Y r β δ t ω h s) (ZtildeAt X Y r β δ t ω h s) :=
   optExpValue_mem_Icc_optZ_of_pos hM hr hβ hδ hδ1 (histConcentration_histAt hω t) h s
 
 /-- **Lemma 8** for the backups (`β > 0`): on the good event, `U̲_h^t ≤ U*_h ≤ Ũ_h^t`. -/
 lemma optExpQ_mem_Icc_UlowerAt_UtildeAt_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hω : ω ∈ goodEvent X Y M s₁ β δ) (t : ℕ) (h : Fin H) (s : S) (a : A) :
-    optExpQ M β h s a ∈ Set.Icc (UlowerAt X Y r β δ t ω h s a) (UtildeAt X Y r β δ t ω h s a) :=
+    optExpQ M H β h s a ∈ Set.Icc (UlowerAt X Y r β δ t ω h s a) (UtildeAt X Y r β δ t ω h s a) :=
   optExpQ_mem_Icc_stepUAt_of_pos hM hr hβ hδ hδ1 (histConcentration_histAt hω t) h s a
 
 omit [MeasurableSingletonClass A] in
@@ -710,7 +721,7 @@ lemma ringZAt_le_ZlowerAt_and_expValue_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (t : ℕ) (ω : Ω) (h : Fin (H + 1))
     (s : S) :
     ringZAt X Y M r β δ t ω h s ≤ ZlowerAt X Y r β δ t ω h s
-      ∧ ringZAt X Y M r β δ t ω h s ≤ expValue M β (greedyAt X Y r β δ t ω) h s :=
+      ∧ ringZAt X Y M r β δ t ω h s ≤ expValue M H β (greedyAt X Y r β δ t ω).extend h s :=
   ringZ_le_optZ_snd_and_expValue_of_pos hM hr hβ h s
 
 /-- **Lemma 10** for the backups (`β > 0`): `Ů_h^t ≤ U̲_h^t` and `Ů_h^t ≤ U^π_h`. -/
@@ -718,7 +729,7 @@ lemma ringUAt_le_UlowerAt_and_expQ_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (t : ℕ) (ω : Ω) (h : Fin H) (s : S)
     (a : A) :
     ringUAt X Y M r β δ t ω h s a ≤ UlowerAt X Y r β δ t ω h s a
-      ∧ ringUAt X Y M r β δ t ω h s a ≤ expQ M β (greedyAt X Y r β δ t ω) h s a :=
+      ∧ ringUAt X Y M r β δ t ω h s a ≤ expQ M H β (greedyAt X Y r β δ t ω).extend h s a :=
   ringU_le_stepUAt_snd_and_expQ_of_pos hM hr hβ h s a
 
 /-- **Lemma 11** (one-step certificate bound, `β > 0`): on the good event, for a visited pair,
@@ -749,7 +760,8 @@ lemma ZtildeAt_sub_ringZAt_le_certAt_of_pos (hM : M.HasRewardFn r)
 lemma optExpValue_sub_expValue_le_certAt_of_pos (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hω : ω ∈ goodEvent X Y M s₁ β δ) (t : ℕ) (h : Fin (H + 1)) (s : S) :
-    optExpValue M β h s - expValue M β (greedyAt X Y r β δ t ω) h s ≤ certAt X Y r β δ t ω h s :=
+    optExpValue M H β h s - expValue M H β (greedyAt X Y r β δ t ω).extend h s
+      ≤ certAt X Y r β δ t ω h s :=
   optExpValue_sub_expValue_le_cert_of_pos hM hr hβ hδ hδ1 (histConcentration_histAt hω t) h s
 
 /-- **Soundness of the stopping rule** (`β > 0`): on the good event, if the stopping condition
@@ -758,8 +770,8 @@ lemma optEntropicValue_sub_entropicValue_greedyAt_le_of_pos (hM : M.HasRewardFn 
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (hβ : 0 < β) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (hω : ω ∈ goodEvent X Y M s₁ β δ) {ε : ℝ} (hε : 0 ≤ ε) {t : ℕ}
     (hstop : stopCond r β δ ε s₁ (histAt X Y t ω)) :
-    optEntropicValue M β (startStep H) s₁
-      - entropicValue M β (greedyAt X Y r β δ t ω) (startStep H) s₁ ≤ ε :=
+    optEntropicValue M H β 0 s₁
+      - entropicValue M H β (greedyAt X Y r β δ t ω).extend 0 s₁ ≤ ε :=
   optEntropicValue_sub_entropicValue_le_of_stopCond_of_pos hM hr hβ hδ hδ1
     (histConcentration_histAt hω t) hε hstop
 
@@ -773,7 +785,7 @@ lemma certAt_le_of_pos (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.I
     (s : S) :
     certAt X Y r β δ t ω h.castSucc s ≤ Real.exp (β * r h s (greedyAt X Y r β δ t ω h s)) *
       (36 * √(vecVar (M.transVec h s (greedyAt X Y r β δ t ω h s))
-          (expValue M β (greedyAt X Y r β δ t ω) h.succ)
+          (expValue M H β (greedyAt X Y r β δ t ω).extend (h + 1))
           * starRateMinAt X Y δ h s (greedyAt X Y r β δ t ω h s) t ω)
         + (1 + 13 / H) * vecExp (M.transVec h s (greedyAt X Y r β δ t ω h s))
           (certAt X Y r β δ t ω h.succ)

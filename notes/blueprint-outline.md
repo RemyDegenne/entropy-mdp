@@ -910,3 +910,15 @@ chapters and the Lean statements follow the amended versions, which supersede th
   `thm:change_of_measure` is one-sided (a.s. finiteness under the first environment only) for
   every event of (stopped history, output), through `lem:pinfo_stopped_chain_rule`, lower
   semicontinuity and convexity of `klbin`; stopping times are taken as stopping rules.
+* **MDP library generalized (2026-09-17, after phase 2).** The layered embedding of
+  `def:layered_mdp` became the time-augmented MDP `M.augmented : MDP (S × ℕ) A ℝ` with
+  `ℕ`-indexed steps and no terminal layer; the values, variances, `maxReturn`, `statesLaw` and
+  `statesEnv` take the horizon `H` as an argument and are defined for policies
+  `π : ℕ → S → A`, unbundled from their measurability (the learner's `Fin H`-policies extend by
+  `Policy.extend`), the optimal values are suprema over all measurable policies (attained by
+  the greedy policy of the Bellman
+  recursion, `lem:opt_bellman`), the trajectory theory holds on any state space with
+  measurable singletons, and bounded rewards replace the exponential-moment hypotheses. The
+  reward function is `r : ℕ → S → A → ℝ` and `entropicBPI H r β δ ε s₁` takes the horizon
+  explicitly; the headline statements and comparator challenges changed accordingly (see the
+  last section of `notes/lean-design.md`).

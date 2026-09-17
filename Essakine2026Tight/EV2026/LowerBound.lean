@@ -105,14 +105,14 @@ theorem exists_hardMDP_lowerBound_le_lintegral_stoppingTime
     (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H)
     {β : ℝ} (hβ : β ≠ 0) {δ : ℝ} (hδ : δ ∈ Set.Ioc 0 (1 / 16)) {ε : ℝ} (hε : 0 < ε)
     (hcond : ConditionA β (effHorizon (Fintype.card S) (Fintype.card A) H) ε) :
-    ∃ (r₀ : Fin H → S → A → ℝ) (M₀ : EpisodicMDP S A H) (s₁ : S),
+    ∃ (r₀ : ℕ → S → A → ℝ) (M₀ : EpisodicMDP S A) (s₁ : S),
       (∀ h s a, r₀ h s a ∈ Set.Icc 0 1) ∧ M₀.HasRewardFn r₀ ∧
       ∀ 𝒜 : BPIAlg S A H, IsEntropicPAC 𝒜 r₀ β ε δ s₁ →
         ∀ {Ω : Type v} {_mΩ : MeasurableSpace Ω} (P : Measure Ω) [IsProbabilityMeasure P]
           (X : ℕ → Ω → Policy S A H) (Y : ℕ → Ω → Traj S H) (out : Ω → Policy S A H),
-          𝒜.IsRun (statesEnv M₀ s₁) (fun _ _ ↦ ()) X Y out P →
+          𝒜.IsRun (statesEnv M₀ H s₁) (fun _ _ ↦ ()) X Y out P →
           ENNReal.ofReal (lowerBound (Fintype.card S) (Fintype.card A) H β ε δ
-              (maxReturn M₀ s₁)) ≤
+              (maxReturn M₀ H s₁)) ≤
             ∫⁻ ω, (𝒜.stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ∂P := by
   classical
   have : Nonempty S := Fintype.card_pos_iff.1 (by omega)
@@ -123,7 +123,7 @@ theorem exists_hardMDP_lowerBound_le_lintegral_stoppingTime
   refine ⟨hardReward H, hardMDP H β ε none, stateAt S 0, hardReward_mem_Icc H,
     hasRewardFn_hardMDP H β ε none, ?_⟩
   intro 𝒜 hPAC Ω _ P _ X Y out hrun
-  set M₀ : EpisodicMDP S A H := hardMDP H β ε none with hM₀
+  set M₀ : EpisodicMDP S A := hardMDP H β ε none with hM₀
   set s₀ : S := stateAt S 0 with hs₀
   set τ := 𝒜.stoppingTime (fun _ _ ↦ ()) X Y with hτ_def
   set T := ∫⁻ ω, (τ ω : ℝ≥0∞) ∂P with hT_def
@@ -147,17 +147,17 @@ theorem exists_hardMDP_lowerBound_le_lintegral_stoppingTime
   have hmeasE : ∀ t : ℕ × ℕ × ℕ, MeasurableSet {π : Policy S A H | hardTriple π = t} :=
     fun _ ↦ (Set.toFinite _).measurableSet
   -- Step 1: change of measure for each triple
-  have hcm : ∀ t ∈ U, klBer ((𝒜.outputMeasure (statesEnv M₀ s₀)).real
+  have hcm : ∀ t ∈ U, klBer ((𝒜.outputMeasure (statesEnv M₀ H s₀)).real
         {π | hardTriple π = t})
-      ((𝒜.outputMeasure (statesEnv (hardMDP H β ε (some t)) s₀)).real {π | hardTriple π = t})
+      ((𝒜.outputMeasure (statesEnv (hardMDP H β ε (some t)) H s₀)).real {π | hardTriple π = t})
       ≤ ∑ π, (∫⁻ ω, (pullCount X π (τ ω).toNat ω : ℝ≥0∞) ∂P)
         * (if hardTriple π = t then klBer pm pp else 0) := by
     intro t ht
     have h := IdentAlg.IsRun.klBer_measureReal_outputMeasure_le_sum_pullCount
-      (ν := statesKernel M₀ s₀) (ν' := statesKernel (hardMDP H β ε (some t)) s₀) hrun hτ
+      (ν := statesKernel M₀ H s₀) (ν' := statesKernel (hardMDP H β ε (some t)) H s₀) hrun hτ
       (hmeasE t)
     have hxeq : P.real (out ⁻¹' {π | hardTriple π = t})
-        = (𝒜.outputMeasure (statesEnv M₀ s₀)).real {π | hardTriple π = t} :=
+        = (𝒜.outputMeasure (statesEnv M₀ H s₀)).real {π | hardTriple π = t} :=
       hout.measureReal_eq (hmeasE t)
     rw [hxeq] at h
     refine h.trans (Finset.sum_le_sum fun π _ ↦ ?_)
@@ -171,20 +171,20 @@ theorem exists_hardMDP_lowerBound_le_lintegral_stoppingTime
     rw [h0, h1]
     split_ifs <;> simp
   -- Step 2: the PAC property
-  have hy : ∀ t ∈ U, (𝒜.outputMeasure (statesEnv (hardMDP H β ε (some t)) s₀)).real
+  have hy : ∀ t ∈ U, (𝒜.outputMeasure (statesEnv (hardMDP H β ε (some t)) H s₀)).real
       {π | hardTriple π = t} ∈ Set.Icc (1 - δ) 1 := by
     intro t ht
     have hbad := hPAC ⟨hardMDP H β ε (some t), hasRewardFn_hardMDP H β ε (some t)⟩
     have hsub : {π : Policy S A H | hardTriple π = t}ᶜ ⊆ {d | ε <
-        optEntropicValue (hardMDP H β ε (some t)) β (startStep H) s₀
-          - entropicValue (hardMDP H β ε (some t)) β d (startStep H) s₀} :=
+        optEntropicValue (hardMDP H β ε (some t)) H β 0 s₀
+          - entropicValue (hardMDP H β ε (some t)) H β d.extend 0 s₀} :=
       fun π hπ ↦ lt_optEntropicValue_sub_entropicValue_hardMDP hS hA hH hβ hε hH' hcond ht π hπ
     have hc := (measureReal_mono hsub).trans hbad
     rw [measureReal_compl (hmeasE t), probReal_univ] at hc
     exact ⟨by linarith, measureReal_le_one⟩
-  have hx : ∀ t ∈ U, (𝒜.outputMeasure (statesEnv M₀ s₀)).real {π | hardTriple π = t}
+  have hx : ∀ t ∈ U, (𝒜.outputMeasure (statesEnv M₀ H s₀)).real {π | hardTriple π = t}
       ∈ Set.Icc (0 : ℝ) 1 := fun _ _ ↦ ⟨measureReal_nonneg, measureReal_le_one⟩
-  have hxsum : ∑ t ∈ U, (𝒜.outputMeasure (statesEnv M₀ s₀)).real {π | hardTriple π = t} ≤ 1 := by
+  have hxsum : ∑ t ∈ U, (𝒜.outputMeasure (statesEnv M₀ H s₀)).real {π | hardTriple π = t} ≤ 1 := by
     refine le_trans (le_of_eq (measureReal_biUnion_finset
       (f := fun t ↦ {π : Policy S A H | hardTriple π = t})
       (fun t _ t' _ htt' ↦ Set.disjoint_left.2 fun π h1 h2 ↦
@@ -249,7 +249,7 @@ theorem exists_hardMDP_lowerBound_le_lintegral_stoppingTime
     rw [ENNReal.ofReal_div_of_pos hk]
     exact ENNReal.div_le_of_le_mul' h2
   refine le_trans (ENNReal.ofReal_le_ofReal ?_) h3
-  have hG0 : 0 ≤ maxReturn M₀ s₀ := maxReturn_nonneg M₀
+  have hG0 : 0 ≤ maxReturn M₀ H s₀ := maxReturn_nonneg M₀ H
     (rewardsIn_of_hasRewardFn _ (hasRewardFn_hardMDP H β ε none) measurableSet_Icc
       (hardReward_mem_Icc H)) s₀
   exact lowerBound_le_of_card hβ hε hδ hH' hG0 (maxReturn_hardMDP_le hS hA hH none) hUcard

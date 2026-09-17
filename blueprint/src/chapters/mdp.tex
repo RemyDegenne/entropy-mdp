@@ -12,8 +12,11 @@ library material (namespace \texttt{Learning.MDP}, files \texttt{Episodic.lean},
 \textbf{Indexing convention.} The paper's steps are $h = 1, \dots, H$ with the terminal step
 $H + 1$: a state-action pair is visited at the steps $1, \dots, H$ and the state $S_{H+1}$ is
 the last state of an episode. The blueprint keeps this $1$-indexing throughout. Lean is
-$0$-indexed: a step of a state-action pair is $h \in \texttt{Fin H}$ and a step of a state value
-is $h \in \texttt{Fin (H + 1)}$, so that the paper's step $h$ is Lean's $h - 1$. The quantity
+$0$-indexed: the steps of the trajectory laws and of the values are $h \in \N$ (the horizon
+$H$ is an argument of the values, and the values are trivial from the step $H$ on), while the
+steps of the $H$-step policies played by the learner and of the quantities computed by the
+algorithm are $h \in \texttt{Fin H}$ or $h \in \texttt{Fin (H + 1)}$; the paper's step $h$ is
+Lean's $h - 1$. The quantity
 $e^{\beta(H - h)}$ of the paper (the range of $Z^*_{h+1}$, see Lemma~\ref{lem:opt_exp_value_range})
 is $e^{\beta k}$ with $k = H - 1 - h$ the number of steps \emph{after} the Lean step $h$, and the
 clip $e^{\beta(H + 1 - h)}$ of Chapter~\ref{chap:algorithm} is $e^{\beta(k + 1)}$. Backward
@@ -60,9 +63,12 @@ more generally $q f := \sum_{s'} q(s') f(s')$ and $\Var_q(f) := q(f - qf)^2$ for
 vector $q$ on $\Ss$. The \emph{mean reward} is $r_h(s, a) := \int x\, R_h(dx \mid s, a)$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{EpisodicMDP S A H} with fields
-\texttt{trans : Fin H → Kernel (S × A) S} and \texttt{reward : Fin H → Kernel (S × A) ℝ}
-(Markov kernels; the reward and the next state are independent given $(s, a)$, which is the
+\textbf{Lean remark.} \texttt{EpisodicMDP S A} with fields
+\texttt{trans : ℕ → Kernel (S × A) S} and \texttt{reward : ℕ → Kernel (S × A) ℝ}
+(Markov kernels indexed by all the steps $h \in \N$, the horizon $H$ being an argument of the
+values and of the episode environment; the state and action spaces are arbitrary measurable
+spaces, the finiteness of the paper entering through the hypotheses of the statements that
+need it; the reward and the next state are independent given $(s, a)$, which is the
 paper's model and which the deterministic rewards of Definition~\ref{def:reward_fn} make
 harmless). \texttt{M.transVec h s a : S → ℝ} is the vector of transition probabilities
 $p_h(\cdot \mid s, a)$ and \texttt{M.meanReward h s a} the mean reward; the operators
@@ -85,7 +91,8 @@ $[0, 1]$; only the transitions are unknown to the learner.
 
 \textbf{Lean remark.} \texttt{M.HasRewardFn r} is the predicate
 $\forall h\, s\, a,\ \texttt{M.reward h (s, a) = Measure.dirac (r h s a)}$; the class
-$\mathcal M_r$ is the subtype \texttt{\{M : EpisodicMDP S A H // M.HasRewardFn r\}}. The
+$\mathcal M_r$ is the subtype \texttt{\{M : EpisodicMDP S A // M.HasRewardFn r\}}, with
+\texttt{r : ℕ → S → A → ℝ}. The
 condition $r \in [0, 1]$ is a separate hypothesis \texttt{∀ h s a, r h s a ∈ Set.Icc 0 1} of
 the statements that need it (all the results of Chapters~\ref{chap:algorithm}
 to~\ref{chap:lower_bound}).
@@ -99,72 +106,85 @@ finitely many policies ($A^{SH}$). For $g : \Ss \times \As \to \R$ we write
 $(\pi_h g)(s) := g(s, \pi_h(s))$ for the composition with the policy at step $h$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{Policy S A H := Fin H → S → A}, a finite type (\texttt{Fintype}
-instance by \texttt{Pi.instFintype}), with the discrete $\sigma$-algebra. The paper also allows
+\textbf{Lean remark.} The trajectory laws and the values are defined for a policy
+\texttt{π : ℕ → S → A} on all the steps. As for a stochastic process in Mathlib, the policy is not
+bundled with its measurability: the definitions are total (the trajectory law of a policy which
+is not measurable at every step is the zero measure, as \texttt{Measure.map} of a non-measurable
+function), and the lemmas take the hypothesis \texttt{hπ : ∀ h, Measurable (π h)}. The learner
+plays $H$-step policies \texttt{Policy S A H := Fin H → S → A}, a finite type (\texttt{Fintype}
+instance by \texttt{Pi.instFintype}) with the discrete $\sigma$-algebra, extended to all the steps
+by \texttt{Policy.extend} (the policy on the first $H$ steps, a fixed action beyond;
+\texttt{Policy.extend\_fin}, \texttt{Policy.extend\_injective}, and
+\texttt{Policy.measurable\_extend} on a countable discrete state space); the values of
+\texttt{π.extend} only depend on \texttt{π} (\texttt{expValue\_congr}). The paper also allows
 stochastic policies in the notation $(\pi_h g)(s) = \E_{A \sim \pi_h(\cdot \mid s)} g(s, A)$;
 only deterministic policies are needed (the learner plays deterministic policies and the
 optimal policies are deterministic, Lemma~\ref{lem:opt_bellman}).
 
-\section{Trajectory laws through the layered MDP}
+\section{Trajectory laws through the time-augmented MDP}
 \label{sec:mdp_trajectories}
 
 The trajectory of a policy in a finite-horizon MDP is defined as the trajectory of a
-stationary policy in a stationary MDP, the \emph{layered} MDP, whose state records the current
-step; this reuses LML's trajectory measures and makes the Markov property a consequence of the
-Ionescu--Tulcea construction.
+stationary policy in a stationary MDP, the \emph{time-augmented} MDP, whose state records the
+current step; this reuses LML's trajectory measures and makes the Markov property a consequence
+of the Ionescu--Tulcea construction.
 
-\begin{definition}[Layered MDP]\label{def:layered_mdp}
-\lean{Learning.MDP.Episodic.LayerState, Learning.MDP.Episodic.layerTrans, Learning.MDP.Episodic.layerReward, Learning.MDP.Episodic.layerMDP, Learning.MDP.Episodic.Policy.layer}\leanok
+\begin{definition}[Time-augmented MDP]\label{def:layered_mdp}
+\lean{Learning.MDP.Episodic.EpisodicMDP.augmented, Learning.MDP.Episodic.EpisodicMDP.augTrans, Learning.MDP.Episodic.EpisodicMDP.augReward, Learning.MDP.Episodic.augPolicy, Learning.MDP.Episodic.measurable_augPolicy, Learning.MDP.Episodic.Policy.extend, Learning.MDP.Episodic.Policy.measurable_extend}\leanok
 \uses{def:episodic_mdp, def:policy, def:mdp}
-The \emph{layered MDP} of $\mathcal M$ is the stationary MDP (Definition~\ref{def:mdp}) on the
-state space $\Ss \times \{1, \dots, H + 1\}$ with actions $\As$: from a state $(s, h)$ with
-$h \le H$ and an action $a$, the reward has law $R_h(\cdot \mid s, a)$ and the next state is
-$(s', h + 1)$ with $s' \sim p_h(\cdot \mid s, a)$; the layer $H + 1$ is absorbing: from
-$(s, H + 1)$ the reward is $0$ and the next state is $(s, H + 1)$ whatever the action. A policy
-$\pi$ of $\mathcal M$ becomes the stationary policy $\pi^{\mathrm{lay}}(s, h) := \pi_h(s)$ for
-$h \le H$ (and an arbitrary fixed action on the terminal layer).
+The \emph{time-augmented MDP} of $\mathcal M$ is the stationary MDP (Definition~\ref{def:mdp})
+on the state space $\Ss \times \N$ with actions $\As$: from a state $(s, h)$ and an action $a$,
+the reward has law $R_h(\cdot \mid s, a)$ and the next state is $(s', h + 1)$ with
+$s' \sim p_h(\cdot \mid s, a)$. A policy $\pi = (\pi_h)_{h \in \N}$ of $\mathcal M$ becomes the
+stationary policy $\pi^{\mathrm{aug}}(s, h) := \pi_h(s)$; an $H$-step policy is extended by a
+fixed action beyond the horizon.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{layerMDP M : MDP (S × Fin (H + 1)) A ℝ} and
-\texttt{Policy.layer π : S × Fin (H + 1) → A}. The step index of the layered state is
-\texttt{Fin (H + 1)} ($0$-indexed: the paper's layer $h$ is \texttt{⟨h - 1, \_⟩}, the terminal
-layer is \texttt{Fin.last H}), and the next layer is \texttt{min (h + 1) H} so that the last
-layer is absorbing. On the terminal layer \texttt{Policy.layer} plays a default action of the
-nonempty type \texttt{A}.
+\textbf{Lean remark.} \texttt{M.augmented : MDP (S × ℕ) A ℝ} (kernels \texttt{M.augTrans},
+\texttt{M.augReward}) and \texttt{augPolicy π : S × ℕ → A}, measurable when every
+\texttt{π h} is (\texttt{measurable\_augPolicy}, by
+\texttt{measurable\_from\_prod\_countable\_left}). The steps are all of $\N$: there is no
+terminal layer, the trajectory runs forever and the finite horizon only enters through the
+return of the first $H - h$ rounds (Definition~\ref{def:episode_return}). An $H$-step policy
+\texttt{π : Policy S A H} is \texttt{π.extend}, which plays a default action of the nonempty
+type \texttt{A} beyond the horizon.
 
 \begin{definition}[Trajectory law from a state at a step]\label{def:step_law}
 \lean{Learning.MDP.Episodic.stepLaw}\leanok
 \uses{def:layered_mdp}
-For a policy $\pi$, a state $s$ and a step $h \in \{1, \dots, H + 1\}$, the \emph{trajectory law}
-$\Prob^\pi_{(s, h)}$ is the law of the trajectory of the stationary policy $\pi^{\mathrm{lay}}$ in
-the layered MDP started at the state $(s, h)$, i.e.\ the sequence of rounds
-$((S_{h+j}, h + j), A_{h+j}, R_{h+j})_{j \ge 0}$ (observation, action, feedback) with the layer
-index capped at $H + 1$. We write $(S_i, A_i, R_i)_{i \ge h}$ for this trajectory (so $S_h = s$,
-$A_i = \pi_i(S_i)$ and $R_i \sim R_i(\cdot \mid S_i, A_i)$ for $h \le i \le H$, and $R_i = 0$,
-$S_i = S_{H+1}$ for $i > H$) and $\E^\pi_{(s, h)}$ for the expectation under
+For a policy $\pi$, a state $s$ and a step $h \in \N$, the \emph{trajectory law}
+$\Prob^\pi_{(s, h)}$ is the law of the trajectory of the stationary policy $\pi^{\mathrm{aug}}$ in
+the time-augmented MDP started at the state $(s, h)$, i.e.\ the sequence of rounds
+$((S_{h+j}, h + j), A_{h+j}, R_{h+j})_{j \ge 0}$ (observation, action, feedback). We write
+$(S_i, A_i, R_i)_{i \ge h}$ for this trajectory (so $S_h = s$, $A_i = \pi_i(S_i)$ and
+$R_i \sim R_i(\cdot \mid S_i, A_i)$ for $i \ge h$) and $\E^\pi_{(s, h)}$ for the expectation under
 $\Prob^\pi_{(s, h)}$; $\Prob^\pi := \Prob^\pi_{(s_1, 1)}$ and $\E^\pi := \E^\pi_{(s_1, 1)}$ when an
 initial state $s_1$ is fixed.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{stepLaw M π (s, h) := (layerMDP M).policyMeasure π.layer \_ (s, h)},
-a probability measure on \texttt{ℕ → Round (S × Fin (H + 1)) A ℝ} (LML
-\texttt{MDP.policyMeasure}, the trajectory measure \texttt{trajMeasure} of the stationary policy
-algorithm \texttt{policyAlg} in \texttt{MDP.env (layerMDP M) (Measure.dirac (s, h))}). The
-round $j$ of the trajectory corresponds to the paper's step $h + j$.
+\textbf{Lean remark.} \texttt{stepLaw M π (s, h) := M.augmented.policyMeasure (augPolicy π) \_ (s, h)}
+for \texttt{π : ℕ → S → A} measurable at every step (\texttt{stepLaw\_of\_measurable}; it is
+\texttt{0} otherwise) and \texttt{h : ℕ}, a probability measure
+(\texttt{isProbabilityMeasure\_stepLaw}) on
+\texttt{ℕ → Round (S × ℕ) A ℝ} (LML \texttt{MDP.policyMeasure}, the trajectory measure
+\texttt{trajMeasure} of the stationary policy algorithm \texttt{policyAlg} in
+\texttt{MDP.env M.augmented (Measure.dirac (s, h))}); \texttt{stepLawKernel M π h} is the same
+law as a kernel from the state. The round $j$ of the trajectory corresponds to the paper's step
+$h + j$.
 
 \begin{definition}[Episode return and state sequence]\label{def:episode_return}
 \lean{Learning.MDP.Episodic.episodeReturn, Learning.MDP.Episodic.episodeStates, Learning.MDP.Episodic.Traj}\leanok
 \uses{def:step_law}
-The \emph{return from step $h$} of a trajectory is $R^\pi_h := \sum_{i = h}^H R_i$. Since the
-rewards of the layered trajectory after the terminal layer are $0$, it is the sum of the
-first $H$ rewards of the layered trajectory whatever the starting step: $R^\pi_h = \sum_{j < H} R_{h+j}$.
-The \emph{state sequence} of an episode started at $(s_1, 1)$ is $(S_1, \dots, S_{H+1})$: the
+The \emph{return from step $h$} of a trajectory is $R^\pi_h := \sum_{i = h}^H R_i$, the sum of
+the first $H + 1 - h$ rewards of the trajectory from $(s, h)$ ($0$ if $h > H$). The
+\emph{state sequence} of an episode started at $(s_1, 1)$ is $(S_1, \dots, S_{H+1})$: the
 observation states of the first $H + 1$ rounds. We call the pair (state sequence, rewards) the
 \emph{episode}.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{episodeReturn H : (ℕ → Round (S × Fin (H + 1)) A ℝ) → ℝ},
-\texttt{traj ↦ ∑ j : Fin H, (traj j).feedback}, and
+\textbf{Lean remark.} \texttt{episodeReturn n : (ℕ → Round (S × ℕ) A ℝ) → ℝ},
+\texttt{traj ↦ ∑ k ∈ range n, (traj k).feedback}, the sum of the first \texttt{n} rewards: the
+return from the ($0$-indexed) step \texttt{h} is \texttt{episodeReturn (H - h)}, and
 \texttt{episodeStates H : \_ → Traj S H}, \texttt{traj ↦ fun i : Fin (H + 1) ↦ (traj i).obs.1},
 where \texttt{Traj S H := Fin (H + 1) → S}. Both are measurable (finite sums and coordinate
 projections).
@@ -172,7 +192,7 @@ projections).
 \begin{lemma}[Markov property of the trajectory of a stationary policy]\label{lem:policy_markov}
 \lean{Learning.MDP.hasCondDistrib_shiftRound_trajMeasure, Learning.MDP.hasLaw_step_zero_policyMeasure, Learning.MDP.hasCondDistrib_obs_one_trajMeasure}\leanok
 \uses{def:mdp}
-Let $M$ be an MDP with countable state space (discrete $\sigma$-algebra), $\pi$ a measurable
+Let $M$ be an MDP whose state space has measurable singletons, $\pi$ a measurable
 stationary deterministic policy and $\mu_0$ an initial law, and let $(O_j, A_j, Y_j)_{j \ge 0}$ be
 the canonical trajectory of $\pi$ in the environment of $M$ from $\mu_0$. Then the first round
 $(O_0, A_0, Y_0)$ has law $\mu_0(ds)\,\delta_{\pi(s)}(da)\,R(dy \mid s, a)$, the state $O_1$ has
@@ -199,8 +219,10 @@ law of this triple under the trajectory law is $Q$, which is the claim.
 \end{proof}
 
 \textbf{Lean remark.} File \texttt{MDP/Markov.lean}, in LML generality (\texttt{Learning.MDP},
-countable state space). The trajectory law of $\pi$ as a kernel from the initial state is
-\texttt{policyKernel M hπ}; the first round and the state of round $1$ are
+arbitrary state space with \texttt{MeasurableSingletonClass}). The trajectory law of $\pi$ as a
+kernel from the initial state is \texttt{policyKernel M hπ}, built with Mathlib's
+\texttt{Kernel.traj} from the step kernels (\texttt{iicStepKernel}) so that its measurability
+is Mathlib's; the first round and the state of round $1$ are
 \texttt{firstRoundState}, the shift is \texttt{shiftRound}, the auxiliary measure is
 \texttt{shiftMeasure} and the prepending map is \texttt{consRound}. The general
 \texttt{HasCondDistrib} tools used are in \texttt{Mathlib/Probability/HasCondDistrib.lean}
@@ -208,9 +230,9 @@ countable state space). The trajectory law of $\pi$ as a kernel from the initial
 \texttt{HasCondDistrib.compProd\_left}).
 
 \begin{lemma}[Markov property of the trajectory law]\label{lem:step_law_markov}
-\lean{Learning.MDP.Episodic.hasLaw_stepLaw_castSucc, Learning.MDP.Episodic.ae_obs_zero_stepLaw, Learning.MDP.Episodic.ae_action_zero_stepLaw, Learning.MDP.Episodic.hasLaw_shiftRound_stepLaw_last, Learning.MDP.Episodic.ae_feedback_eq_zero_stepLaw_last, Learning.MDP.Episodic.ae_feedback_eq_zero_stepLaw, Learning.MDP.Episodic.ae_episodeReturn_eq_add_shiftRound, Learning.MDP.Episodic.ae_stepLaw_castSucc_of_ae, Learning.MDP.Episodic.lintegral_stepLaw_castSucc}\leanok
+\lean{Learning.MDP.Episodic.hasLaw_stepLaw_succ, Learning.MDP.Episodic.ae_obs_zero_stepLaw, Learning.MDP.Episodic.ae_action_zero_stepLaw, Learning.MDP.Episodic.hasLaw_feedback_zero_stepLaw, Learning.MDP.Episodic.ae_feedback_eq_policy_stepLaw, Learning.MDP.Episodic.episodeReturn_succ_eq_add_shiftRound, Learning.MDP.Episodic.ae_stepLaw_succ_of_ae, Learning.MDP.Episodic.lintegral_stepLaw_succ, Learning.MDP.Episodic.integral_stepLaw_succ}\leanok
 \uses{def:step_law, def:layered_mdp}
-Let $h \le H$, $s \in \Ss$ and $\pi$ a policy. Under $\Prob^\pi_{(s, h)}$:
+Let $h \in \N$, $s \in \Ss$ and $\pi$ a policy. Under $\Prob^\pi_{(s, h)}$:
 \begin{enumerate}
   \item[(i)] the first round is $S_h = s$, $A_h = \pi_h(s)$, and $(R_h, S_{h+1})$ has law
         $R_h(\cdot \mid s, \pi_h(s)) \otimes p_h(\cdot \mid s, \pi_h(s))$;
@@ -233,14 +255,15 @@ Let $h \le H$, $s \in \Ss$ and $\pi$ a policy. Under $\Prob^\pi_{(s, h)}$:
 \leanok
 The trajectory measure of an algorithm in an environment is the Ionescu--Tulcea measure built
 from the initial law of the observation and the step kernels (LML \texttt{trajMeasure}). For the
-stationary policy $\pi^{\mathrm{lay}}$ in the layered MDP started at $(s, h)$: the observation of
-the round $0$ is $(s, h)$ almost surely (initial law $\delta_{(s, h)}$), the action is the
-deterministic $\pi^{\mathrm{lay}}(s, h) = \pi_h(s)$ (the policy algorithm is deterministic), and
-the feedback and next observation are drawn from the layered step kernel at $((s, h), \pi_h(s))$,
+stationary policy $\pi^{\mathrm{aug}}$ in the time-augmented MDP started at $(s, h)$: the
+observation of the round $0$ is $(s, h)$ almost surely (initial law $\delta_{(s, h)}$), the action
+is the deterministic $\pi^{\mathrm{aug}}(s, h) = \pi_h(s)$ (the policy algorithm is deterministic),
+and the feedback and next observation are drawn from the augmented step kernel at
+$((s, h), \pi_h(s))$,
 which is $R_h(\cdot \mid s, \pi_h(s))$ for the reward and $s' \mapsto (s', h + 1)$ with
 $s' \sim p_h(\cdot \mid s, \pi_h(s))$ for the next state, independently: this is (i). For (ii), the
 canonical trajectory process is an algorithm-environment sequence for the policy algorithm and
-the layered environment (LML \texttt{isAlgEnvSeq\_trajMeasure}); the conditional law of the
+the augmented environment (LML \texttt{isAlgEnvSeq\_trajMeasure}); the conditional law of the
 future rounds $j \ge 1$ given the round $0$ is, by the Ionescu--Tulcea construction, the
 trajectory measure of the same algorithm-environment pair started at the observation of round
 $1$, that is $(S_{h+1}, h + 1)$ (the policy algorithm and the MDP environment are stationary:
@@ -252,19 +275,18 @@ space and then by the monotone class theorem.
 \end{proof}
 
 \textbf{Lean remark.} File \texttt{MDP/StepLaw.lean}, derived from
-Lemma~\ref{lem:policy_markov} for the layered MDP. For a Lean step \texttt{h : Fin H} (the paper's
-$h + 1$), \texttt{hasLaw\_stepLaw\_castSucc} states that under
-\texttt{stepLaw M π (s, h.castSucc)} the triple (reward of round $0$, state of round $1$, shifted
-trajectory) has law
-\texttt{(M.reward h (s, π h s)).prod (M.trans h (s, π h s)) ⊗ₘ Kernel.prodMkLeft ℝ (stepLawKernel M π h.succ)},
-which contains (i) and (ii); the almost sure statements and Lebesgue integrals along one step are
-\texttt{ae\_stepLaw\_castSucc\_of\_ae} and \texttt{lintegral\_stepLaw\_castSucc}. At the terminal
-layer the shifted trajectory has the same law as the trajectory
-(\texttt{hasLaw\_shiftRound\_stepLaw\_last}), all rewards vanish almost surely, hence so do the
-rewards of the rounds at the terminal layer from any start (\texttt{ae\_feedback\_eq\_zero\_stepLaw}), and
-the return is the first reward plus the return of the shifted trajectory almost surely
-(\texttt{ae\_episodeReturn\_eq\_add\_shiftRound}): this is the identity
-$R^\pi_h = R_h + R^\pi_{h+1}$ used by every backward recursion.
+Lemma~\ref{lem:policy_markov} for the time-augmented MDP. For a Lean step \texttt{h : ℕ} (the
+paper's $h + 1$), \texttt{hasLaw\_stepLaw\_succ} states that under \texttt{stepLaw M π (s, h)}
+the triple (reward of round $0$, state of round $1$, shifted trajectory) has law
+\texttt{(M.reward h (s, π h s)).prod (M.trans h (s, π h s)) ⊗ₘ Kernel.prodMkLeft ℝ (stepLawKernel M π (h + 1))},
+which contains (i) and (ii); the almost sure statements and integrals along one step are
+\texttt{ae\_stepLaw\_succ\_of\_ae}, \texttt{lintegral\_stepLaw\_succ} and
+\texttt{integral\_stepLaw\_succ}; with a reward function the first reward is
+$r_h(s, \pi_h(s))$ almost surely (\texttt{ae\_feedback\_eq\_policy\_stepLaw}). The return of
+$n + 1$ rounds is the first reward plus the return of $n$ rounds of the shifted trajectory
+(\texttt{episodeReturn\_succ\_eq\_add\_shiftRound}, an identity of functions): this is
+$R^\pi_h = R_h + R^\pi_{h+1}$, used by every backward recursion, and the recursions stop at the
+step $H$, where the return is the empty sum (no terminal layer is needed).
 
 \begin{definition}[Additive values]\label{def:eval_value}
 \uses{def:step_law, def:episode_return}
@@ -274,9 +296,8 @@ $\E^\pi_{(s, h)}\big[\sum_{i = h}^H f_i(S_i, A_i)\big]$; with $f = r$ (a reward 
 usual (risk-neutral) value $\E^\pi_{(s, h)}[R^\pi_h]$ of the MDP with reward function $r$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{evalValue M π f h s :=
-∫ traj, ∑ j : Fin H, layerFun f (traj j).obs (traj j).action ∂(stepLaw M π (s, h))}, where
-\texttt{layerFun f (s, h) a := f h s a} for a non-terminal layer and $0$ on the terminal layer.
+\textbf{Lean remark.} Not formalized (it would be
+\texttt{∫ traj, ∑ k ∈ range (H - h), f (h + k) (traj k).obs.1 (traj k).action ∂(stepLaw M π (s, h))}).
 It is not needed for the results of the paper (the entropic values are not additive) and
 serves as the risk-neutral reference point.
 
@@ -305,12 +326,14 @@ When $\mathcal M$ has the reward function $r$ (Definition~\ref{def:reward_fn}),
 $U^\pi_h(s, a) = e^{\beta r_h(s, a)}\,(p_h Z^\pi_{h+1})(s, a)$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{expValue M β π h s := ∫ traj, Real.exp (β * episodeReturn H traj) ∂(stepLaw M π (s, h))}
-for \texttt{h : Fin (H + 1)}, and
-\texttt{expQ M β π h s a := ∫ x, Real.exp (β * x.1) * expValue M β π h.succ x.2 ∂((M.reward h ×ₖ M.trans h) (s, a))}
-for \texttt{h : Fin H}; with a reward function, \texttt{expQ = Real.exp (β * r h s a) * vecExp (M.transVec h s a) (expValue M β π h.succ)}
-(\texttt{expQ\_of\_hasRewardFn}). The terminal value $Z^\pi_{H+1} = 1$ is a lemma
-(\texttt{expValue\_last}: the return from the terminal layer is $0$ almost surely), not a
+\textbf{Lean remark.} \texttt{expValue M H β π h s := ∫ traj, Real.exp (β * episodeReturn (H - h) traj) ∂(stepLaw M π (s, h))}
+for \texttt{h : ℕ} and \texttt{π : ℕ → S → A}, and
+\texttt{expQ M H β π h s a := (∫ x, Real.exp (β * x) ∂M.reward h (s, a)) * ∫ s', expValue M H β π (h + 1) s' ∂M.trans h (s, a)};
+with a reward function, \texttt{expQ = Real.exp (β * r h s a) * ∫ s', expValue M H β π (h + 1) s' ∂M.trans h (s, a)}
+(\texttt{expQ\_of\_hasRewardFn}), and on a finite state space
+\texttt{= Real.exp (β * r h s a) * vecExp (M.transVec h s a) (expValue M H β π (h + 1))}
+(\texttt{expQ\_of\_hasRewardFn\_eq\_vecExp}). The terminal value $Z^\pi_{H+1} = 1$ is a lemma
+(\texttt{expValue\_of\_le}: the return of $H - h = 0$ rounds is $0$ for $h \ge H$), not a
 separate definition.
 
 \begin{definition}[Entropic values]\label{def:entropic_value}
@@ -327,18 +350,17 @@ so that $V^\pi_{H+1} = 0$ and $Z^\pi_h = e^{\beta V^\pi_h}$, $U^\pi_h = e^{\beta
 logarithms are well defined by Lemma~\ref{lem:exp_value_range}).
 \end{definition}
 
-\textbf{Lean remark.} \texttt{entropicValue M β π h s := β⁻¹ * Real.log (expValue M β π h s)},
+\textbf{Lean remark.} \texttt{entropicValue M H β π h s := β⁻¹ * Real.log (expValue M H β π h s)},
 \texttt{entropicQ}. The entropic risk measure with $\beta > 0$ is risk-seeking and with
 $\beta < 0$ risk-averse \cite{borkar2001risk}; the formalization treats both signs with the
 same definitions.
 
 \begin{lemma}[Exponential Bellman equation]\label{lem:exp_bellman}
-\lean{Learning.MDP.Episodic.expValue_castSucc, Learning.MDP.Episodic.expValue_last, Learning.MDP.Episodic.lexpValue_castSucc, Learning.MDP.Episodic.lexpValue_lt_top, Learning.MDP.Episodic.expQ_of_hasRewardFn, Learning.MDP.Episodic.integrable_exp_mul_of_rewardsIn}\leanok
+\lean{Learning.MDP.Episodic.expValue_succ, Learning.MDP.Episodic.expValue_of_le, Learning.MDP.Episodic.lexpValue_succ, Learning.MDP.Episodic.lexpValue_lt_top, Learning.MDP.Episodic.expQ_of_hasRewardFn, Learning.MDP.Episodic.expQ_of_hasRewardFn_eq_vecExp, Learning.MDP.Episodic.integrable_exp_mul_of_rewardsIn, Learning.MDP.Episodic.expValue_congr}\leanok
 \uses{def:exp_value, lem:step_law_markov}
-Assume that the rewards have finite exponential moments of order $\beta$:
-$\int e^{\beta x}\,R_h(dx \mid s, a) < \infty$ for all $h, s, a$ (true for bounded rewards, in
-particular for a reward function). Then $Z^\pi_{H+1} = 1$ and for every policy $\pi$, step
-$h \le H$ and state $s$,
+Assume that the rewards are bounded: $R_h(\cdot \mid s, a)$ is supported in a fixed interval
+$[a, b]$ for all $h, s, a$ (true for a reward function with values in $[0, 1]$). Then
+$Z^\pi_{h} = 1$ for $h \ge H + 1$ and for every policy $\pi$, step $h \le H$ and state $s$,
 \[
   Z^\pi_h(s) = U^\pi_h(s, \pi_h(s)),
 \]
@@ -352,8 +374,8 @@ has the reward function $r$.
 Under $\Prob^\pi_{(s, h)}$, $R^\pi_h = R_h + R^\pi_{h+1}$ where $R^\pi_{h+1} = \sum_{i \ge h+1} R_i$
 is a function of the shifted trajectory, so
 $e^{\beta R^\pi_h} = e^{\beta R_h}\, e^{\beta R^\pi_{h+1}}$. Lemma~\ref{lem:step_law_markov}(ii) with
-$G(R, s') = e^{\beta R}$ and $F = e^{\beta R^\pi_{h+1}}$ (bounded: the rewards of the layered
-trajectory are integrable and $F \ge 0$; in general use the nonnegative version) gives
+$G(R, s') = e^{\beta R}$ and $F = e^{\beta R^\pi_{h+1}}$ (bounded, the rewards being bounded)
+gives
 $Z^\pi_h(s) = \E_{(R, S') \sim R_h \otimes p_h(\cdot \mid s, \pi_h(s))}[e^{\beta R} Z^\pi_{h+1}(S')]
 = U^\pi_h(s, \pi_h(s))$, since $\E^\pi_{(s', h+1)}[e^{\beta R^\pi_{h+1}}] = Z^\pi_{h+1}(s')$ by
 definition. The deterministic-reward form is Definition~\ref{def:exp_value}.
@@ -362,11 +384,13 @@ definition. The deterministic-reward form is Definition~\ref{def:exp_value}.
 \textbf{Lean remark.} The identity is first proved for the Lebesgue integrals
 $L^\pi_h(s) := \int^- e^{\beta R^\pi_h}\,d\Prob^\pi_{(s,h)} \in [0, \infty]$ (\texttt{lexpValue}),
 without any hypothesis: $L^\pi_h(s) = \big(\int^- e^{\beta x}R_h(dx \mid s, a)\big)\sum_{s'} p_h(s' \mid s, a)L^\pi_{h+1}(s')$
-with $a = \pi_h(s)$ (\texttt{lexpValue\_castSucc}). The exponential moment hypothesis makes all
-$L^\pi_h(s)$ finite by backward induction (\texttt{lexpValue\_lt\_top}), and then
-$Z^\pi_h = (L^\pi_h)^{\mathrm{toReal}}$ satisfies the Bellman equation (\texttt{expValue\_castSucc}).
-Without it the Bochner-integral identity can fail (a non-integrable exponential return has
-Bochner integral $0$), so the hypothesis is not an artifact.
+with $a = \pi_h(s)$ (\texttt{lexpValue\_succ}). The boundedness hypothesis
+(\texttt{M.RewardsIn (Set.Icc a b)}) makes all $L^\pi_h(s)$ finite
+(\texttt{lexpValue\_lt\_top}), and then $Z^\pi_h = (L^\pi_h)^{\mathrm{toReal}}$ satisfies the
+Bellman equation (\texttt{expValue\_succ}). Without such a hypothesis the Bochner-integral
+identity can fail (a non-integrable exponential return has Bochner integral $0$), so the
+hypothesis is not an artifact. The backward inductions on the step \texttt{h : ℕ} are
+\texttt{horizon\_induction} (the case $h \ge H$, then the step from $h + 1$ to $h < H$).
 
 \begin{lemma}[Ranges of the exponential values]\label{lem:exp_value_range}
 \lean{Learning.MDP.Episodic.expValue_mem_Icc, Learning.MDP.Episodic.expQ_mem_Icc, Learning.MDP.Episodic.ae_episodeReturn_mem_Icc, Learning.MDP.Episodic.expValue_pos}\leanok
@@ -402,14 +426,13 @@ expectation preserves the bounds. Positivity: the lower bounds are positive.
 \end{proof}
 
 \textbf{Lean remark.} The ranges are stated with \texttt{min 1 (Real.exp (β * (H - h)))} and
-\texttt{max 1 (Real.exp (β * (H - h)))} for the Lean state step \texttt{h : Fin (H + 1)}
-(\texttt{H - h} steps to go; for \texttt{expQ} at \texttt{h : Fin H} the same exponent). The
+\texttt{max 1 (Real.exp (β * (H - h)))} for the Lean step \texttt{h : ℕ} (\texttt{H - h} steps to
+go, truncated subtraction; for \texttt{expQ} at \texttt{h < H} the same exponent). The
 Lean proof of the ranges of $Z^\pi$ and $U^\pi$ is analytic, by backward induction on the
 exponential Bellman equation (Lemma~\ref{lem:exp_bellman}), with the product rule
 \texttt{mul\_mem\_Icc\_min\_max\_exp}; the almost sure bound on the return is proved by
-backward induction with \texttt{ae\_episodeReturn\_eq\_add\_shiftRound} and
-\texttt{ae\_stepLaw\_castSucc\_of\_ae}. Positivity \texttt{expValue\_pos} only needs finite
-exponential moments.
+induction on the number of rounds with \texttt{episodeReturn\_succ\_eq\_add\_shiftRound} and
+\texttt{ae\_stepLaw\_succ\_of\_ae}. Positivity \texttt{expValue\_pos} only needs bounded rewards.
 
 \begin{lemma}[Monotonicity of the exponential Bellman operator]\label{lem:exp_value_monotone}
 \lean{Learning.MDP.vecExp_mono, Learning.MDP.vecExp_nonneg, Learning.MDP.vecExp_const, Learning.MDP.vecExp_add, Learning.MDP.vecExp_const_mul, Learning.MDP.vecExp_mem_Icc, Learning.MDP.abs_vecExp_le, Learning.MDP.transVec_nonneg, Learning.MDP.sum_transVec, Learning.MDP.Episodic.EpisodicMDP.sum_transVec, Learning.MDP.Episodic.integral_eq_vecExp_transVec}\leanok
@@ -440,8 +463,8 @@ $\int f\,dp_h(\cdot \mid s, a)$ with \texttt{vecExp (M.transVec h s a) f}.
 \begin{definition}[Optimal values]\label{def:opt_value}
 \lean{Learning.MDP.Episodic.optEntropicValue, Learning.MDP.Episodic.optExpValue, Learning.MDP.Episodic.optExpQ}\leanok
 \uses{def:entropic_value, def:exp_value}
-The \emph{optimal entropic value} is $V^*_h(s) := \sup_\pi V^\pi_h(s)$ (a maximum over the finite
-set of policies), the \emph{optimal exponential value} is $Z^*_h(s) := e^{\beta V^*_h(s)}$, and the
+The \emph{optimal entropic value} is $V^*_h(s) := \sup_\pi V^\pi_h(s)$ (a supremum over all
+measurable policies, finite for bounded rewards), the \emph{optimal exponential value} is $Z^*_h(s) := e^{\beta V^*_h(s)}$, and the
 \emph{optimal exponential state-action value} is, for $h \le H$,
 \[
   U^*_h(s, a) := \E_{(R, S') \sim R_h(\cdot \mid s, a) \otimes p_h(\cdot \mid s, a)}
@@ -451,40 +474,43 @@ set of policies), the \emph{optimal exponential value} is $Z^*_h(s) := e^{\beta 
 The paper writes $Q^*_h := \beta^{-1} \log U^*_h$; then $Z^*_{H+1} = 1$ and $V^*_{H+1} = 0$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{optEntropicValue M β h s := ⨆ π : Policy S A H, entropicValue M β π h s}
-(a supremum over a finite nonempty type of reals, hence attained: \texttt{ciSup} with
-\texttt{Finite.bddAbove\_range}), \texttt{optExpValue M β h s := Real.exp (β * optEntropicValue M β h s)},
-\texttt{optExpQ M β h s a} defined as \texttt{expQ} with \texttt{optExpValue M β h.succ} in
+\textbf{Lean remark.} \texttt{optEntropicValue M H β h s := ⨆ π : \{π : ℕ → S → A // ∀ k, Measurable (π k)\}, entropicValue M H β π h s}
+(a \texttt{ciSup} in $\R$ over the policies measurable at every step, so that the zero measure
+of a non-measurable policy never enters the supremum; bounded above for bounded rewards:
+\texttt{bddAbove\_entropicValue}; it is attained, Lemma~\ref{lem:opt_bellman}),
+\texttt{optExpValue M H β h s := Real.exp (β * optEntropicValue M H β h s)},
+\texttt{optExpQ M H β h s a} defined as \texttt{expQ} with \texttt{optExpValue M H β (h + 1)} in
 place of the value of a policy.
 
 \begin{lemma}[Optimal exponential value as an extremum]\label{lem:opt_exp_value_eq}
-\lean{Learning.MDP.Episodic.expValue_le_optExpValue, Learning.MDP.Episodic.optExpValue_le_expValue, Learning.MDP.Episodic.exists_expValue_eq_optExpValue, Learning.MDP.Episodic.expValue_eq_exp_mul_entropicValue, Learning.MDP.Episodic.entropicValue_le_optEntropicValue, Learning.MDP.Episodic.exists_entropicValue_eq_optEntropicValue}\leanok
+\lean{Learning.MDP.Episodic.expValue_le_optExpValue, Learning.MDP.Episodic.optExpValue_le_expValue, Learning.MDP.Episodic.expValue_eq_exp_mul_entropicValue, Learning.MDP.Episodic.entropicValue_le_optEntropicValue, Learning.MDP.Episodic.bddAbove_entropicValue, Learning.MDP.Episodic.entropicValue_le_of_pos, Learning.MDP.Episodic.entropicValue_le_of_neg}\leanok
 \uses{def:opt_value, lem:exp_value_range}
-Assume $Z^\pi_h(s) > 0$ for every policy $\pi$ (true for rewards with finite exponential moments,
-Lemma~\ref{lem:exp_value_range}, in particular for rewards in $[0, 1]$). If $\beta > 0$ then $Z^*_h(s) = \max_\pi Z^\pi_h(s)$, and if $\beta < 0$
-then $Z^*_h(s) = \min_\pi Z^\pi_h(s)$, for every $h \le H + 1$ and $s$. In both cases
+Assume $\beta \ne 0$ and that the rewards are in $[0, 1]$. Then for every $h$ and $s$ the values
+$V^\pi_h(s)$ are bounded above uniformly in $\pi$ (by $H - h$ for $\beta > 0$, by $0$ for
+$\beta < 0$), so $V^*_h(s)$ is finite and $V^\pi_h(s) \le V^*_h(s)$ for every policy $\pi$; hence
 $Z^\pi_h(s) \le Z^*_h(s)$ ($\beta > 0$), resp.\ $Z^*_h(s) \le Z^\pi_h(s)$ ($\beta < 0$), for every
-policy $\pi$, with equality for some policy.
+policy $\pi$. (The supremum is attained, by the greedy policy of Lemma~\ref{lem:opt_bellman}.)
 \end{lemma}
 
 \begin{proof}
 \uses{def:opt_value, def:entropic_value, lem:exp_value_range}
 \leanok
-The set of policies is finite and nonempty, so $V^*_h(s) = \max_\pi V^\pi_h(s)$ is attained at
-some $\pi^\circ$. The map $x \mapsto e^{\beta x}$ is increasing for $\beta > 0$ and decreasing
-for $\beta < 0$, and $Z^\pi_h(s) = e^{\beta V^\pi_h(s)}$ (Definition~\ref{def:entropic_value},
-using $Z^\pi_h(s) > 0$ from Lemma~\ref{lem:exp_value_range}). Hence for $\beta > 0$,
-$Z^*_h(s) = e^{\beta V^{\pi^\circ}_h(s)} = Z^{\pi^\circ}_h(s) \ge Z^\pi_h(s)$ for all $\pi$, and for
-$\beta < 0$ the inequalities are reversed.
+By Lemma~\ref{lem:exp_value_range}, $Z^\pi_h(s) > 0$ and $Z^\pi_h(s)$ lies between $1$ and
+$e^{\beta(H - h)}$, so $V^\pi_h(s) = \beta^{-1} \log Z^\pi_h(s)$ is bounded above uniformly in
+$\pi$ and the supremum $V^*_h(s)$ is a real number with $V^\pi_h(s) \le V^*_h(s)$. The map
+$x \mapsto e^{\beta x}$ is increasing for $\beta > 0$ and decreasing for $\beta < 0$, and
+$Z^\pi_h(s) = e^{\beta V^\pi_h(s)}$ (Definition~\ref{def:entropic_value}, using $Z^\pi_h(s) > 0$),
+which gives the inequalities.
 \end{proof}
 
 \begin{lemma}[Optimal exponential Bellman equation]\label{lem:opt_bellman}
-\lean{Learning.MDP.Episodic.optPolicy, Learning.MDP.Episodic.expValue_optPolicy, Learning.MDP.Episodic.optExpValue_castSucc_eq, Learning.MDP.Episodic.optExpQ_le_optExpValue, Learning.MDP.Episodic.optExpValue_le_optExpQ, Learning.MDP.Episodic.optExpValue_last, Learning.MDP.Episodic.optExpQ_of_hasRewardFn, Learning.MDP.Episodic.expQ_le_optExpQ, Learning.MDP.Episodic.optExpQ_le_expQ}\leanok
+\lean{Learning.MDP.Episodic.optExpValueRec, Learning.MDP.Episodic.optExpQRec, Learning.MDP.Episodic.optPolicy, Learning.MDP.Episodic.expValue_optPolicy, Learning.MDP.Episodic.expValue_le_optExpValueRec, Learning.MDP.Episodic.optExpValueRec_le_expValue, Learning.MDP.Episodic.optEntropicValue_eq, Learning.MDP.Episodic.optExpValue_eq_optExpValueRec, Learning.MDP.Episodic.optExpValue_eq_expValue_optPolicy, Learning.MDP.Episodic.exists_expValue_eq_optExpValue, Learning.MDP.Episodic.exists_entropicValue_eq_optEntropicValue, Learning.MDP.Episodic.optExpValue_succ_eq, Learning.MDP.Episodic.optExpQ_le_optExpValue, Learning.MDP.Episodic.optExpValue_le_optExpQ, Learning.MDP.Episodic.optExpValue_of_le, Learning.MDP.Episodic.optExpQ_of_hasRewardFn, Learning.MDP.Episodic.optExpQ_of_hasRewardFn_eq_vecExp, Learning.MDP.Episodic.expQ_le_optExpQ, Learning.MDP.Episodic.optExpQ_le_expQ}\leanok
 \uses{def:opt_value, lem:exp_bellman, lem:exp_value_monotone, lem:opt_exp_value_eq}
-Let $\beta \ne 0$ and assume that the rewards of $\mathcal M$ have finite exponential moments of
-order $\beta$ (for instance, $\mathcal M$ has a reward function $r$ with values in $[0, 1]$). Then
-$Z^*_{H+1} = 1$, $U^*_h(s, a) = e^{\beta r_h(s, a)}(p_h Z^*_{h+1})(s, a)$, and for every $h \le H$ and
-$s$,
+Let $\beta \ne 0$ and assume that the rewards of $\mathcal M$ are in $[0, 1]$ (for instance,
+$\mathcal M$ has a reward function $r$ with values in $[0, 1]$), with finitely many actions and
+countably many states. Then the supremum $V^*_h(s)$ is attained,
+$Z^*_{h} = 1$ for $h \ge H + 1$, $U^*_h(s, a) = e^{\beta r_h(s, a)}(p_h Z^*_{h+1})(s, a)$, and for
+every $h \le H$ and $s$,
 \[
   Z^*_h(s) = \max_{a \in \As} U^*_h(s, a) \quad (\beta > 0),
   \qquad
@@ -499,35 +525,38 @@ it is optimal from every state at every step, and in particular $V^*_h(s) = V^{\
 \uses{lem:exp_bellman, lem:exp_value_monotone, lem:opt_exp_value_eq, def:opt_value, lem:exp_value_range}
 \leanok
 Let $\beta > 0$ (the case $\beta < 0$ is identical with $\min$ in place of $\max$, $\argmin$ in
-place of $\argmax$ and all inequalities reversed, using the $\min$ form of
-Lemma~\ref{lem:opt_exp_value_eq}). $Z^*_{H+1} = e^{\beta \cdot 0} = 1$ since every $V^\pi_{H+1} = 0$.
-The formula for $U^*_h$ is Definition~\ref{def:opt_value}. Let $\pi^*$ be the greedy policy (any
-choice of maximizers). We prove by backward induction on $h = H + 1, H, \dots, 1$ the
-statement $P(h)$: \emph{for every $s$, $Z^{\pi^*}_h(s) = Z^*_h(s)$}. $P(H + 1)$: both sides are $1$.
-Assume $P(h + 1)$ with $h \le H$, and fix $s$.
+place of $\argmax$ and all inequalities reversed). Define the backward recursion
+$\tilde Z_h(s) := 1$ for $h \ge H + 1$ and
+$\tilde Z_h(s) := \max_a \tilde U_h(s, a)$ with
+$\tilde U_h(s, a) := e^{\beta r_h(s, a)} (p_h \tilde Z_{h+1})(s, a)$ for $h \le H$ (the maximum
+over the finite set of actions exists), and let $\pi^*_h(s) \in \argmax_a \tilde U_h(s, a)$ be a
+greedy policy of this recursion.
 \begin{enumerate}
-  \item[(a)] For every policy $\pi$, by the exponential Bellman equation
-        (Lemma~\ref{lem:exp_bellman}), $Z^\pi_h(s) = e^{\beta r_h(s, \pi_h(s))}(p_h Z^\pi_{h+1})(s, \pi_h(s))$.
-        Since $Z^\pi_{h+1} \le Z^*_{h+1}$ pointwise (Lemma~\ref{lem:opt_exp_value_eq} at the step $h+1$),
-        monotonicity (Lemma~\ref{lem:exp_value_monotone}) gives
-        $Z^\pi_h(s) \le e^{\beta r_h(s, \pi_h(s))}(p_h Z^*_{h+1})(s, \pi_h(s)) = U^*_h(s, \pi_h(s)) \le \max_a U^*_h(s, a)$.
-  \item[(b)] For $\pi = \pi^*$: $Z^{\pi^*}_h(s) = e^{\beta r_h(s, \pi^*_h(s))}(p_h Z^{\pi^*}_{h+1})(s, \pi^*_h(s))
-        = e^{\beta r_h(s, \pi^*_h(s))}(p_h Z^*_{h+1})(s, \pi^*_h(s)) = U^*_h(s, \pi^*_h(s)) = \max_a U^*_h(s, a)$,
-        by $P(h + 1)$ (the value of $\pi^*$ from the step $h + 1$ only depends on
-        $\pi^*_{h+1}, \dots, \pi^*_H$) and the definition of $\pi^*_h(s)$.
+  \item[(a)] $Z^{\pi^*} = \tilde Z$: by backward induction on $h$, using the exponential
+        Bellman equation (Lemma~\ref{lem:exp_bellman}) for $\pi^*$ and the definition of $\pi^*_h$.
+  \item[(b)] For every policy $\pi$, $Z^\pi_h(s) \le \tilde Z_h(s)$: by backward induction on $h$,
+        $Z^\pi_h(s) = e^{\beta r_h(s, \pi_h(s))}(p_h Z^\pi_{h+1})(s, \pi_h(s))
+        \le e^{\beta r_h(s, \pi_h(s))}(p_h \tilde Z_{h+1})(s, \pi_h(s)) = \tilde U_h(s, \pi_h(s))
+        \le \tilde Z_h(s)$, by the Bellman equation, the induction hypothesis and monotonicity
+        (Lemma~\ref{lem:exp_value_monotone}).
 \end{enumerate}
-By (a) and (b), $Z^{\pi^*}_h(s) = \max_a U^*_h(s, a) \ge \max_\pi Z^\pi_h(s) = Z^*_h(s) \ge Z^{\pi^*}_h(s)$
-(Lemma~\ref{lem:opt_exp_value_eq}), so all are equal: this is $P(h)$ and the Bellman equation at
-the step $h$. Finally $V^*_h(s) = V^{\pi^*}_h(s)$ by taking logarithms.
+By (b), $V^\pi_h(s) \le \beta^{-1}\log \tilde Z_h(s) = V^{\pi^*}_h(s)$ for every $\pi$, so the supremum
+$V^*_h(s)$ is at most $V^{\pi^*}_h(s)$, and $V^{\pi^*}_h(s) \le V^*_h(s)$ by
+Lemma~\ref{lem:opt_exp_value_eq}: the supremum is attained at $\pi^*$ and
+$Z^* = Z^{\pi^*} = \tilde Z$. The Bellman equation and the formula for $U^*_h$ then follow from
+the recursion defining $\tilde Z$ and $\tilde U$.
 \end{proof}
 
-\textbf{Lean remark.} The sup over policies decouples across steps only through the greedy
-policy: prove the two statements ``$Z^\pi_h(s) \le Z^*_h(s)$ for all $\pi$'' (this is
-Lemma~\ref{lem:opt_exp_value_eq}) and ``$Z^{\pi^*}_h(s) = \max_a U^*_h(s, a)$ and
-$Z^{\pi^*}_h(s) \ge Z^*_h(s)$'' by the backward induction above (\texttt{optExpValue\_eq\_max\_optExpQ},
-\texttt{expValue\_optPolicy}); \texttt{argmax} is LML's choice of a maximizer on a finite type
-(\texttt{Learning.argmax}), and the $\beta < 0$ case uses \texttt{argmin}. The induction is
-on \texttt{j : ℕ}, the number of steps to the end, with the step \texttt{h = H - j}.
+\textbf{Lean remark.} The recursion is \texttt{optExpValueRec} / \texttt{optExpQRec} (a
+well-founded recursion on \texttt{H - h}) and the greedy policy is
+\texttt{optPolicy : ℕ → S → A}, built with \texttt{Finite.exists\_max} /
+\texttt{Finite.exists\_min} on the finite action type and measurable on a countable discrete
+state space (\texttt{measurable\_optPolicy}); (a) is \texttt{expValue\_optPolicy}, (b) is
+\texttt{expValue\_le\_optExpValueRec} (\texttt{optExpValueRec\_le\_expValue} for $\beta < 0$),
+and the conclusions are \texttt{optEntropicValue\_eq}, \texttt{optExpValue\_eq\_optExpValueRec}
+and \texttt{optExpValue\_succ\_eq}. This is where the countability of the state space and the
+finiteness of the action space enter (\texttt{[Countable S] [Finite A] [Nonempty A]}); the
+supremum over all measurable policies needs no finiteness of the set of policies.
 
 \begin{lemma}[Ranges of the optimal exponential values]\label{lem:opt_exp_value_range}
 \lean{Learning.MDP.Episodic.optExpValue_mem_Icc, Learning.MDP.Episodic.optExpQ_mem_Icc, Learning.MDP.Episodic.optExpValue_pos}\leanok
@@ -586,7 +615,7 @@ $\beta^{-1}\log(Z^*/Z^\pi) = \abs\beta^{-1}\log(Z^\pi/Z^*)$).
 
 \textbf{Lean remark.} This is the identity behind the stopping rule of Section~4 of the
 paper (``Stopping rule'') and of its Appendix~B.2; both directions of the sign of $\beta$ are
-needed. The formal statements hold at every step \texttt{h : Fin (H + 1)} and only assume
+needed. The formal statements hold at every step \texttt{h : ℕ} and only assume
 $Z^\pi_h(s) > 0$ (not the range of the rewards); $Z^*_h(s) = e^{\beta V^*_h(s)} > 0$ holds by
 definition.
 
@@ -605,9 +634,10 @@ the supremum over the policies of the essential supremum of the return of an epi
 trajectory law of the policy from $(s_1, 1)$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{maxReturn M s₁ := ⨆ π : Policy S A H, essSup (episodeReturn H) (stepLaw M π (s₁, 0))}
-(a supremum over a finite type; \texttt{essSup} in $\R$, a conditionally complete lattice, is
-the Mathlib \texttt{MeasureTheory.essSup}). The paper's ``supremum over all sources of
+\textbf{Lean remark.} \texttt{maxReturn M H s₁ := ⨆ π : \{π : ℕ → S → A // ∀ k, Measurable (π k)\}, essSup (episodeReturn H) (stepLaw M π (s₁, 0))}
+(a supremum over the measurable policies, bounded by $H$ for rewards in $[0, 1]$:
+\texttt{bddAbove\_essSup\_episodeReturn}; \texttt{essSup} in $\R$, a conditionally complete
+lattice, is the Mathlib \texttt{MeasureTheory.essSup}). The paper's ``supremum over all sources of
 randomness'' is the essential supremum under the trajectory law: the two agree for the
 finitely supported laws of the paper (finite state space, deterministic rewards) and the
 essential supremum is the version that makes sense for reward kernels.
@@ -654,9 +684,10 @@ $Y_t = (s^{t+1}_1, \dots, s^{t+1}_{H+1})$ its state sequence; we write $a^{t+1}_
 for the action played at step $h$ of the episode $t + 1$.
 \end{definition}
 
-\textbf{Lean remark.} \texttt{statesKernel M s₁ : Kernel (Policy S A H) (Traj S H)},
-\texttt{π ↦ (stepLaw M π (s₁, 0)).map (episodeStates H)} (a kernel on a countable discrete
-type: \texttt{Kernel.ofFunOfCountable}), and \texttt{statesEnv M s₁ := stationaryEnv (statesKernel M s₁) : Environment Unit (Policy S A H) (Traj S H)}.
+\textbf{Lean remark.} \texttt{statesLaw M H s₁ π := (stepLaw M π (s₁, 0)).map (episodeStates H)}
+for a policy \texttt{π : ℕ → S → A}, \texttt{statesKernel M H s₁ : Kernel (Policy S A H) (Traj S H)},
+\texttt{π ↦ statesLaw M H s₁ π.extend} (measurable on the countable discrete type of
+$H$-step policies), and \texttt{statesEnv M H s₁ := stationaryEnv (statesKernel M H s₁) : Environment Unit (Policy S A H) (Traj S H)}.
 The observation type is \texttt{Unit}. The rewards are not part of the feedback: an
 algorithm for this environment is a learner who knows $r$; this is the reason why the PAC
 property below is stated for the class $\mathcal M_r$.

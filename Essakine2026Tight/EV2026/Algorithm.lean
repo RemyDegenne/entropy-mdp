@@ -15,10 +15,10 @@ public import Essakine2026Tight.Mathlib.MeasureTheory.MeasurableSpace.Sigma
 /-!
 # The Entropic-BPI algorithm (Essakine, Vernade 2026, Algorithm 1)
 
-This file defines the **Entropic-BPI** algorithm `entropicBPI r β δ ε s₁ : BPIAlg S A H` for the
-known reward function `r`, the risk parameter `β`, the confidence `δ`, the accuracy `ε` and the
-initial state `s₁`, and the quantities of its analysis, as functions of the history
-`hist : Hist Unit (Policy S A H) (Traj S H) t` of the first `t` episodes.
+This file defines the **Entropic-BPI** algorithm `entropicBPI H r β δ ε s₁ : BPIAlg S A H` for
+the horizon `H`, the known reward function `r`, the risk parameter `β`, the confidence `δ`, the
+accuracy `ε` and the initial state `s₁`, and the quantities of its analysis, as functions of the
+history `hist : Hist Unit (Policy S A H) (Traj S H) t` of the first `t` episodes.
 
 Steps are `0`-indexed (`h : Fin H`, the paper's `h + 1`), and the backward recursions are indexed
 by the number `j` of steps from the current step to the end: `optZ r β δ hist j` is the pair
@@ -143,7 +143,7 @@ noncomputable def empTrans {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H)
 /-- One backward step of the optimistic planning: the values `(Z̃, Z̲)` at the step with `k`
 steps after it, from the values `prev` at the next step (`stepU` for every pair, then the max
 (`β > 0`) or the min (`β < 0`) over the actions); the identity if `k ≥ H`. -/
-noncomputable def optZStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def optZStep (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) (prev : (S → ℝ) × (S → ℝ)) :
     (S → ℝ) × (S → ℝ) :=
   if hk : k < H then
@@ -156,24 +156,24 @@ noncomputable def optZStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : �
 
 /-- The optimistic and pessimistic exponential values `(Z̃, Z̲)` at the step `H - j` computed
 from the history `hist` (backward recursion; `j = 0` is the terminal step, with values `1`). -/
-noncomputable def optZ (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def optZ (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (j : ℕ) : (S → ℝ) × (S → ℝ) :=
   Nat.rec (motive := fun _ ↦ (S → ℝ) × (S → ℝ)) (fun _ ↦ 1, fun _ ↦ 1) (optZStep r β δ hist) j
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
-lemma optZ_zero (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+lemma optZ_zero (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : optZ r β δ hist 0 = (fun _ ↦ 1, fun _ ↦ 1) :=
   rfl
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
-lemma optZ_succ (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+lemma optZ_succ (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) :
     optZ r β δ hist (k + 1) = optZStep r β δ hist k (optZ r β δ hist k) := rfl
 
 /-- The backups `(Ũ, U̲)(s, a)` at the step `h` computed from the history `hist`. -/
-noncomputable def stepUAt (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def stepUAt (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (h : Fin H) (s : S) (a : A) : ℝ × ℝ :=
   let prev := optZ r β δ hist (H - 1 - h)
   stepU (Fintype.card S) (Fintype.card A) H β δ (H - 1 - h) (visitCount hist h s a) (r h s a)
@@ -181,14 +181,14 @@ noncomputable def stepUAt (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ
 
 /-- The greedy policy `π^{t+1}` computed from the history `hist`: `argmax_a Ũ(s, a)` if `β > 0`,
 `argmin_a U̲(s, a)` if `β < 0`. -/
-noncomputable def greedy (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def greedy (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : Policy S A H :=
   fun h s ↦ if 0 < β then argmax fun a ↦ (stepUAt r β δ hist h s a).1
     else argmin fun a ↦ (stepUAt r β δ hist h s a).2
 
 /-- One backward step of the certificate: `π^{t+1} G` at the step with `k` steps after it, from
 the certificate `prev` at the next step; the identity if `k ≥ H`. -/
-noncomputable def certStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def certStep (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) (prev : S → ℝ) : S → ℝ :=
   fun s ↦
     if hk : k < H then
@@ -206,46 +206,47 @@ noncomputable def certStep (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : �
 /-- The certificate `π^{t+1} G` at the step `H - j` computed from the history `hist` (backward
 recursion; `j = 0` is the terminal step, with value `0`), clipped at `e^{β (k + 1)}` (`β > 0`)
 or `1` (`β < 0`) where `k` is the number of steps after the current step. -/
-noncomputable def cert (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def cert (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (j : ℕ) : S → ℝ :=
   Nat.rec (motive := fun _ ↦ S → ℝ) (fun _ ↦ 0) (certStep r β δ hist) j
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
-lemma cert_zero (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+lemma cert_zero (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : cert r β δ hist 0 = fun _ ↦ 0 := rfl
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
-lemma cert_succ (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+lemma cert_succ (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) :
     cert r β δ hist (k + 1) = certStep r β δ hist k (cert r β δ hist k) := rfl
 
 /-- The stopping rule of Entropic-BPI: `π^{t+1} G_1(s₁) ≤ (e^{βε} - 1) e^{-βε} Z̃_1(s₁)` if
 `β > 0`, `π^{t+1} G_1(s₁) ≤ (1 - e^{βε}) Z̲_1(s₁)` if `β < 0`. -/
-noncomputable def stopCond (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) {t : ℕ}
+noncomputable def stopCond (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : Prop :=
   if 0 < β then
     cert r β δ hist H s₁ ≤ (Real.exp (β * ε) - 1) / Real.exp (β * ε) * (optZ r β δ hist H).1 s₁
   else cert r β δ hist H s₁ ≤ (1 - Real.exp (β * ε)) * (optZ r β δ hist H).2 s₁
 
-lemma measurable_greedy_fst (r : Fin H → S → A → ℝ) (β δ : ℝ) (n : ℕ) :
+lemma measurable_greedy_fst (r : ℕ → S → A → ℝ) (β δ : ℝ) (n : ℕ) :
     Measurable fun p : Hist Unit (Policy S A H) (Traj S H) n × Unit ↦ greedy r β δ p.1 :=
   measurable_of_countable _
 
-lemma measurable_greedy_snd (r : Fin H → S → A → ℝ) (β δ : ℝ) :
+lemma measurable_greedy_snd (r : ℕ → S → A → ℝ) (β δ : ℝ) :
     Measurable fun h : Σ n : ℕ, Hist Unit (Policy S A H) (Traj S H) n ↦ greedy r β δ h.2 :=
   measurable_of_countable _
 
-lemma measurableSet_stopCond (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) :
+lemma measurableSet_stopCond (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) :
     MeasurableSet {h : Σ n : ℕ, Hist Unit (Policy S A H) (Traj S H) n | stopCond r β δ ε s₁ h.2} :=
   (Set.to_countable _).measurableSet
 
-/-- **Algorithm 1** (Entropic-BPI) with known rewards `r`, risk parameter `β`, confidence `δ`,
-accuracy `ε` and initial state `s₁`: at each episode, play the greedy policy of the optimistic
-backups computed from the past episodes; stop when the certificate of the greedy policy is small
-enough, and output the greedy policy. -/
-noncomputable def entropicBPI (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) : BPIAlg S A H where
+variable (H) in
+/-- **Algorithm 1** (Entropic-BPI) with horizon `H`, known rewards `r`, risk parameter `β`,
+confidence `δ`, accuracy `ε` and initial state `s₁`: at each episode, play the greedy policy of
+the optimistic backups computed from the past episodes; stop when the certificate of the greedy
+policy is small enough, and output the greedy policy. -/
+noncomputable def entropicBPI (r : ℕ → S → A → ℝ) (β δ ε : ℝ) (s₁ : S) : BPIAlg S A H where
   alg := detAlgorithm (fun _ p ↦ greedy r β δ p.1) (measurable_greedy_fst r β δ)
   stopSet := {h | stopCond r β δ ε s₁ h.2}
   measurableSet_stopSet := measurableSet_stopCond r β δ ε s₁
@@ -254,7 +255,7 @@ noncomputable def entropicBPI (r : Fin H → S → A → ℝ) (β δ ε : ℝ) (
 /-! ### Auxiliary quantities of the analysis -/
 
 /-- One backward step of the auxiliary value `Z̊` of the analysis, for the MDP `M`. -/
-noncomputable def ringZStep (M : EpisodicMDP S A H) (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def ringZStep (M : EpisodicMDP S A) (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (k : ℕ) (prev : S → ℝ) : S → ℝ :=
   fun s ↦
     if hk : k < H then
@@ -267,12 +268,12 @@ noncomputable def ringZStep (M : EpisodicMDP S A H) (r : Fin H → S → A → �
 
 /-- The auxiliary value `Z̊` of the analysis at the step `H - j`, for the MDP `M` with reward
 function `r` and the history `hist`. -/
-noncomputable def ringZ (M : EpisodicMDP S A H) (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def ringZ (M : EpisodicMDP S A) (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (j : ℕ) : S → ℝ :=
   Nat.rec (motive := fun _ ↦ S → ℝ) (fun _ ↦ 1) (ringZStep M r β δ hist) j
 
 /-- The auxiliary backup `Ů(s, a)` of the analysis at the step `h`. -/
-noncomputable def ringU (M : EpisodicMDP S A H) (r : Fin H → S → A → ℝ) (β δ : ℝ) {t : ℕ}
+noncomputable def ringU (M : EpisodicMDP S A) (r : ℕ → S → A → ℝ) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) (h : Fin H) (s : S) (a : A) : ℝ :=
   let prev := optZ r β δ hist (H - 1 - h)
   ringUAux (Fintype.card S) (Fintype.card A) H β δ (H - 1 - h) (visitCount hist h s a) (r h s a)

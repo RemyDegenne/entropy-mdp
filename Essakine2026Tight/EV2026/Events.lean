@@ -7,6 +7,7 @@ module
 
 public import Essakine2026Tight.EV2026.RateBounds
 public import Essakine2026Tight.EV2026.VisitCounts
+public import Essakine2026Tight.LeanMachineLearning.ReinforcementLearning.MDP.Values
 public import Essakine2026Tight.LeanMachineLearning.ReinforcementLearning.MDP.VisitConcentration
 public import Essakine2026Tight.Mathlib.InformationTheory.KLTimeUniform
 public import Essakine2026Tight.Mathlib.Probability.Moments.SelfNormalizedBernsteinIID
@@ -54,40 +55,42 @@ variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [
   [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A] [MeasurableSingletonClass A]
   {H : ℕ} {Ω : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω}
   {alg : Algorithm Unit (Policy S A H) (Traj S H)} {X : ℕ → Ω → Policy S A H}
-  {Y : ℕ → Ω → Traj S H} {M : EpisodicMDP S A H} {s₁ : S} {δ : ℝ}
+  {Y : ℕ → Ω → Traj S H} {M : EpisodicMDP S A} {s₁ : S} {δ : ℝ}
 
 /-! ### Pseudo-counts -/
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [MeasurableSingletonClass S]
+  [MeasurableSingletonClass A] in
 /-- **Increments of the pseudo-counts**: `n̄_h^{t+1}(s, a) = n̄_h^t(s, a) + p^{π_t}_h(s, a)`, where
 `π_t = X t` is the policy of the episode `t`. -/
-lemma pseudoCount_succ (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A H) (s₁ : S) (h : Fin H)
+lemma pseudoCount_succ (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A) (s₁ : S) (h : Fin H)
     (s : S) (a : A) (t : ℕ) (ω : Ω) :
     pseudoCount X M s₁ h s a (t + 1) ω
-      = pseudoCount X M s₁ h s a t ω + occupancy M (X t ω) s₁ h s a := by
+      = pseudoCount X M s₁ h s a t ω + occupancy M (X t ω).extend s₁ h s a := by
   simp [pseudoCount, sum_range_succ]
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [MeasurableSingletonClass S]
+  [MeasurableSingletonClass A] in
 /-- The pseudo-counts vanish before the first episode. -/
 @[simp]
-lemma pseudoCount_zero (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A H) (s₁ : S) (h : Fin H)
+lemma pseudoCount_zero (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A) (s₁ : S) (h : Fin H)
     (s : S) (a : A) (ω : Ω) : pseudoCount X M s₁ h s a 0 ω = 0 := by
   simp [pseudoCount]
 
 omit [DecidableEq S] [DecidableEq A] in
 /-- The pseudo-counts of all pairs sum to the number of episodes: `∑_{s, a} n̄_h^t(s, a) = t`. -/
-lemma sum_pseudoCount (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A H) (s₁ : S) (h : Fin H)
+lemma sum_pseudoCount (X : ℕ → Ω → Policy S A H) (M : EpisodicMDP S A) (s₁ : S) (h : Fin H)
     (t : ℕ) (ω : Ω) : ∑ s, ∑ a, pseudoCount X M s₁ h s a t ω = t := by
   simp only [pseudoCount]
   simp_rw [sum_comm (s := (univ : Finset A)) (t := range t)]
   rw [sum_comm]
-  simp [sum_occupancy]
+  simp [sum_occupancy M (X _ ω).measurable_extend]
 
-omit [DecidableEq S] in
+omit [Fintype S] [Fintype A] [DecidableEq S] in
 /-- **The paper's pseudo-counts are the expectations of the random pseudo-counts**:
 `E[n_h^t(s, a)] = E[n̄_h^t(s, a)]` in every run of an algorithm in the episode environment. -/
-lemma integral_visitCountAt_eq_integral_pseudoCount [IsProbabilityMeasure P]
-    [DecidableEq S] (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (h : Fin H)
+lemma integral_visitCountAt_eq_integral_pseudoCount [Finite S] [Finite A] [IsProbabilityMeasure P]
+    [DecidableEq S] (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (h : Fin H)
     (s : S) (a : A) (t : ℕ) :
     ∫ ω, (visitCountAt X Y h s a t ω : ℝ) ∂P = ∫ ω, pseudoCount X M s₁ h s a t ω ∂P := by
   have hvis (i : ℕ) : Integrable
@@ -97,12 +100,12 @@ lemma integral_visitCountAt_eq_integral_pseudoCount [IsProbabilityMeasure P]
       ((hseq.measurable_action i).prodMk (hseq.measurable_feedback i))).aestronglyMeasurable 1
       (.of_forall fun ω ↦ ?_)
     split_ifs <;> simp
-  have hocc (i : ℕ) : Integrable (fun ω ↦ occupancy M (X i ω) s₁ h s a) P := by
+  have hocc (i : ℕ) : Integrable (fun ω ↦ occupancy M (X i ω).extend s₁ h s a) P := by
     refine Integrable.of_bound ((measurable_of_countable (fun π : Policy S A H ↦
-      occupancy M π s₁ h s a)).comp (hseq.measurable_action i)).aestronglyMeasurable 1
+      occupancy M π.extend s₁ h s a)).comp (hseq.measurable_action i)).aestronglyMeasurable 1
       (.of_forall fun ω ↦ ?_)
     rw [Real.norm_eq_abs, abs_of_nonneg (occupancy_nonneg M _ s₁ h s a)]
-    exact occupancy_le_one M _ s₁ h s a
+    exact occupancy_le_one M (X i ω).measurable_extend s₁ h s a
   simp_rw [visitCountAt_eq_pullCount, pullCount_eq_sum, Nat.cast_sum, Nat.cast_ite, Nat.cast_one,
     Nat.cast_zero]
   simp only [pseudoCount]
@@ -166,7 +169,7 @@ lemma log_one_div_div_eq_alphaCnt :
 
 /-- The counts event fails for the triple `(h, s, a)` with probability at most `δ / (3 S A H)`. -/
 lemma measure_exists_visitCountAt_lt_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) (h : Fin H)
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) (h : Fin H)
     (s : S) (a : A) :
     P {ω | ∃ t, (visitCountAt X Y h s a t ω : ℝ) < pseudoCount X M s₁ h s a t ω / 2
         - alphaCnt (Fintype.card S) (Fintype.card A) H δ}
@@ -182,7 +185,7 @@ lemma measure_exists_visitCountAt_lt_le [IsProbabilityMeasure P]
 /-- **Probability of the counts event**: in every run of an algorithm in the episode environment,
 for `δ > 0`, `P(𝓔^cnt fails) ≤ δ / 3`. -/
 lemma measure_compl_eventCnt_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) :
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) :
     P (eventCnt X Y M s₁ δ)ᶜ ≤ ENNReal.ofReal (δ / 3) := by
   refine le_trans (measure_mono fun ω hω ↦ ?_)
     (measure_iUnion_le_ofReal_div_three hδ.le (measure_exists_visitCountAt_lt_le hseq hδ))
@@ -272,7 +275,7 @@ this is the time-uniform Bernstein inequality for an i.i.d. sequence of law `p_h
 indexed by the number of visits and transferred to the run by the time-uniform domination of the
 observed next states. -/
 lemma measure_exists_lt_abs_vecExp_empTransAt_sub_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
     (h : Fin H) (s : S) (a : A) {g : S → ℝ} {c : ℝ} (hgc : ∀ x y, g x - g y ≤ c) :
     P {ω | ∃ t, 0 < visitCountAt X Y h s a t ω ∧
         √(2 * vecVar (M.transVec h s a) g * starRateAt X Y δ h s a t ω)
@@ -351,8 +354,8 @@ lemma measure_exists_lt_abs_vecExp_empTransAt_sub_le [IsProbabilityMeasure P]
 in the episode environment, for `δ ∈ (0, 1]` and `b h ≥ max f_{h+1} - min f_{h+1}`,
 `P(𝓔_f fails) ≤ δ / 3`. -/
 lemma measure_compl_eventBern_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
-    {f : Fin (H + 1) → S → ℝ} {b : Fin H → ℝ} (hb : ∀ h x y, f h.succ x - f h.succ y ≤ b h) :
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) (hδ1 : δ ≤ 1)
+    {f : ℕ → S → ℝ} {b : ℕ → ℝ} (hb : ∀ (h : Fin H) x y, f (h + 1) x - f (h + 1) y ≤ b h) :
     P (eventBern X Y M δ f b)ᶜ ≤ ENNReal.ofReal (δ / 3) := by
   refine le_trans (measure_mono fun ω hω ↦ ?_) (measure_iUnion_le_ofReal_div_three hδ.le
     fun h s a ↦ measure_exists_lt_abs_vecExp_empTransAt_sub_le hseq hδ hδ1 h s a (hb h))
@@ -367,7 +370,7 @@ the time-uniform KL concentration of the empirical distribution of an i.i.d. seq
 `p_h(· | s, a)`, indexed by the number of visits and transferred to the run by the time-uniform
 domination of the observed next states. -/
 lemma measure_exists_klThreshold_lt_klDiv_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) (h : Fin H)
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) (h : Fin H)
     (s : S) (a : A) :
     P {ω | ∃ t, klThreshold (Fintype.card S) (Fintype.card A) H δ (visitCountAt X Y h s a t ω)
         < klDiv (weightedMeasure (empTransAt X Y h s a t ω)) (M.trans h (s, a))}
@@ -410,7 +413,7 @@ lemma measure_exists_klThreshold_lt_klDiv_le [IsProbabilityMeasure P]
 /-- **Probability of the KL event**: in every run of an algorithm in the episode environment, for
 `δ > 0`, `P(𝓔_KL fails) ≤ δ / 3`. -/
 lemma measure_compl_eventKL_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) (hδ : 0 < δ) :
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) (hδ : 0 < δ) :
     P (eventKL X Y M δ)ᶜ ≤ ENNReal.ofReal (δ / 3) := by
   refine le_trans (measure_mono fun ω hω ↦ ?_) (measure_iUnion_le_ofReal_div_three hδ.le
     fun h s a ↦ measure_exists_klThreshold_lt_klDiv_le hseq hδ h s a)
@@ -420,21 +423,21 @@ lemma measure_compl_eventKL_le [IsProbabilityMeasure P]
 
 /-! ### The good event -/
 
-omit [DecidableEq S] [DecidableEq A] in
+omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] in
 /-- **Ranges of the optimal exponential values** (as needed by the Bernstein event of the good
 event): for rewards in `[0, 1]` and every `β`, the oscillation of `Z*_{h+1}` is at most
 `e^{β (H - 1 - h)}` if `β > 0` and `1 - e^{β (H - 1 - h)}` otherwise. -/
-lemma optExpValue_succ_sub_le (hM : M.RewardsIn (Set.Icc 0 1)) (β : ℝ) (h : Fin H) (x y : S) :
-    optExpValue M β h.succ x - optExpValue M β h.succ y
+lemma optExpValue_succ_sub_le [Finite S] [Finite A] (hM : M.RewardsIn (Set.Icc 0 1)) (β : ℝ)
+    (h : Fin H) (x y : S) :
+    optExpValue M H β (h + 1) x - optExpValue M H β (h + 1) y
       ≤ if 0 < β then Real.exp (β * (H - 1 - h : ℕ)) else 1 - Real.exp (β * (H - 1 - h : ℕ)) := by
   rcases eq_or_ne β 0 with rfl | hβ
   · simp [optExpValue]
-  have hk : ((H - (h.succ : ℕ) : ℕ) : ℝ) = ((H - 1 - h : ℕ) : ℝ) := by
+  have hk : ((H - (h + 1 : ℕ) : ℕ) : ℝ) = ((H - 1 - h : ℕ) : ℝ) := by
     congr 1
-    simp only [Fin.val_succ]
     omega
-  have hx := optExpValue_mem_Icc M β hM hβ h.succ x
-  have hy := optExpValue_mem_Icc M β hM hβ h.succ y
+  have hx := optExpValue_mem_Icc M H β hM hβ (h + 1) x
+  have hy := optExpValue_mem_Icc M H β hM hβ (h + 1) y
   rw [hk] at hx hy
   set e := Real.exp (β * (H - 1 - h : ℕ)) with he
   rcases hβ.lt_or_gt with hneg | hpos
@@ -452,7 +455,7 @@ lemma optExpValue_succ_sub_le (hM : M.RewardsIn (Set.Icc 0 1)) (β : ℝ) (h : F
 MDP with a reward function with values in `[0, 1]`, for every `β` and `δ ∈ (0, 1]`, the good event
 fails with probability at most `δ`. -/
 lemma measure_compl_goodEvent_le [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) {r : Fin H → S → A → ℝ}
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) {r : ℕ → S → A → ℝ}
     (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (β : ℝ) (hδ : 0 < δ)
     (hδ1 : δ ≤ 1) :
     P (goodEvent X Y M s₁ β δ)ᶜ ≤ ENNReal.ofReal δ := by
@@ -460,11 +463,13 @@ lemma measure_compl_goodEvent_le [IsProbabilityMeasure P]
     rw [hM h s a]
     exact (ae_dirac_iff measurableSet_Icc).2 (hr h s a)
   have hKL := measure_compl_eventKL_le hseq hδ
-  have hBern := measure_compl_eventBern_le hseq hδ hδ1 (optExpValue_succ_sub_le hRew β)
+  have hBern := measure_compl_eventBern_le hseq hδ hδ1 (f := optExpValue M H β)
+    (b := fun h ↦ if 0 < β then Real.exp (β * (H - 1 - h : ℕ))
+      else 1 - Real.exp (β * (H - 1 - h : ℕ))) (optExpValue_succ_sub_le hRew β)
   have hCnt := measure_compl_eventCnt_le hseq hδ
   rw [goodEvent, Set.compl_inter, Set.compl_inter]
-  calc P ((eventKL X Y M δ)ᶜ ∪ (eventBern X Y M δ (optExpValue M β) _)ᶜ ∪ (eventCnt X Y M s₁ δ)ᶜ)
-      ≤ P (eventKL X Y M δ)ᶜ + P (eventBern X Y M δ (optExpValue M β) _)ᶜ
+  calc P ((eventKL X Y M δ)ᶜ ∪ (eventBern X Y M δ (optExpValue M H β) _)ᶜ ∪ (eventCnt X Y M s₁ δ)ᶜ)
+      ≤ P (eventKL X Y M δ)ᶜ + P (eventBern X Y M δ (optExpValue M H β) _)ᶜ
         + P (eventCnt X Y M s₁ δ)ᶜ :=
         (measure_union_le _ _).trans (add_le_add_left (measure_union_le _ _) _)
     _ ≤ ENNReal.ofReal (δ / 3) + ENNReal.ofReal (δ / 3) + ENNReal.ofReal (δ / 3) := by
@@ -479,7 +484,7 @@ lemma measure_compl_goodEvent_le [IsProbabilityMeasure P]
 of an MDP with a reward function with values in `[0, 1]`, for every `β` and `δ ∈ (0, 1]`, the good
 event has probability at least `1 - δ`. -/
 lemma one_sub_le_measureReal_goodEvent [IsProbabilityMeasure P]
-    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M s₁) P) {r : Fin H → S → A → ℝ}
+    (hseq : IsAlgEnvSeq (fun _ _ ↦ ()) X Y alg (statesEnv M H s₁) P) {r : ℕ → S → A → ℝ}
     (hM : M.HasRewardFn r) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) (β : ℝ) (hδ : 0 < δ)
     (hδ1 : δ ≤ 1) :
     1 - δ ≤ P.real (goodEvent X Y M s₁ β δ) := by

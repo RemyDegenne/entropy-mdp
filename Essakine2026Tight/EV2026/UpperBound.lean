@@ -39,12 +39,12 @@ variable {S A : Type*} [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [
 `r` with values in `[0, 1]`, `β ≠ 0`, `δ ∈ (0, 1)` and `ε ∈ (0, 2 / (|β| H S)]`, Entropic-BPI
 with parameters `r, β, δ, ε` and initial state `s₁` is `(ε, δ)`-PAC for entropic best-policy
 identification on the class of MDPs with reward function `r`. -/
-theorem isEntropicPAC_entropicBPI (r : Fin H → S → A → ℝ) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
+theorem isEntropicPAC_entropicBPI (r : ℕ → S → A → ℝ) (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1)
     {β δ ε : ℝ} (hβ : β ≠ 0) (hδ : δ ∈ Set.Ioo 0 1)
     (hε : ε ∈ Set.Ioc 0 (2 / (|β| * H * Fintype.card S))) (s₁ : S) :
-    IsEntropicPAC (entropicBPI r β δ ε s₁) r β ε δ s₁ := by
+    IsEntropicPAC (entropicBPI H r β δ ε s₁) r β ε δ s₁ := by
   intro M
-  have hrun := (entropicBPI r β δ ε s₁).isRun_runMeasure (statesEnv M.1 s₁)
+  have hrun := (entropicBPI H r β δ ε s₁).isRun_runMeasure (statesEnv M.1 H s₁)
   rw [← hrun.hasLaw_output.measureReal_eq (Set.to_countable _).measurableSet]
   rcases hβ.lt_or_gt with hneg | hpos
   · exact measureReal_bad_le_of_neg M.2 hr hneg hδ.1 hδ.2.le hε.1 hrun
@@ -55,17 +55,17 @@ function `r` with values in `[0, 1]`, `β ≠ 0`, `δ ∈ (0, 1)`, `ε ∈ (0, 2
 MDP `M` with reward function `r`, in every run of Entropic-BPI on `M` from `s₁`, with
 probability at least `1 - δ` its number of episodes `τ` is at most
 `upperBound S A H β ε δ G_max(M)`. -/
-theorem probReal_stoppingTime_entropicBPI_le_ge (r : Fin H → S → A → ℝ)
+theorem probReal_stoppingTime_entropicBPI_le_ge (r : ℕ → S → A → ℝ)
     (hr : ∀ h s a, r h s a ∈ Set.Icc 0 1) {β δ ε : ℝ} (hβ : β ≠ 0) (hδ : δ ∈ Set.Ioo 0 1)
     (hε : ε ∈ Set.Ioc 0 (2 / (|β| * H * Fintype.card S))) (s₁ : S)
-    (M : EpisodicMDP S A H) (hM : M.HasRewardFn r)
+    (M : EpisodicMDP S A) (hM : M.HasRewardFn r)
     {Ω : Type*} {_mΩ : MeasurableSpace Ω} (P : Measure Ω) [IsProbabilityMeasure P]
     (X : ℕ → Ω → Policy S A H) (Y : ℕ → Ω → Traj S H) (out : Ω → Policy S A H)
-    (h : (entropicBPI r β δ ε s₁).IsRun (statesEnv M s₁) (fun _ _ ↦ ()) X Y out P) :
+    (h : (entropicBPI H r β δ ε s₁).IsRun (statesEnv M H s₁) (fun _ _ ↦ ()) X Y out P) :
     1 - δ ≤ P.real {ω |
-      ((entropicBPI r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤
+      ((entropicBPI H r β δ ε s₁).stoppingTime (fun _ _ ↦ ()) X Y ω : ℝ≥0∞) ≤
         ENNReal.ofReal
-          (upperBound (Fintype.card S) (Fintype.card A) H β ε δ (maxReturn M s₁))} := by
+          (upperBound (Fintype.card S) (Fintype.card A) H β ε δ (maxReturn M H s₁))} := by
   rcases hβ.lt_or_gt with hneg | hpos
   · exact one_sub_le_measureReal_stoppingTime_le_of_neg hM hr hneg hδ.1 hδ.2.le hε.1 h
   · exact one_sub_le_measureReal_stoppingTime_le_of_pos hM hr hpos hδ.1 hδ.2.le hε.1 h

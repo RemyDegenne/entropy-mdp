@@ -474,16 +474,16 @@ noncomputable def bernRange (H : ℕ) (β : ℝ) (h : Fin H) : ℝ :=
 /-- The concentration inequalities of the good event at the history `hist`: the KL inequality
 for every step and pair, and the Bernstein inequality for the optimal exponential values at every
 visited pair. -/
-structure HistConcentration (M : EpisodicMDP S A H) (β δ : ℝ) {t : ℕ}
+structure HistConcentration (M : EpisodicMDP S A) (β δ : ℝ) {t : ℕ}
     (hist : Hist Unit (Policy S A H) (Traj S H) t) : Prop where
   /-- The KL inequality `KL(p̂_h(s, a) ‖ p_h(s, a)) ≤ α(n) / n`. -/
   kl : ∀ h s a, klDiv (weightedMeasure (empTrans hist h s a)) (M.trans h (s, a)) ≤
     klThreshold (Fintype.card S) (Fintype.card A) H δ (visitCount hist h s a)
   /-- The Bernstein inequality for `Z*_{h+1}` at the visited pairs. -/
   bern : ∀ h s a, 0 < visitCount hist h s a →
-    |vecExp (empTrans hist h s a) (optExpValue M β h.succ)
-        - vecExp (M.transVec h s a) (optExpValue M β h.succ)| ≤
-      √(2 * vecVar (M.transVec h s a) (optExpValue M β h.succ)
+    |vecExp (empTrans hist h s a) (optExpValue M H β (h + 1))
+        - vecExp (M.transVec h s a) (optExpValue M H β (h + 1))| ≤
+      √(2 * vecVar (M.transVec h s a) (optExpValue M H β (h + 1))
           * (alphaStar (Fintype.card S) (Fintype.card A) H δ (visitCount hist h s a)
             / visitCount hist h s a))
       + 3 * bernRange H β h
@@ -492,14 +492,16 @@ structure HistConcentration (M : EpisodicMDP S A H) (β δ : ℝ) {t : ℕ}
 
 variable {Ω : Type*} {mΩ : MeasurableSpace Ω} {X : ℕ → Ω → Policy S A H} {Y : ℕ → Ω → Traj S H}
 
+omit [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- On the good event, the history of the first `t` episodes satisfies the concentration
 inequalities. -/
-lemma histConcentration_histAt {M : EpisodicMDP S A H} {s₁ : S} {β δ : ℝ} {ω : Ω}
+lemma histConcentration_histAt {M : EpisodicMDP S A} {s₁ : S} {β δ : ℝ} {ω : Ω}
     (hω : ω ∈ goodEvent X Y M s₁ β δ) (t : ℕ) : HistConcentration M β δ (histAt X Y t ω) :=
   ⟨hω.1.1 t, hω.1.2 t⟩
 
+omit [Nonempty A] [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The KL inequality at a visited pair, with the finite threshold `α(n) / n`. -/
-lemma HistConcentration.klDiv_le_ofReal {M : EpisodicMDP S A H} {β δ : ℝ} {t : ℕ}
+lemma HistConcentration.klDiv_le_ofReal {M : EpisodicMDP S A} {β δ : ℝ} {t : ℕ}
     {hist : Hist Unit (Policy S A H) (Traj S H) t} (hc : HistConcentration M β δ hist) (h : Fin H)
     (s : S) (a : A) (hn : 0 < visitCount hist h s a) :
     klDiv (weightedMeasure (empTrans hist h s a)) (M.trans h (s, a)) ≤
@@ -511,7 +513,7 @@ lemma HistConcentration.klDiv_le_ofReal {M : EpisodicMDP S A H} {β δ : ℝ} {t
 omit [Fintype S] [Fintype A] [DecidableEq S] [DecidableEq A] [Nonempty A]
   [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The point masses of the transition kernel are the transition vector. -/
-lemma measureReal_trans_singleton (M : EpisodicMDP S A H) (h : Fin H) (s : S) (a : A) (s' : S) :
+lemma measureReal_trans_singleton (M : EpisodicMDP S A) (h : Fin H) (s : S) (a : A) (s' : S) :
     (M.trans h (s, a)).real {s'} = M.transVec h s a s' := rfl
 
 /-- `α*(n) / n ≤ α(n) / n` for a nonempty state space. -/
@@ -546,7 +548,7 @@ lemma cast_sub_castSucc_eq (h : Fin H) :
 
 /-! ### Recursion equations at a step -/
 
-variable {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H) t) (r : Fin H → S → A → ℝ) (β δ : ℝ)
+variable {t : ℕ} (hist : Hist Unit (Policy S A H) (Traj S H) t) (r : ℕ → S → A → ℝ) (β δ : ℝ)
 
 omit [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
@@ -568,7 +570,7 @@ lemma cert_sub_eq (h : Fin H) (s : S) :
 
 omit [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The ring value at the step `h`. -/
-lemma ringZ_sub_eq (M : EpisodicMDP S A H) (h : Fin H) (s : S) :
+lemma ringZ_sub_eq (M : EpisodicMDP S A) (h : Fin H) (s : S) :
     ringZ M r β δ hist (H - h) s = ringU M r β δ hist h s (greedy r β δ hist h s) := by
   rw [sub_val_eq h]
   change ringZStep M r β δ hist (H - 1 - h) (ringZ M r β δ hist (H - 1 - h)) s = _
@@ -577,7 +579,7 @@ lemma ringZ_sub_eq (M : EpisodicMDP S A H) (h : Fin H) (s : S) :
 
 omit [MeasurableSingletonClass S] [MeasurableSingletonClass A] in
 /-- The terminal ring value is `1`. -/
-lemma ringZ_zero (M : EpisodicMDP S A H) : ringZ M r β δ hist 0 = fun _ ↦ 1 := rfl
+lemma ringZ_zero (M : EpisodicMDP S A) : ringZ M r β δ hist 0 = fun _ ↦ 1 := rfl
 
 end History
 
@@ -648,8 +650,8 @@ lemma mem_Icc_exp_one_of_neg {β u x : ℝ} (hβ : β < 0) (hu : 0 ≤ u)
   rwa [min_eq_right h1, max_eq_left h1] at hx
 
 /-- An MDP whose reward function has values in `[0, 1]` has rewards in `[0, 1]`. -/
-lemma rewardsIn_Icc_of_hasRewardFn {S A : Type*} [MeasurableSpace S] [MeasurableSpace A] {H : ℕ}
-    {M : EpisodicMDP S A H} {r : Fin H → S → A → ℝ} (hM : M.HasRewardFn r)
+lemma rewardsIn_Icc_of_hasRewardFn {S A : Type*} [MeasurableSpace S] [MeasurableSpace A]
+    {M : EpisodicMDP S A} {r : ℕ → S → A → ℝ} (hM : M.HasRewardFn r)
     (hr : ∀ h s a, r h s a ∈ Set.Icc (0 : ℝ) 1) : M.RewardsIn (Set.Icc 0 1) :=
   rewardsIn_of_hasRewardFn M hM measurableSet_Icc hr
 

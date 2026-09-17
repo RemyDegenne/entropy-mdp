@@ -115,11 +115,11 @@ lemma isProbabilityMeasure_hardTransFun (H : ℕ) (β ε : ℝ) (u : Option (ℕ
   · infer_instance
 
 /-- The transition kernels of the hard instance `u`. -/
-noncomputable def hardTrans (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) (h : Fin H) :
+noncomputable def hardTrans (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) (h : ℕ) :
     Kernel (S × A) S :=
   ⟨fun p ↦ hardTransFun H β ε u h p.1 p.2, measurable_of_countable _⟩
 
-instance (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) (h : Fin H) :
+instance (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) (h : ℕ) :
     IsMarkovKernel (hardTrans (S := S) (A := A) H β ε u h) :=
   ⟨fun p ↦ isProbabilityMeasure_hardTransFun H β ε u h p.1 p.2⟩
 
@@ -127,20 +127,21 @@ omit [Nonempty S] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSp
   [MeasurableSingletonClass A] in
 /-- The reward function of the hard instances: `1` in the good state from the step `H / 3 + d`
 on. -/
-noncomputable def hardReward (H : ℕ) (h : Fin H) (s : S) (_a : A) : ℝ :=
+noncomputable def hardReward (H : ℕ) (h : ℕ) (s : S) (_a : A) : ℝ :=
   if sIdx s = 1 ∧ H / 3 + treeDepth (Fintype.card S) (Fintype.card A) ≤ h then 1 else 0
 
 /-- The hard instance `𝓜_u` (`u = none` for `𝓜₀`). -/
-noncomputable def hardMDP (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) : EpisodicMDP S A H :=
+noncomputable def hardMDP (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) : EpisodicMDP S A :=
   EpisodicMDP.ofDet (hardTrans H β ε u) (hardReward H)
+    (EpisodicMDP.measurable_rewardFn (hardReward H))
 
 lemma hasRewardFn_hardMDP (H : ℕ) (β ε : ℝ) (u : Option (ℕ × ℕ × ℕ)) :
     (hardMDP (S := S) (A := A) H β ε u).HasRewardFn (hardReward H) :=
-  EpisodicMDP.hasRewardFn_ofDet _ _
+  EpisodicMDP.hasRewardFn_ofDet _ _ _
 
 omit [Nonempty S] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
-lemma hardReward_mem_Icc (H : ℕ) (h : Fin H) (s : S) (a : A) :
+lemma hardReward_mem_Icc (H : ℕ) (h : ℕ) (s : S) (a : A) :
     hardReward H h s a ∈ Set.Icc (0 : ℝ) 1 := by
   unfold hardReward; split_ifs <;> simp
 
@@ -347,22 +348,16 @@ section Law
 variable [Nonempty A] {β ε : ℝ} {u : Option (ℕ × ℕ × ℕ)}
 
 omit [Nonempty A] in
-lemma hardMDP_trans_apply (h : Fin H) (s : S) (a : A) :
+lemma hardMDP_trans_apply (h : ℕ) (s : S) (a : A) :
     (hardMDP H β ε u).trans h (s, a) = hardTransFun H β ε u h s a := rfl
 
 /-- In the good and bad states the sequence of states is constant. -/
 lemma stateSeqLaw_hardMDP_absorbing (π : Policy S A H) (hS : 6 ≤ Fintype.card S) {i : ℕ}
-    (hi : i = 1 ∨ i = 2) (h : Fin (H + 1)) :
-    stateSeqLaw (hardMDP H β ε u) π h (stateAt S i) = Measure.dirac fun _ ↦ stateAt S i := by
-  induction h using Fin.reverseInduction with
-  | last => exact stateSeqLaw_last _ _ _
-  | cast j ih =>
-    rw [stateSeqLaw_castSucc, hardMDP_trans_apply, hardTransFun_absorbing hS hi,
-      Measure.dirac_bind (Kernel.measurable _), Kernel.map_apply _ (measurable_seqCons _),
-      stateSeqKernel_apply, ih, Measure.map_dirac' (measurable_seqCons _)]
-    congr 1
-    funext k
-    simp [seqCons]
+    (hi : i = 1 ∨ i = 2) (h : ℕ) :
+    stateSeqLaw (hardMDP H β ε u) π.extend h (stateAt S i)
+      = Measure.dirac fun _ ↦ stateAt S i :=
+  stateSeqLaw_eq_dirac_of_absorbing _ π.measurable_extend h _ fun k _ ↦ by
+    rw [hardMDP_trans_apply, hardTransFun_absorbing hS hi]
 
 omit [Nonempty A] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
@@ -384,16 +379,12 @@ noncomputable def succProb (β ε : ℝ) (H : ℕ) (u : Option (ℕ × ℕ × �
 /-- The law of the sequence of states from the leaf reached by `π`. -/
 lemma stateSeqLaw_hardMDP_arrival (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     (hA : 2 ≤ Fintype.card A) (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H) :
-    stateSeqLaw (hardMDP H β ε u) π ⟨arrival π, by have := arrival_lt_H π hS hA hH; omega⟩
-        (stateAt S (pathIdx π (arrival π)))
+    stateSeqLaw (hardMDP H β ε u) π.extend (arrival π) (stateAt S (pathIdx π (arrival π)))
       = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map
           fun s' k ↦ pathSeq π s' (arrival π + k) := by
   have harr := arrival_lt_H π hS hA hH
-  have hcs : (⟨arrival π, by omega⟩ : Fin (H + 1)) = (⟨arrival π, harr⟩ : Fin H).castSucc := rfl
-  rw [hcs, stateSeqLaw_castSucc, hardMDP_trans_apply]
-  change (Kernel.map (stateSeqKernel (hardMDP H β ε u) π (⟨arrival π, harr⟩ : Fin H).succ)
-    (seqCons (stateAt S (pathIdx π (arrival π))))) ∘ₘ hardTransFun H β ε u (arrival π) _ _ = _
-  rw [hardTransFun_arrival π hS hA hH, ← Measure.deterministic_comp_eq_map
+  rw [stateSeqLaw_succ _ π.measurable_extend, hardMDP_trans_apply, Policy.extend_of_lt π harr,
+    hardTransFun_arrival π hS hA hH, ← Measure.deterministic_comp_eq_map
     (measurable_pathSeq_shift π (arrival π))]
   refine Measure.comp_congr ?_
   filter_upwards [ae_bernoulliMeasure (x := stateAt S 1) (y := stateAt S 2) (succProb β ε H u π)]
@@ -404,8 +395,7 @@ lemma stateSeqLaw_hardMDP_arrival (π : Policy S A H) (hS : 6 ≤ Fintype.card S
     · exact ⟨1, Or.inl rfl, hz⟩
     · exact ⟨2, Or.inr rfl, hz⟩
   obtain ⟨i, hi, rfl⟩ := hz'
-  rw [show (⟨arrival π, harr⟩ : Fin H).succ = (⟨arrival π + 1, by omega⟩ : Fin (H + 1)) from rfl,
-    stateSeqLaw_hardMDP_absorbing π hS hi, Measure.map_dirac' (measurable_seqCons _)]
+  rw [stateSeqLaw_hardMDP_absorbing π hS hi, Measure.map_dirac' (measurable_seqCons _)]
   congr 1
   funext k
   rcases k with _ | k
@@ -418,8 +408,7 @@ probability `succProb β ε H u π`. -/
 lemma stateSeqLaw_hardMDP_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     (hA : 2 ≤ Fintype.card A) (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H)
     (m : ℕ) (hm : m ≤ arrival π) :
-    stateSeqLaw (hardMDP H β ε u) π ⟨m, by have := arrival_lt_H π hS hA hH; omega⟩
-        (stateAt S (pathIdx π m))
+    stateSeqLaw (hardMDP H β ε u) π.extend m (stateAt S (pathIdx π m))
       = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map
           fun s' k ↦ pathSeq π s' (m + k) := by
   have harr := arrival_lt_H π hS hA hH
@@ -430,13 +419,11 @@ lemma stateSeqLaw_hardMDP_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     exact stateSeqLaw_hardMDP_arrival π hS hA hH
   | succ n ih =>
     have hmlt : m < arrival π := by omega
-    have hcs : (⟨m, by omega⟩ : Fin (H + 1)) = (⟨m, by omega⟩ : Fin H).castSucc := rfl
-    rw [hcs, stateSeqLaw_castSucc, hardMDP_trans_apply, hardTransFun_path π hS hA hH hmlt,
-      Measure.dirac_bind (Kernel.measurable _), Kernel.map_apply _ (measurable_seqCons _),
-      stateSeqKernel_apply]
-    have ih' := ih (m + 1) (by omega) (by omega)
-    rw [show (⟨m, by omega⟩ : Fin H).succ = (⟨m + 1, by omega⟩ : Fin (H + 1)) from rfl, ih',
-      Measure.map_map (measurable_seqCons _) (measurable_pathSeq_shift π (m + 1))]
+    have hmH : m < H := by omega
+    rw [stateSeqLaw_succ _ π.measurable_extend, hardMDP_trans_apply, Policy.extend_of_lt π hmH,
+      hardTransFun_path π hS hA hH hmlt, Measure.dirac_bind (Kernel.measurable _),
+      Kernel.map_apply _ (measurable_seqCons _), stateSeqKernel_apply, ih (m + 1) (by omega)
+      (by omega), Measure.map_map (measurable_seqCons _) (measurable_pathSeq_shift π (m + 1))]
     congr 1
     funext s' k
     rcases k with _ | k
@@ -449,12 +436,12 @@ lemma stateSeqLaw_hardMDP_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
 /-- The law of the states of an episode of `π` from the waiting state. -/
 lemma statesLaw_hardMDP (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (hA : 2 ≤ Fintype.card A)
     (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H) :
-    statesLaw (hardMDP H β ε u) (stateAt S 0) π
+    statesLaw (hardMDP H β ε u) H (stateAt S 0) π.extend
       = (bernoulliMeasure (stateAt S 1) (stateAt S 2) (succProb β ε H u π)).map
           fun s' (h : Fin (H + 1)) ↦ pathSeq π s' h := by
   have h0 := stateSeqLaw_hardMDP_path (u := u) (β := β) (ε := ε) π hS hA hH 0 (Nat.zero_le _)
   rw [statesLaw_eq_map_stateSeqLaw]
-  change (stateSeqLaw (hardMDP H β ε u) π ⟨0, _⟩ (stateAt S (pathIdx π 0))).map _ = _
+  change (stateSeqLaw (hardMDP H β ε u) π.extend 0 (stateAt S (pathIdx π 0))).map _ = _
   rw [h0, Measure.map_map (Measurable.of_eval fun _ ↦ measurable_pi_apply _)
     (measurable_pathSeq_shift π 0)]
   congr 1
@@ -466,8 +453,8 @@ hard instances is at most the binary divergence of their success probabilities. 
 lemma klDiv_statesLaw_hardMDP_le (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     (hA : 2 ≤ Fintype.card A) (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H)
     (u u' : Option (ℕ × ℕ × ℕ)) :
-    InformationTheory.klDiv (statesLaw (hardMDP H β ε u) (stateAt S 0) π)
-        (statesLaw (hardMDP H β ε u') (stateAt S 0) π)
+    InformationTheory.klDiv (statesLaw (hardMDP H β ε u) H (stateAt S 0) π.extend)
+        (statesLaw (hardMDP H β ε u') H (stateAt S 0) π.extend)
       ≤ InformationTheory.klBer (succProb β ε H u π) (succProb β ε H u' π) := by
   rw [statesLaw_hardMDP π hS hA hH, statesLaw_hardMDP π hS hA hH]
   refine (InformationTheory.klDiv_map_le _ _ (measurable_of_countable _)).trans_eq ?_
@@ -483,58 +470,52 @@ section Values
 variable [Nonempty A] {β ε : ℝ} {u : Option (ℕ × ℕ × ℕ)}
 
 omit [Nonempty A] in
-lemma integrable_exp_hardMDP (β' : ℝ) (h : Fin H) (s : S) (a : A) :
-    Integrable (fun x ↦ Real.exp (β' * x)) ((hardMDP H β ε u).reward h (s, a)) :=
-  integrable_exp_mul_of_rewardsIn _ β'
-    (rewardsIn_of_hasRewardFn _ (hasRewardFn_hardMDP H β ε u) measurableSet_Icc
-      (hardReward_mem_Icc H)) h s a
-
-omit [Nonempty A] in
-lemma vecExp_hardMDP_transVec (h : Fin H) (s : S) (a : A) (f : S → ℝ) :
-    vecExp ((hardMDP H β ε u).transVec h s a) f = ∫ s', f s' ∂hardTransFun H β ε u h s a :=
-  (integral_eq_vecExp_transVec _ h s a f).symm
+/-- The rewards of the hard instances lie in `[0, 1]`. -/
+lemma rewardsIn_hardMDP : (hardMDP (S := S) (A := A) H β ε u).RewardsIn (Set.Icc 0 1) :=
+  rewardsIn_of_hasRewardFn _ (hasRewardFn_hardMDP H β ε u) measurableSet_Icc
+    (hardReward_mem_Icc H)
 
 /-- The number of rewarded steps from the step `m` in the good state. -/
 def rewardCount (H rs m : ℕ) : ℕ := H - max m rs
 
 /-- The exponential value of the good state. -/
-lemma expValue_hardMDP_good (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (m : Fin (H + 1)) :
-    expValue (hardMDP H β ε u) β π m (stateAt S 1)
+lemma expValue_hardMDP_good (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (m : ℕ) :
+    expValue (hardMDP H β ε u) H β π.extend m (stateAt S 1)
       = Real.exp (β * rewardCount H (H / 3 + treeDepth (Fintype.card S) (Fintype.card A)) m) := by
-  induction m using Fin.reverseInduction with
-  | last => simp [expValue_last, rewardCount]
-  | cast i ih =>
-    rw [expValue_castSucc _ β (integrable_exp_hardMDP β), expQ_of_hasRewardFn _ β
-      (hasRewardFn_hardMDP H β ε u), vecExp_hardMDP_transVec,
-      hardTransFun_absorbing hS (Or.inl rfl), integral_dirac, ih, ← Real.exp_add]
+  induction m using horizon_induction H with
+  | h0 m hm =>
+    rw [expValue_of_le _ _ _ π.measurable_extend hm]
+    simp [rewardCount, Nat.sub_eq_zero_of_le (le_max_of_le_left hm)]
+  | hstep m hm ih =>
+    rw [expValue_succ _ _ _ rewardsIn_hardMDP π.measurable_extend hm, expQ_of_hasRewardFn _ _ _
+      (hasRewardFn_hardMDP H β ε u), hardMDP_trans_apply, hardTransFun_absorbing hS (Or.inl rfl),
+      integral_dirac, ih, ← Real.exp_add]
     congr 1
     simp only [hardReward, sIdx_stateAt (show 1 < Fintype.card S by omega), true_and,
-      rewardCount, Fin.val_castSucc, Fin.val_succ]
+      rewardCount]
     split_ifs with hrs
-    · have hi := i.is_lt
-      rw [max_eq_left hrs, max_eq_left (by omega), show H - (i : ℕ) = (H - ((i : ℕ) + 1)) + 1 by
-        omega]
+    · rw [max_eq_left hrs, max_eq_left (by omega), show H - m = (H - (m + 1)) + 1 by omega]
       push_cast
       ring
     · rw [max_eq_right (by omega), max_eq_right (by omega)]
       ring
 
 /-- The exponential value of the bad state. -/
-lemma expValue_hardMDP_bad (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (m : Fin (H + 1)) :
-    expValue (hardMDP H β ε u) β π m (stateAt S 2) = 1 := by
-  induction m using Fin.reverseInduction with
-  | last => exact expValue_last _ _ _ _
-  | cast i ih =>
-    rw [expValue_castSucc _ β (integrable_exp_hardMDP β), expQ_of_hasRewardFn _ β
-      (hasRewardFn_hardMDP H β ε u), vecExp_hardMDP_transVec,
-      hardTransFun_absorbing hS (Or.inr rfl), integral_dirac, ih]
+lemma expValue_hardMDP_bad (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (m : ℕ) :
+    expValue (hardMDP H β ε u) H β π.extend m (stateAt S 2) = 1 := by
+  induction m using horizon_induction H with
+  | h0 m hm => exact expValue_of_le _ _ _ π.measurable_extend hm _
+  | hstep m hm ih =>
+    rw [expValue_succ _ _ _ rewardsIn_hardMDP π.measurable_extend hm, expQ_of_hasRewardFn _ _ _
+      (hasRewardFn_hardMDP H β ε u), hardMDP_trans_apply, hardTransFun_absorbing hS (Or.inr rfl),
+      integral_dirac, ih]
     simp [hardReward, sIdx_stateAt (show 2 < Fintype.card S by omega)]
 
 omit [Nonempty A] [MeasurableSpace S] [MeasurableSingletonClass S] [MeasurableSpace A]
   [MeasurableSingletonClass A] in
 lemma hardReward_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S) (hA : 2 ≤ Fintype.card A)
     (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H) {m : ℕ} (hm : m ≤ arrival π)
-    (h : Fin H) (a : A) : hardReward H h (stateAt S (pathIdx π m)) a = 0 := by
+    (h : ℕ) (a : A) : hardReward H h (stateAt S (pathIdx π m)) a = 0 := by
   have hlt := pathIdx_lt π hS hA hH hm
   have hne : pathIdx π m ≠ 1 := by
     rcases pathInv_of_le_arrival π hS hA hH hm with ⟨h0, -⟩ | ⟨h3, -, -⟩ <;> omega
@@ -545,8 +526,7 @@ value of `π` is `1 + p (e^{β H'} - 1)` with `p` its success probability. -/
 lemma expValue_hardMDP_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     (hA : 2 ≤ Fintype.card A) (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H)
     (m : ℕ) (hm : m ≤ arrival π) :
-    expValue (hardMDP H β ε u) β π ⟨m, by have := arrival_lt_H π hS hA hH; omega⟩
-        (stateAt S (pathIdx π m))
+    expValue (hardMDP H β ε u) H β π.extend m (stateAt S (pathIdx π m))
       = hardZ β (effHorizon (Fintype.card S) (Fintype.card A) H) (succProb β ε H u π) := by
   have harr := arrival_lt_H π hS hA hH
   have hlt := arrival_lt π hS hA hH
@@ -554,32 +534,27 @@ lemma expValue_hardMDP_path (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
   induction n generalizing m with
   | zero =>
     obtain rfl : m = arrival π := by omega
-    have hcs : (⟨arrival π, by omega⟩ : Fin (H + 1)) = (⟨arrival π, harr⟩ : Fin H).castSucc := rfl
-    rw [hcs, expValue_castSucc _ β (integrable_exp_hardMDP β), expQ_of_hasRewardFn _ β
-      (hasRewardFn_hardMDP H β ε u), vecExp_hardMDP_transVec, hardReward_path π hS hA hH le_rfl,
-      mul_zero, Real.exp_zero, one_mul]
-    change ∫ s', expValue (hardMDP H β ε u) β π ⟨arrival π + 1, by omega⟩ s'
-      ∂hardTransFun H β ε u (arrival π) _ (π ⟨arrival π, harr⟩ _) = _
-    rw [hardTransFun_arrival π hS hA hH, integral_bernoulliMeasure,
-      expValue_hardMDP_good π hS, expValue_hardMDP_bad π hS]
+    rw [expValue_succ _ _ _ rewardsIn_hardMDP π.measurable_extend harr, expQ_of_hasRewardFn _ _ _
+      (hasRewardFn_hardMDP H β ε u), hardReward_path π hS hA hH le_rfl, mul_zero, Real.exp_zero,
+      one_mul, hardMDP_trans_apply, Policy.extend_of_lt π harr,
+      hardTransFun_arrival π hS hA hH, integral_bernoulliMeasure, expValue_hardMDP_good π hS,
+      expValue_hardMDP_bad π hS]
     simp only [rewardCount, hardZ, smul_eq_mul, succProb, effHorizon]
     rw [max_eq_right (by omega), Nat.sub_sub]
     ring
   | succ n ih =>
     have hmlt : m < arrival π := by omega
-    have hcs : (⟨m, by omega⟩ : Fin (H + 1)) = (⟨m, by omega⟩ : Fin H).castSucc := rfl
-    rw [hcs, expValue_castSucc _ β (integrable_exp_hardMDP β), expQ_of_hasRewardFn _ β
-      (hasRewardFn_hardMDP H β ε u), vecExp_hardMDP_transVec, hardReward_path π hS hA hH hm,
-      mul_zero, Real.exp_zero, one_mul]
-    change ∫ s', expValue (hardMDP H β ε u) β π ⟨m + 1, by omega⟩ s'
-      ∂hardTransFun H β ε u m _ (π ⟨m, by omega⟩ _) = _
-    rw [hardTransFun_path π hS hA hH hmlt, integral_dirac]
+    have hmH : m < H := by omega
+    rw [expValue_succ _ _ _ rewardsIn_hardMDP π.measurable_extend hmH, expQ_of_hasRewardFn _ _ _
+      (hasRewardFn_hardMDP H β ε u), hardReward_path π hS hA hH hm, mul_zero, Real.exp_zero,
+      one_mul, hardMDP_trans_apply, Policy.extend_of_lt π hmH,
+      hardTransFun_path π hS hA hH hmlt, integral_dirac]
     exact ih (m + 1) (by omega) (by omega)
 
 /-- The exponential value of a policy from the waiting state at the first step. -/
 lemma expValue_hardMDP_start (π : Policy S A H) (hS : 6 ≤ Fintype.card S)
     (hA : 2 ≤ Fintype.card A) (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H) :
-    expValue (hardMDP H β ε u) β π (startStep H) (stateAt S 0)
+    expValue (hardMDP H β ε u) H β π.extend 0 (stateAt S 0)
       = hardZ β (effHorizon (Fintype.card S) (Fintype.card A) H) (succProb β ε H u π) :=
   expValue_hardMDP_path π hS hA hH 0 (Nat.zero_le _)
 
@@ -731,65 +706,73 @@ lemma lt_optEntropicValue_sub_entropicValue_hardMDP (hS : 6 ≤ Fintype.card S)
     (hcond : ConditionA β (effHorizon (Fintype.card S) (Fintype.card A) H) ε)
     {t : ℕ × ℕ × ℕ} (ht : t ∈ hardTriples (Fintype.card S) (Fintype.card A) H)
     (π : Policy S A H) (hπ : hardTriple π ≠ t) :
-    ε < optEntropicValue (hardMDP (A := A) H β ε (some t)) β (startStep H) (stateAt S 0)
-      - entropicValue (hardMDP H β ε (some t)) β π (startStep H) (stateAt S 0) := by
+    ε < optEntropicValue (hardMDP (A := A) H β ε (some t)) H β 0 (stateAt S 0)
+      - entropicValue (hardMDP H β ε (some t)) H β π.extend 0 (stateAt S 0) := by
   set M := hardMDP (S := S) (A := A) H β ε (some t)
   set H' := effHorizon (Fintype.card S) (Fintype.card A) H
   obtain ⟨hp0, hp01, -, hp1, -⟩ := hardParams_valid hβ hH' hε hcond
-  have hZ : ∀ π', expValue M β π' (startStep H) (stateAt S 0)
+  have hR : M.RewardsIn (Set.Icc 0 1) := rewardsIn_hardMDP
+  have hZ : ∀ π' : Policy S A H, expValue M H β π'.extend 0 (stateAt S 0)
       = hardZ β H' (if some t = some (hardTriple π') then hardPPlus β H' ε
         else hardPMinus β H') := by
     intro π'
     rw [expValue_hardMDP_start π' hS hA hH, coe_succProb hβ hε hH' hcond]
-  have hZpos : ∀ π', 0 < expValue M β π' (startStep H) (stateAt S 0) :=
-    fun π' ↦ expValue_pos M β (integrable_exp_hardMDP β) π' _ _
+  have hZpos : ∀ π' : ℕ → S → A, (∀ k, Measurable (π' k)) →
+      0 < expValue M H β π' 0 (stateAt S 0) :=
+    fun _ hπ' ↦ expValue_pos M H β hR hπ' _ _
   obtain ⟨πu, hπu⟩ := exists_hardTriple_eq hS hA hH ht
-  have hZu : expValue M β πu (startStep H) (stateAt S 0) = hardZ β H' (hardPPlus β H' ε) := by
+  have hZu : expValue M H β πu.extend 0 (stateAt S 0) = hardZ β H' (hardPPlus β H' ε) := by
     rw [hZ]
     simp [hπu]
-  have hZπ : expValue M β π (startStep H) (stateAt S 0) = hardZ β H' (hardPMinus β H') := by
+  have hZπ : expValue M H β π.extend 0 (stateAt S 0) = hardZ β H' (hardPMinus β H') := by
     have hne : t ≠ hardTriple π := fun h ↦ hπ h.symm
     rw [hZ]
     simp [hne]
   have hgap := lt_inv_mul_log_hardZ_div hβ hH' hε
   have hzp := hardZ_pos (β := β) (H' := H') (by linarith : 0 ≤ hardPPlus β H' ε) hp1.le
   have hzm := hardZ_pos (β := β) (H' := H') hp0.le (by linarith : hardPMinus β H' ≤ 1)
-  have hZstar : optExpValue M β (startStep H) (stateAt S 0) = hardZ β H' (hardPPlus β H' ε) := by
-    obtain ⟨π₀, hπ₀⟩ := exists_expValue_eq_optExpValue M β hβ hZpos
-    rw [← hπ₀, hZ]
+  have hZstar : optExpValue M H β 0 (stateAt S 0) = hardZ β H' (hardPPlus β H' ε) := by
+    obtain ⟨π₀, hπ₀m, hπ₀⟩ := exists_expValue_eq_optExpValue M H β hR hβ 0 (stateAt S 0)
+    -- the optimal policy restricted to the horizon
+    set π₀' : Policy S A H := fun k s ↦ π₀ k s with hπ₀'
+    have hcongr : expValue M H β π₀ 0 (stateAt S 0)
+        = expValue M H β π₀'.extend 0 (stateAt S 0) :=
+      expValue_congr M H β hR hπ₀m π₀'.measurable_extend
+        (fun k hk ↦ by funext s; rw [Policy.extend_of_lt _ hk]) 0 _
+    rw [← hπ₀, hcongr, hZ]
     split_ifs with h
     · rfl
     · exfalso
-      have hZ₀ : optExpValue M β (startStep H) (stateAt S 0) = hardZ β H' (hardPMinus β H') := by
-        rw [← hπ₀, hZ]
+      have hZ₀ : optExpValue M H β 0 (stateAt S 0) = hardZ β H' (hardPMinus β H') := by
+        rw [← hπ₀, hcongr, hZ]
         simp only [h, ↓reduceIte]
       rcases hβ.lt_or_gt with hneg | hpos
-      · have hle := optExpValue_le_expValue M β hneg (hZpos πu)
+      · have hle := optExpValue_le_expValue M H β hR hneg πu.measurable_extend 0 (stateAt S 0)
         rw [hZ₀, hZu] at hle
         have hlog : 0 ≤ Real.log (hardZ β H' (hardPPlus β H' ε) / hardZ β H' (hardPMinus β H')) :=
           Real.log_nonneg ((one_le_div hzm).2 hle)
         have : β⁻¹ * Real.log (hardZ β H' (hardPPlus β H' ε) / hardZ β H' (hardPMinus β H')) ≤ 0 :=
           mul_nonpos_of_nonpos_of_nonneg (inv_nonpos.2 hneg.le) hlog
         linarith
-      · have hle := expValue_le_optExpValue M β hpos (hZpos πu)
+      · have hle := expValue_le_optExpValue M H β hR hpos πu.measurable_extend 0 (stateAt S 0)
         rw [hZ₀, hZu] at hle
         have hlog : Real.log (hardZ β H' (hardPPlus β H' ε) / hardZ β H' (hardPMinus β H')) ≤ 0 :=
           Real.log_nonpos (by positivity) ((div_le_one hzm).2 hle)
         have : β⁻¹ * Real.log (hardZ β H' (hardPPlus β H' ε) / hardZ β H' (hardPMinus β H')) ≤ 0 :=
           mul_nonpos_of_nonneg_of_nonpos (inv_nonneg.2 hpos.le) hlog
         linarith
-  rw [optEntropicValue_sub_entropicValue M β hβ (hZpos π), hZstar, hZπ]
+  rw [optEntropicValue_sub_entropicValue M H β hβ (hZpos π.extend π.measurable_extend), hZstar, hZπ]
   exact hgap
 
 /-- The maximal return of the hard instances is at most the effective horizon. -/
 lemma maxReturn_hardMDP_le (hS : 6 ≤ Fintype.card S) (hA : 2 ≤ Fintype.card A)
     (hH : 3 * treeDepth (Fintype.card S) (Fintype.card A) ≤ H) (u : Option (ℕ × ℕ × ℕ)) :
-    maxReturn (hardMDP (A := A) H β ε u) (stateAt S 0)
+    maxReturn (hardMDP (A := A) H β ε u) H (stateAt S 0)
       ≤ effHorizon (Fintype.card S) (Fintype.card A) H := by
   set rs := H / 3 + treeDepth (Fintype.card S) (Fintype.card A)
   have hrs : rs ≤ H := by have := two_le_treeDepth hS hA; omega
   set c : ℕ → ℝ := fun k ↦ if rs ≤ k then 1 else 0
-  have hM : ∀ (k : Fin H) (s : S) (a : A), ∀ᵐ x ∂(hardMDP H β ε u).reward k (s, a),
+  have hM : ∀ (k : ℕ) (s : S) (a : A), ∀ᵐ x ∂(hardMDP H β ε u).reward k (s, a),
       x ∈ Set.Icc 0 (c k) := by
     intro k s a
     rw [hasRewardFn_hardMDP H β ε u k s a]
@@ -800,13 +783,14 @@ lemma maxReturn_hardMDP_le (hS : 6 ≤ Fintype.card S) (hA : 2 ≤ Fintype.card 
     · exact absurd h1.2 h2
     · simp
     · simp
-  have hsum : ∑ k ∈ Finset.Ico ((startStep H : Fin (H + 1)) : ℕ) H, c k
+  have hsum : ∑ k ∈ Finset.range H, c (0 + k)
       = effHorizon (Fintype.card S) (Fintype.card A) H := by
-    simp only [c, startStep, Finset.sum_boole]
-    rw [show (Finset.Ico 0 H).filter (fun k ↦ rs ≤ k) = Finset.Ico rs H by
+    simp only [c, Nat.zero_add, Finset.sum_boole]
+    rw [show (Finset.range H).filter (fun k ↦ rs ≤ k) = Finset.Ico rs H by
       ext k; simp; omega, Nat.card_Ico, effHorizon, Nat.sub_sub]
   refine ciSup_le fun π ↦ ?_
-  have hae := ae_episodeReturn_mem_Icc_sum (hardMDP H β ε u) π hM (startStep H) (stateAt S 0)
+  have := isProbabilityMeasure_stepLaw (hardMDP H β ε u) π.2 (stateAt S 0, 0)
+  have hae := ae_episodeReturn_mem_Icc_sum (hardMDP H β ε u) π.2 hM H 0 (stateAt S 0)
   rw [hsum] at hae
   exact essSup_le_of_ae_le _ (hae.mono fun _ hx ↦ hx.2)
     (Filter.isCoboundedUnder_le_of_eventually_le _ (hae.mono fun _ hx ↦ hx.1))

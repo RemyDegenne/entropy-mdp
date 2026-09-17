@@ -23,9 +23,10 @@ round and the state `s'` of the second round. Its integral form is
 
 The proof is by uniqueness of the trajectory law (`Kernel.hasLaw_trajMeasureFin`): the process
 obtained by prepending a round to a trajectory drawn from the policy kernel of the next state
-has the same conditional laws as the canonical trajectory. The state space is assumed countable
-with measurable singletons, which makes the policy kernel measurable for free; the general case
-follows from the measurability of `Kernel.traj` in its initial condition.
+has the same conditional laws as the canonical trajectory. The trajectory law is a kernel from
+the initial state for an arbitrary measurable state space (`policyKernel`): it is Mathlib's
+`Kernel.traj` of the step kernels after the first round (`iicStepKernel`, which do not depend on
+the initial state), composed with the law of the first round.
 -/
 
 @[expose] public section
@@ -157,18 +158,73 @@ lemma consRound_firstRoundState_shiftRound (x : ℕ → Round 𝓢 𝓐 𝓡) :
 
 /-! ### The policy kernel -/
 
-variable [Countable 𝓢] [MeasurableSingletonClass 𝓢]
+/-- The law of a round after the first one, given the previous rounds: the state is drawn from
+`M.P` at the last state-action pair, then the action `π s` and the reward. -/
+noncomputable def succStepKernel (n : ℕ) : Kernel (Hist 𝓢 𝓐 𝓡 (n + 1)) (Round 𝓢 𝓐 𝓡) :=
+  M.P.comap (lastObsAction n) (measurable_lastObsAction n)
+    ⊗ₖ Kernel.prodMkLeft (Hist 𝓢 𝓐 𝓡 (n + 1)) (actionRewardKernel M hπ)
 
-lemma measurable_policyMeasure : Measurable (M.policyMeasure π hπ) := measurable_of_countable _
+instance (n : ℕ) : IsMarkovKernel (succStepKernel M hπ n) := by
+  unfold succStepKernel; infer_instance
 
-/-- The trajectory law of the policy `π` as a kernel from the initial state. -/
+lemma succStepKernel_apply (n : ℕ) (h : Hist 𝓢 𝓐 𝓡 (n + 1)) :
+    succStepKernel M hπ n h = M.P (lastObsAction n h) ⊗ₘ actionRewardKernel M hπ := by
+  rw [succStepKernel, Kernel.compProd_apply_eq_compProd_sectR, Kernel.comap_apply,
+    Kernel.sectR_prodMkLeft]
+
+/-- The step kernels at rounds `n + 1` are `succStepKernel`, whatever the initial law. -/
+lemma stepKernel_policyAlg_env_succ_eq_succStepKernel (μ₀ : Measure 𝓢) [IsProbabilityMeasure μ₀]
+    (n : ℕ) : stepKernel (policyAlg π hπ) (M.env μ₀) (n + 1) = succStepKernel M hπ n := by
+  ext h : 1
+  rw [stepKernel_policyAlg_env_succ, succStepKernel_apply]
+
+/-- The kernels of the rounds after the first one, indexed as `Kernel.traj` requires. -/
+noncomputable def iicStepKernel (n : ℕ) :
+    Kernel (Π _ : Finset.Iic n, Round 𝓢 𝓐 𝓡) (Round 𝓢 𝓐 𝓡) :=
+  (succStepKernel M hπ n).comap (MeasurableEquiv.finSuccPiIic (fun _ ↦ Round 𝓢 𝓐 𝓡) n).symm
+    (MeasurableEquiv.measurable _)
+
+instance (n : ℕ) : IsMarkovKernel (iicStepKernel M hπ n) := by
+  unfold iicStepKernel; infer_instance
+
+lemma iicOfFin_stepKernel_policyAlg_env (μ₀ : Measure 𝓢) [IsProbabilityMeasure μ₀] :
+    Kernel.iicOfFin (X := fun _ ↦ Round 𝓢 𝓐 𝓡) (stepKernel (policyAlg π hπ) (M.env μ₀))
+      = iicStepKernel M hπ := by
+  funext n
+  rw [Kernel.iicOfFin, iicStepKernel, stepKernel_policyAlg_env_succ_eq_succStepKernel]
+
+lemma _root_.ProbabilityTheory.Kernel.traj_congr {X : ℕ → Type*} [∀ n, MeasurableSpace (X n)]
+    {κ₁ κ₂ : (n : ℕ) → Kernel (Π i : Finset.Iic n, X i) (X (n + 1))}
+    [∀ n, IsMarkovKernel (κ₁ n)] [∀ n, IsMarkovKernel (κ₂ n)] (h : κ₁ = κ₂) (a : ℕ) :
+    Kernel.traj κ₁ a = Kernel.traj κ₂ a := by
+  subst h; rfl
+
+/-- The trajectory law of the policy `π` as a kernel from the initial state: the trajectory
+kernel of the step kernels after the first round, composed with the law of the first round. -/
 noncomputable def policyKernel : Kernel 𝓢 (ℕ → Round 𝓢 𝓐 𝓡) :=
-  ⟨M.policyMeasure π hπ, measurable_policyMeasure M hπ⟩
+  Kernel.traj (iicStepKernel M hπ) 0
+    ∘ₖ (Kernel.id ⊗ₖ Kernel.prodMkLeft 𝓢 (actionRewardKernel M hπ)).map
+      (MeasurableEquiv.piUnique (fun _ : Finset.Iic 0 ↦ Round 𝓢 𝓐 𝓡)).symm
 
-@[simp] lemma policyKernel_apply (s : 𝓢) : policyKernel M hπ s = M.policyMeasure π hπ s := rfl
+@[simp] lemma policyKernel_apply (s : 𝓢) : policyKernel M hπ s = M.policyMeasure π hπ s := by
+  have : ∀ n, IsMarkovKernel (Kernel.iicOfFin (X := fun _ ↦ Round 𝓢 𝓐 𝓡)
+      (stepKernel (policyAlg π hπ) (M.env (Measure.dirac s))) n) := fun n ↦ by
+    unfold Kernel.iicOfFin; infer_instance
+  rw [policyKernel, Kernel.comp_apply, Kernel.map_apply _ (MeasurableEquiv.measurable _),
+    Kernel.compProd_apply_eq_compProd_sectR, Kernel.id_apply, Kernel.sectR_prodMkLeft,
+    policyMeasure, trajMeasure, Kernel.trajMeasureFin_def, Kernel.trajMeasure,
+    stepKernel_policyAlg_env_zero,
+    Kernel.traj_congr (iicOfFin_stepKernel_policyAlg_env M hπ (Measure.dirac s)).symm]
 
 instance : IsMarkovKernel (policyKernel M hπ) :=
-  ⟨fun s ↦ isProbabilityMeasure_policyMeasure M π hπ s⟩
+  ⟨fun s ↦ by rw [policyKernel_apply]; infer_instance⟩
+
+lemma coe_policyKernel : ⇑(policyKernel M hπ) = M.policyMeasure π hπ :=
+  funext (policyKernel_apply M hπ)
+
+/-- The trajectory law of a policy is a measurable function of the initial state. -/
+lemma measurable_policyMeasure : Measurable (M.policyMeasure π hπ) := by
+  rw [← coe_policyKernel]; exact (policyKernel M hπ).measurable
 
 lemma map_step_zero_policyKernel :
     (policyKernel M hπ).map (IT.step 0)
@@ -215,7 +271,6 @@ lemma hasLaw_consRound_zero :
     _ = _ := (Kernel.hasLaw_eval_zero_trajMeasureFin (X := fun _ ↦ Round 𝓢 𝓐 𝓡)
         (κ' := stepKernel (policyAlg π hπ) (M.env μ₀))).map_eq
 
-omit [Countable 𝓢] [MeasurableSingletonClass 𝓢] in
 /-- The state of the second round given the first round, under the trajectory law. -/
 lemma hasCondDistrib_obs_one_trajMeasure :
     HasCondDistrib (IT.obs 1) (fun x ↦ x 0) M.roundKernel
@@ -318,18 +373,33 @@ lemma map_consRound_shiftMeasure :
     · exact hasCondDistrib_consRound_succ_succ M hπ μ₀ m
   exact hlaw.map_eq
 
-/-- Almost surely under the auxiliary measure, the trajectory part starts from the given state. -/
-lemma ae_obs_zero_shiftMeasure :
-    ∀ᵐ p ∂(shiftMeasure M hπ μ₀), (p.2 0).obs = p.1.2 := by
-  rw [shiftMeasure, Measure.ae_compProd_iff (measurableSet_eq_fun
-    (f := fun p : (Round 𝓢 𝓐 𝓡 × 𝓢) × (ℕ → Round 𝓢 𝓐 𝓡) ↦ (p.2 0).obs) (g := fun p ↦ p.1.2)
-    (by fun_prop) (by fun_prop))]
-  refine Filter.Eventually.of_forall fun q ↦ ?_
+variable [MeasurableSingletonClass 𝓢]
+
+/-- Under the trajectory law from a state, the state of the first round is that state. -/
+lemma ae_obs_zero_policyMeasure (s : 𝓢) : ∀ᵐ x ∂(M.policyMeasure π hπ s), IT.obs 0 x = s :=
+  (IT.hasLaw_obs_zero (policyAlg π hπ) (M.env (Measure.dirac s))).ae_eq_of_dirac
+
+/-- Reading the first round, the state of the second round and the shift on a reconstructed
+trajectory gives back the auxiliary measure: the only difference is the state of the second
+round, which is the given state almost surely under the trajectory law from that state. -/
+lemma map_firstRoundState_shiftRound_consRound_shiftMeasure :
+    (shiftMeasure M hπ μ₀).map (fun p ↦ (firstRoundState (consRound p), shiftRound (consRound p)))
+      = shiftMeasure M hπ μ₀ := by
+  have hF : Measurable fun p : (Round 𝓢 𝓐 𝓡 × 𝓢) × (ℕ → Round 𝓢 𝓐 𝓡) ↦
+      (firstRoundState (consRound p), shiftRound (consRound p)) :=
+    (measurable_firstRoundState.prodMk measurable_shiftRound).comp measurable_consRound
+  ext T hT
+  rw [Measure.map_apply hF hT, shiftMeasure, Measure.compProd_apply (hT.preimage hF),
+    Measure.compProd_apply hT]
+  refine lintegral_congr fun q ↦ ?_
   rw [Kernel.prodMkLeft_apply, policyKernel_apply]
-  have h0 : HasLaw (IT.obs 0) (Measure.dirac q.2) (M.policyMeasure π hπ q.2) :=
-    IT.hasLaw_obs_zero (policyAlg π hπ) (M.env (Measure.dirac q.2))
-  filter_upwards [h0.ae_eq_of_dirac] with x hx
-  exact hx
+  refine measure_congr ?_
+  filter_upwards [ae_obs_zero_policyMeasure M hπ q.2] with y hy
+  have h1 : firstRoundState (consRound (q, y)) = q := by
+    rw [firstRoundState]
+    exact Prod.ext rfl hy
+  have h2 : shiftRound (consRound (q, y)) = y := rfl
+  simp only [Set.mem_preimage, h1, h2]
 
 /-- **Markov property** of the trajectory law of a stationary policy: under
 `trajMeasure (policyAlg π hπ) (M.env μ₀)`, the trajectory shifted by one round has conditional
@@ -339,10 +409,6 @@ lemma hasCondDistrib_shiftRound_trajMeasure :
       (Kernel.prodMkLeft (Round 𝓢 𝓐 𝓡) (policyKernel M hπ))
       (trajMeasure (policyAlg π hπ) (M.env μ₀)) := by
   refine ⟨(measurable_firstRoundState.prodMk measurable_shiftRound).aemeasurable, ?_⟩
-  have hae : ∀ᵐ p ∂(shiftMeasure M hπ μ₀),
-      (firstRoundState (consRound p), shiftRound (consRound p)) = p := by
-    filter_upwards [ae_obs_zero_shiftMeasure M hπ μ₀] with p hp
-    exact Prod.ext (Prod.ext rfl hp) (funext fun _ ↦ rfl)
   calc (trajMeasure (policyAlg π hπ) (M.env μ₀)).map (fun x ↦ (firstRoundState x, shiftRound x))
       = ((shiftMeasure M hπ μ₀).map consRound).map
           (fun x ↦ (firstRoundState x, shiftRound x)) := by
@@ -351,8 +417,68 @@ lemma hasCondDistrib_shiftRound_trajMeasure :
           (fun p ↦ (firstRoundState (consRound p), shiftRound (consRound p))) :=
         Measure.map_map (measurable_firstRoundState.prodMk measurable_shiftRound)
           measurable_consRound
-    _ = (shiftMeasure M hπ μ₀).map id := Measure.map_congr hae
-    _ = shiftMeasure M hπ μ₀ := Measure.map_id
+    _ = shiftMeasure M hπ μ₀ := map_firstRoundState_shiftRound_consRound_shiftMeasure M hπ μ₀
     _ = _ := by rw [shiftMeasure]
+
+end Learning.MDP
+
+namespace Learning.MDP
+
+variable {𝓢 𝓐 𝓡 : Type*} {m𝓢 : MeasurableSpace 𝓢} {m𝓐 : MeasurableSpace 𝓐}
+  {m𝓡 : MeasurableSpace 𝓡}
+
+/-! ### Shifts and prefixes of trajectories -/
+
+/-- The shift of a trajectory by `k` rounds. -/
+def shiftRounds (k : ℕ) (x : ℕ → Round 𝓢 𝓐 𝓡) (n : ℕ) : Round 𝓢 𝓐 𝓡 := x (n + k)
+
+/-- The shift by `k` rounds is measurable. -/
+@[fun_prop]
+lemma measurable_shiftRounds (k : ℕ) : Measurable (shiftRounds (𝓢 := 𝓢) (𝓐 := 𝓐) (𝓡 := 𝓡) k) :=
+  Measurable.of_eval fun _ ↦ measurable_pi_apply _
+
+/-- Shifting by `0` rounds does nothing. -/
+@[simp] lemma shiftRounds_zero (x : ℕ → Round 𝓢 𝓐 𝓡) : shiftRounds 0 x = x := rfl
+
+/-- Shifting by `k + 1` rounds is shifting by one round, then by `k` rounds. -/
+lemma shiftRounds_succ (k : ℕ) (x : ℕ → Round 𝓢 𝓐 𝓡) :
+    shiftRounds (k + 1) x = shiftRounds k (shiftRound x) := rfl
+
+/-- The first `k + 1` rounds are the first round followed by the first `k` rounds of the shifted
+trajectory. -/
+lemma hist_succ_eq_cons (k : ℕ) (x : ℕ → Round 𝓢 𝓐 𝓡) :
+    IT.hist (k + 1) x = Fin.cons (x 0) (IT.hist k (shiftRound x)) := by
+  funext i
+  refine Fin.cases rfl (fun j ↦ ?_) i
+  simp [IT.hist, shiftRound]
+
+omit m𝓢 m𝓐 m𝓡 in
+/-- Prepending a coordinate to a finite sequence is measurable. -/
+lemma measurable_finCons {X : Type*} {mX : MeasurableSpace X} {n : ℕ} :
+    Measurable fun p : X × (Fin n → X) ↦ (Fin.cons p.1 p.2 : Fin (n + 1) → X) := by
+  refine measurable_pi_iff.2 fun i ↦ ?_
+  refine Fin.cases ?_ (fun j ↦ ?_) i
+  · simpa using measurable_fst
+  · simp only [Fin.cons_succ]
+    exact (measurable_pi_apply j).comp measurable_snd
+
+omit m𝓢 m𝓐 m𝓡 in
+/-- Appending a coordinate to a finite sequence is measurable. -/
+lemma measurable_finSnoc {X : Type*} {mX : MeasurableSpace X} {n : ℕ} :
+    Measurable fun p : (Fin n → X) × X ↦ (Fin.snoc p.1 p.2 : Fin (n + 1) → X) := by
+  refine measurable_pi_iff.2 fun i ↦ ?_
+  refine Fin.lastCases ?_ (fun j ↦ ?_) i
+  · simp only [Fin.snoc_last]
+    exact measurable_snd
+  · simp only [Fin.snoc_castSucc]
+    exact (measurable_pi_apply j).comp measurable_fst
+
+/-- The first `k + 1` rounds are the first `k` rounds followed by the round `k`. -/
+lemma hist_succ_eq_snoc (k : ℕ) (x : ℕ → Round 𝓢 𝓐 𝓡) :
+    IT.hist (k + 1) x = Fin.snoc (IT.hist k x) (shiftRounds k x 0) := by
+  funext i
+  refine Fin.lastCases ?_ (fun j ↦ ?_) i
+  · simp [IT.hist, shiftRounds]
+  · simp [IT.hist]
 
 end Learning.MDP

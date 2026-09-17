@@ -148,9 +148,28 @@ status:
     blueprint statement used by the headline theorems is `\leanok` with its proof, and
     `lake exe checkdecls blueprint/lean_decls` passes. The statements and the definitions in
     their closure are unchanged since phase 1; the comparator challenges were regenerated (only
-    their import lists, namespace stubs and one `open` changed). Findings of phase 2 (hypotheses
+    their import lists, namespace stubs and one `open` changed), and
+    `scripts/comparator-verify.sh --insecure` passes for all three (the solution proves exactly
+    the challenged statements with the standard axioms, replayed through the Lean kernel). Findings of phase 2 (hypotheses
     that are not needed, slack in the constants, implicit assumptions of the paper's proofs) are
     listed in `notes/paper-errata.md`; library material to upstream in
     `notes/upstreaming-candidates.md`.
+
+    Generalization of the MDP library (2026-09-17). The finite-horizon MDP library was rewritten
+    in library generality (arbitrary measurable state and action spaces, `ℕ`-indexed steps
+    with the horizon as an argument of the values, policies `π : ℕ → S → A` unbundled from their
+    measurability (total definitions, lemmas with `hπ : ∀ h, Measurable (π h)`) and the
+    time-augmented stationary MDP `M.augmented : MDP (S × ℕ) A ℝ`, `policyKernel` through
+    Mathlib's `Kernel.traj`, bounded rewards `RewardsIn` instead of exponential-moment
+    hypotheses, occupancy measures and the entropic variances in integral form with tabular
+    corollaries; `notes/lean-design.md`, last section), and the paper files were adapted. The
+    headline statements changed accordingly, staying true to the paper: `entropicBPI H r β δ ε s₁`
+    takes the horizon explicitly, the reward function is `r : ℕ → S → A → ℝ`, the PAC property
+    compares the values of `π̂.extend` at the step `0`, the optimal value is the supremum over
+    the measurable policies, and Theorem 3 quantifies over
+    `EpisodicMDP S A` with `statesEnv M₀ H s₁` and `maxReturn M₀ H s₁`. All three theorems are
+    proved (no `sorry`, standard axioms), `lake build --wfail`, the linter and the blueprint
+    `\lean` tags pass; the comparator challenges were regenerated and `lake build Comparator`
+    passes, the full comparator run remains to be redone.
   sorry_count: 0
   sorry_in_definitions: 0

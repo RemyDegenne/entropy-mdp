@@ -24,20 +24,43 @@ list grows with phase 2.
     `notes/lean-design.md`.
 * `MDP/Vec.lean`: `vecExp`, `vecVar`, `transVec` (expectation and variance of a function under a
   probability vector on a finite type; transition probabilities of a kernel as a vector).
-* `MDP/Episodic.lean`: `EpisodicMDP` (transition and reward kernels per step, mirroring `MDP`),
-  `Policy`, `Traj`, the layered stationary MDP `layerMDP` and the trajectory law `stepLaw`
-  through `MDP.policyMeasure`, `episodeReturn`, `episodeStates`, `occupancy`, the episode
-  environment `statesEnv` (stationary, action = policy, feedback = state sequence) and `BPIAlg`.
-* `MDP/Entropic.lean`: exponential and entropic values, optimal values, entropic variances,
-  `maxReturn`, `IsEntropicPAC` (an `IdentAlg.IsPAC` over the class of MDPs with a fixed reward
-  function).
+* `MDP/Episodic.lean`: `EpisodicMDP` (`ℕ`-indexed transition and reward kernels, mirroring
+  `MDP`), unbundled policies `π : ℕ → S → A` (lemmas take `hπ : ∀ h, Measurable (π h)`), the
+  `H`-step policies `Policy`, `Traj` and their extension `Policy.extend`, the time-augmented
+  stationary MDP `augmented` with the stationary policy `augPolicy π`, and the total trajectory
+  law `stepLaw` through `MDP.policyMeasure` (`0` for a non-measurable policy), `episodeReturn`,
+  `episodeStates`, `occupancyMeasure`/`occupancy`, `statesLaw`, the episode environment
+  `statesEnv` (stationary, action = policy, feedback = state sequence) and `BPIAlg`.
+* `MDP/Entropic.lean`: exponential and entropic values with the horizon as an argument,
+  optimal values (suprema over measurable policies), entropic variances, `maxReturn`,
+  `IsEntropicPAC` (an `IdentAlg.IsPAC` over the class of MDPs with a fixed reward function).
+* `MDP/Values.lean` (2026-09-17): `horizon_induction`, the exponential Bellman equation
+  `expValue_succ` for bounded rewards, ranges, `expValue_congr` (the value of a policy only
+  depends on its first `H` steps), the optimal Bellman recursion `optExpValueRec` and its greedy
+  policy `optPolicy` attaining the supremum over all measurable policies
+  (`optEntropicValue_eq`, `optExpValue_succ_eq`, `optExpQ_le_optExpValue`, …), `maxReturn` bounds.
+* `MDP/StepLaw.lean`, `MDP/Occupancy.lean`, `MDP/StateSeq.lean` (2026-09-17): the Markov
+  property of `stepLaw` along one step and along `k` steps (`hasLaw_stepLaw_succ`,
+  `hasCondDistrib_shiftRounds_stepLaw`, `hasCondDistrib_obs_succ_hist_stepLaw`, …) on a state
+  space with `MeasurableSingletonClass` only; occupancy measures and their recursion
+  (`occupancyMeasure_eq_map`, `stateLawAt_succ`); the law of the state sequence
+  (`stateSeqLaw_succ`, `stateSeqLaw_eq_dirac_of_absorbing`).
+* `MDP/Unroll.lean`, `MDP/UnrollBounds.lean`, `MDP/EntropicVariance.lean` (2026-09-17): the
+  Markov property with multiplicative weights along the trajectory
+  (`integral_prod_mul_obs_succ`), the unrolling of backward recursive inequalities
+  (`integral_prod_mul_le_of_backward`, `le_sum_integral_of_backward_exp`), measurability and
+  bounds of the entropic variances, their Bellman recursion in integral form
+  (`entropicVarQ_eq_of_hasRewardFn`) and their telescoping to the variance of the exponentiated
+  return, and the Cauchy–Schwarz bound of the variance terms.
 * `MDP/Empirical.lean`: `EmpiricalModel` (visit counts, reward sums, transition counts as an
   additive monoid), models of an episode and of a history of rounds.
 
-* `MDP/Markov.lean` (phase 2): the Markov property of the trajectory law of a stationary policy
-  in an MDP with countable state space (`hasCondDistrib_shiftRound_trajMeasure`: the shifted
-  trajectory has conditional law `policyMeasure` of the next state given the first round and the
-  next state), the policy kernel `policyKernel`, the step kernels of `policyAlg` in `MDP.env`.
+* `MDP/Markov.lean` (phase 2, generalized 2026-09-17): the Markov property of the trajectory
+  law of a stationary policy in an MDP whose state space has measurable singletons
+  (`hasCondDistrib_shiftRound_trajMeasure`: the shifted trajectory has conditional law
+  `policyMeasure` of the next state given the first round and the next state), the policy
+  kernel `policyKernel` built with Mathlib's `Kernel.traj` from the step kernels
+  (`iicStepKernel`, `Kernel.traj_congr`), the step kernels of `policyAlg` in `MDP.env`.
 * `MDP/StepLaw.lean`, `MDP/Values.lean` (phase 2): the one-step law of the trajectory of a
   finite-horizon MDP (`hasLaw_stepLaw_castSucc`), terminal layer, return decomposition,
   exponential Bellman equations (Lebesgue and Bochner forms), ranges, optimal policy and optimal

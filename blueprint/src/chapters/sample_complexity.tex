@@ -348,7 +348,7 @@ project \texttt{colt-2026-83}, \texttt{LinearBandit.isPAC\_of\_forall\_isRun}). 
 direction is the one used by the lower bound (Lemma~\ref{lem:hard_pac_event}). The event
 $\{V^*_1(s_1) - V^{\mathrm{out}}_1(s_1) > \eps\}$ is measurable since the policy type is finite
 (discrete $\sigma$-algebra). The proof takes the second route: for $\mathcal M \in \mathcal M_r$, the canonical run
-\texttt{(entropicBPI r β δ ε s₁).isRun\_runMeasure (statesEnv M s₁)} (its observation process
+\texttt{(entropicBPI H r β δ ε s₁).isRun\_runMeasure (statesEnv M H s₁)} (its observation process
 \texttt{fun n ω ↦ IT.obs n ω.1} is definitionally \texttt{fun \_ \_ ↦ ()}, the observation type being
 \texttt{Unit}), \texttt{IsRun.hasLaw\_output} and \texttt{HasLaw.measureReal\_eq} turn the PAC property into
 the run statement \texttt{measureReal\_bad\_le\_of\_pos} or \texttt{measureReal\_bad\_le\_of\_neg}
